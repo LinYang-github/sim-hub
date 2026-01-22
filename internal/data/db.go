@@ -81,7 +81,6 @@ func seedBasicTypes(db *gorm.DB, configTypes []conf.ResourceType) {
 				SchemaDef:    ct.SchemaDef,
 				ViewerConf:   ct.ViewerConf,
 				ProcessConf:  ct.ProcessConf,
-				ProcessorCmd: ct.ProcessorCmd,
 				CategoryMode: ct.CategoryMode,
 			})
 		}

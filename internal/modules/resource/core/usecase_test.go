@@ -25,7 +25,7 @@ func setupTestUseCase() (*UseCase, *mocks.MockBlobStore, *mocks.MockSTSProvider,
 	mockStore := new(mocks.MockBlobStore)
 	mockSTS := new(mocks.MockSTSProvider)
 
-	uc := NewUseCase(d, mockStore, mockSTS, "test-bucket", nil)
+	uc := NewUseCase(d, mockStore, mockSTS, "test-bucket", nil, "combined", "http://localhost:30030", nil)
 	return uc, mockStore, mockSTS, db
 }
 

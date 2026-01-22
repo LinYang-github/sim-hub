@@ -15,9 +15,9 @@ type Module struct {
 	uc *core.UseCase
 }
 
-func NewModule(d *data.Data, store storage.MultipartBlobStore, stsProvider storage.SecurityTokenProvider, bucket string, natsClient *data.NATSClient) module.Module {
+func NewModule(d *data.Data, store storage.MultipartBlobStore, stsProvider storage.SecurityTokenProvider, bucket string, natsClient *data.NATSClient, role string, apiBaseURL string, handlers map[string]string) module.Module {
 	return &Module{
-		uc: core.NewUseCase(d, store, stsProvider, bucket, natsClient),
+		uc: core.NewUseCase(d, store, stsProvider, bucket, natsClient, role, apiBaseURL, handlers),
 	}
 }
 
@@ -42,6 +42,7 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 		resources.GET("/:id", m.GetResource)
 		resources.DELETE("/:id", m.DeleteResource)         // 新增：删除资源
 		resources.PATCH("/:id/tags", m.UpdateResourceTags) // 新增：更新标签
+		resources.PATCH("/:id/process-result", m.ReportProcessResult)
 	}
 
 	// /api/v1/categories 路径组
@@ -140,6 +141,22 @@ func (m *Module) GetResource(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, res)
+}
+
+// ReportProcessResult 处理由外部 Worker 回填的结果
+func (m *Module) ReportProcessResult(c *gin.Context) {
+	id := c.Param("id")
+	var req core.ProcessResultRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := m.uc.ReportProcessResult(c.Request.Context(), id, req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Result reported"})
 }
 
 // ListResources 列出资源

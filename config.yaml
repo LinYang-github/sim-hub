@@ -22,7 +22,6 @@ resource_types:
       mode: "2D"
     process_conf:
       pipeline: ["gdal_retile"]
-    processor_cmd: ""
     category_mode: "tree"
   - type_key: "model_glb"
     type_name: "3D 模型 (GLB)"
@@ -35,7 +34,6 @@ resource_types:
       component: "ThreeViewer"
     process_conf:
       pipeline: ["model_optimizer"]
-    processor_cmd: ""
     category_mode: "tree"
   - type_key: "scenario"
     type_name: "仿真想定 (ZIP)"
@@ -44,7 +42,6 @@ resource_types:
       properties:
         engine:
           type: "string"
-    processor_cmd: "./drivers/scenario-processor"
     category_mode: "flat"
 
 log:
@@ -60,3 +57,11 @@ nats:
   enabled: false
   url: "nats://localhost:4222"
   subject: "simhub.jobs"
+
+node_role: "combined"
+
+worker:
+  api_base_url: "http://localhost:30030"
+  handlers:
+    scenario: "./drivers/scenario-processor"
+    map_terrain: "" # 留空表示该节点暂不支持处理此类型

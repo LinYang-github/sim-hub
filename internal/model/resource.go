@@ -14,7 +14,6 @@ type ResourceType struct {
 	SchemaDef    map[string]any `gorm:"serializer:json" json:"schema_def"`                    // 前端表单定义的 JSON Schema
 	ViewerConf   map[string]any `gorm:"serializer:json" json:"viewer_conf"`                   // 前端预览组件配置
 	ProcessConf  map[string]any `gorm:"serializer:json" json:"process_conf"`                  // 后端处理管线配置 (JSON)
-	ProcessorCmd string         `gorm:"type:varchar(255)" json:"processor_cmd"`               // 处理器执行指令 (如: /usr/bin/scenario-processor)
 	CategoryMode string         `gorm:"type:varchar(20);default:'flat'" json:"category_mode"` // "flat" 或 "tree"
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`

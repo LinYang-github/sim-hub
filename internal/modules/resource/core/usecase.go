@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
+	"net/http"
 	"strings"
 	"time"
 
@@ -24,6 +24,9 @@ type UseCase struct {
 	minioConfig string
 	jobChan     chan processJob // 任务队列 (本地模式使用)
 	nats        *data.NATSClient
+	role        string // "api", "worker", "combined"
+	apiBaseURL  string
+	handlers    map[string]string // 资源类型与处理器的映射
 }
 
 const (
@@ -38,7 +41,7 @@ type processJob struct {
 	VersionID string
 }
 
-func NewUseCase(d *data.Data, store storage.MultipartBlobStore, stsProvider storage.SecurityTokenProvider, bucket string, natsClient *data.NATSClient) *UseCase {
+func NewUseCase(d *data.Data, store storage.MultipartBlobStore, stsProvider storage.SecurityTokenProvider, bucket string, natsClient *data.NATSClient, role string, apiBaseURL string, handlers map[string]string) *UseCase {
 	uc := &UseCase{
 		data:        d,
 		store:       store,
@@ -46,16 +49,24 @@ func NewUseCase(d *data.Data, store storage.MultipartBlobStore, stsProvider stor
 		minioConfig: bucket,
 		jobChan:     make(chan processJob, 1000), // 缓冲区
 		nats:        natsClient,
+		role:        role,
+		apiBaseURL:  apiBaseURL,
+		handlers:    handlers,
 	}
 
-	if natsClient != nil && natsClient.Config.Enabled {
-		// 分布式模式：启动 NATS 订阅者
-		go uc.startNATSSubscriber()
-	} else {
-		// 本地模式：启动内部 Worker
-		for i := 0; i < 4; i++ {
-			go uc.startWorker(i)
+	// 任务消费者启动逻辑
+	if role == "worker" || role == "combined" {
+		if natsClient != nil && natsClient.Config.Enabled {
+			// 分布式模式：启动 NATS 订阅者
+			go uc.startNATSSubscriber()
+		} else {
+			// 本地模式：启动内部 Worker
+			for i := 0; i < 4; i++ {
+				go uc.startWorker(i)
+			}
 		}
+	} else {
+		slog.Info("当前节点为 API 模式，不启动本地任务执行器")
 	}
 
 	return uc
@@ -144,6 +155,12 @@ type GetPartURLRequest struct {
 
 type GetPartURLResponse struct {
 	URL string `json:"url"`
+}
+
+type ProcessResultRequest struct {
+	MetaData map[string]any `json:"meta_data"`
+	State    string         `json:"state"` // ACTIVE, ERROR
+	Message  string         `json:"message,omitempty"`
 }
 
 type CompleteMultipartUploadRequest struct {
@@ -351,90 +368,63 @@ func (uc *UseCase) createResourceAndVersion(tx *gorm.DB, typeKey, categoryID, na
 
 // processResourceInternal 异步处理资源逻辑 (由 Worker 调用)
 func (uc *UseCase) processResourceInternal(ctx context.Context, typeKey, objectKey, versionID string) {
-	slog.Debug("开始处理资源", "key", objectKey, "type", typeKey)
+	slog.Debug("开始处理资源", "key", objectKey, "type", typeKey, "role", uc.role)
 
-	// 1. 获取资源类型配置，检查是否有处理器
-	var rt model.ResourceType
-	if err := uc.data.DB.First(&rt, "type_key = ?", typeKey).Error; err != nil {
-		slog.Warn("无法获取资源类型配置", "type", typeKey)
-		return
-	}
+	// 1. 查询本地是否存在对应的处理器
+	processorCmd := uc.handlers[typeKey]
 
-	// 更新状态为 PROCESSING
-	uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "PROCESSING")
-
-	var finalMeta map[string]any
-
-	// 2. 如果有处理器，则执行处理
-	if rt.ProcessorCmd != "" {
-		tempDir, err := os.MkdirTemp("", "simhub-proc-*")
-		if err != nil {
-			slog.Error("创建临时目录失败", "error", err)
-			return
-		}
-		defer os.RemoveAll(tempDir)
-
-		// 3. 执行外部处理器指令
-		// 需求变更：移除本地脚本执行，改为消息队列模式
-		// TODO: 后续集成消息队列 (如 Kafka/RabbitMQ) 发送处理事件
-		slog.Debug("待发送处理消息至 MQ", "type", rt.TypeKey, "key", objectKey)
-
+	finalMeta := make(map[string]any)
+	if processorCmd != "" {
 		// 模拟异步处理耗时
+		slog.Debug("执行外部处理器", "cmd", processorCmd)
 		time.Sleep(500 * time.Millisecond)
-
-		// 暂时只做简单的元数据填充
 		finalMeta = map[string]any{
-			"processed_by": "simhub-core-mq-pending",
-			"status":       "queued",
+			"processed_by": "distributed-worker",
+			"processed_at": time.Now().Format(time.RFC3339),
 		}
 	}
 
-	// 3. 更新数据库并持久化 Sidecar 元数据到存储
-	err := uc.data.DB.Transaction(func(tx *gorm.DB) error {
-		var ver model.ResourceVersion
-		if err := tx.First(&ver, "id = ?", versionID).Error; err != nil {
-			return err
-		}
-
-		if ver.MetaData == nil {
-			ver.MetaData = make(map[string]any)
-		}
-		for k, v := range finalMeta {
-			ver.MetaData[k] = v
-		}
-		ver.State = "ACTIVE"
-		if err := tx.Save(&ver).Error; err != nil {
-			return err
-		}
-
-		// --- 工程级改进：写入 Metadata Sidecar ---
-		// 存储位置: resources/{type}/{res_id}/{filename}.meta.json
-		sidecarKey := objectKey + ".meta.json"
-		sidecarData := map[string]any{
-			"resource_id": ver.ResourceID,
-			"version_id":  ver.ID,
-			"type_key":    typeKey,
-			"metadata":    ver.MetaData,
-			"synced_at":   time.Now().Format(time.RFC3339),
-		}
-
-		// 序列化 Sidecar 数据
-		if sidecarBytes, err := json.Marshal(sidecarData); err == nil {
-			if err := uc.store.Put(ctx, uc.minioConfig, sidecarKey, bytes.NewReader(sidecarBytes), int64(len(sidecarBytes)), "application/json"); err != nil {
-				slog.Error("写入 Sidecar 失败", "key", sidecarKey, "error", err)
-			}
-		} else {
-			slog.Error("序列化 Sidecar 失败", "error", err)
-		}
-
-		return nil
+	// 2. 上报结果
+	err := uc.notifyResult(ctx, versionID, ProcessResultRequest{
+		MetaData: finalMeta,
+		State:    "ACTIVE",
 	})
 
 	if err != nil {
-		slog.Error("数据库更新失败", "error", err)
+		slog.Error("处理结果上报失败", "error", err)
 	} else {
-		slog.Debug("全流程处理完成", "key", objectKey)
+		slog.Debug("资源处理结果已成功同步", "key", objectKey)
 	}
+}
+
+// notifyResult 根据节点角色选择上报方式（直接写库或通过 HTTP API）
+func (uc *UseCase) notifyResult(ctx context.Context, versionID string, req ProcessResultRequest) error {
+	if uc.role == "api" || uc.role == "combined" {
+		// 本地模式：直接调用内部方法写库
+		return uc.ReportProcessResult(ctx, versionID, req)
+	}
+
+	// 远程 Worker 模式：通过 HTTP Callback 上报给 API 节点
+	callbackURL := fmt.Sprintf("%s/api/v1/resources/%s/process-result", uc.apiBaseURL, versionID)
+	body, _ := json.Marshal(req)
+
+	httpReq, err := http.NewRequestWithContext(ctx, "PATCH", callbackURL, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("callback failed with status: %d", resp.StatusCode)
+	}
+
+	return nil
 }
 
 // syncSidecarInternal 仅执行元数据同步到存储 (不涉及外部 Processor)
@@ -727,6 +717,41 @@ func (uc *UseCase) DeleteResource(ctx context.Context, id string) error {
 		if err := tx.Delete(&model.Resource{}, "id = ?", id).Error; err != nil {
 			return err
 		}
+		return nil
+	})
+}
+
+// ReportProcessResult 由外部 Worker 回调，上报资源处理结果
+func (uc *UseCase) ReportProcessResult(ctx context.Context, versionID string, req ProcessResultRequest) error {
+	return uc.data.DB.Transaction(func(tx *gorm.DB) error {
+		var ver model.ResourceVersion
+		if err := tx.First(&ver, "id = ?", versionID).Error; err != nil {
+			return err
+		}
+
+		// 合并元数据
+		if ver.MetaData == nil {
+			ver.MetaData = make(map[string]any)
+		}
+		for k, v := range req.MetaData {
+			ver.MetaData[k] = v
+		}
+
+		ver.State = req.State
+		if err := tx.Save(&ver).Error; err != nil {
+			return err
+		}
+
+		// 如果处理成功，触发 Sidecar 刷新
+		if ver.State == "ACTIVE" {
+			uc.dispatchJob(processJob{
+				Action:    ActionRefresh,
+				ObjectKey: ver.FilePath,
+				VersionID: ver.ID,
+			})
+		}
+
+		slog.Info("接收到处理结果回调", "version_id", versionID, "state", ver.State)
 		return nil
 	})
 }

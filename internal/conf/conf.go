@@ -6,6 +6,13 @@ type Data struct {
 	ResourceTypes []ResourceType `mapstructure:"resource_types" json:"resource_types"`
 	Log           Log            `mapstructure:"log" json:"log"`
 	NATS          NATS           `mapstructure:"nats" json:"nats"`
+	NodeRole      string         `mapstructure:"node_role" json:"node_role"` // api, worker, combined
+	Worker        Worker         `mapstructure:"worker" json:"worker"`
+}
+
+type Worker struct {
+	ApiBaseURL string            `mapstructure:"api_base_url" json:"api_base_url"`
+	Handlers   map[string]string `mapstructure:"handlers" json:"handlers"` // 资源类型与本地处理器路径的映射
 }
 
 type NATS struct {
@@ -43,6 +50,5 @@ type ResourceType struct {
 	SchemaDef    map[string]any `mapstructure:"schema_def" json:"schema_def"`
 	ViewerConf   map[string]any `mapstructure:"viewer_conf" json:"viewer_conf"`
 	ProcessConf  map[string]any `mapstructure:"process_conf" json:"process_conf"`
-	ProcessorCmd string         `mapstructure:"processor_cmd" json:"processor_cmd"`
 	CategoryMode string         `mapstructure:"category_mode" json:"category_mode"` // "flat" or "tree"
 }

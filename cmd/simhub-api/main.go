@@ -73,7 +73,7 @@ func main() {
 
 	// 5. 业务模块注册
 	registry := module.NewRegistry()
-	registry.Register(resource.NewModule(dbConn, blobStore, stsProvider, cfg.MinIO.Bucket, natsClient))
+	registry.Register(resource.NewModule(dbConn, blobStore, stsProvider, cfg.MinIO.Bucket, natsClient, cfg.NodeRole, cfg.Worker.ApiBaseURL, cfg.Worker.Handlers))
 
 	// 6. 配置 HTTP 路由
 	r := gin.Default()
