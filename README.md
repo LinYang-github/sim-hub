@@ -102,11 +102,41 @@ resource_types:
 │   ├── model/          # 领域模型 (Resource, Category, Version)
 │   └── modules/        # 业务模块 (Resource Core Logic, Handlers)
 ├── pkg/
-│   └── sts/            # MinIO STS 安全令牌服务封装
+│   ├── storage/        # 统一存储抽象接口与 MinIO 实现
+│   └── logger/         # 结构化日志组件
 ├── sdk/
-│   └── cpp/            # C++ 客户端 SDK
+│   └── cpp/            # C++ 客户端 SDK (支持分片上传、自动重试)
+├── tests/
+│   └── stress/         # 系统压力测试工具
 └── web/                # Vue 3 前端工程
 ```
+
+## 🧪 测试体系 (Testing)
+
+项目建立了三位一体的质量保障体系：
+
+### 1. 单元测试 (Unit Tests)
+*   **Go 端**: 使用 `testify` + `sqlmock` / `insmemory-sqlite` 实现 `UseCase` 逻辑验证。
+    ```bash
+    go test ./internal/modules/resource/core/...
+    ```
+*   **C++ 端**: 使用 `GoogleTest` 实现 SDK 核心逻辑验证。
+    ```bash
+    cd sdk/cpp/build && ./tests/sdk_tests
+    ```
+
+### 2. 压力测试 (Stress Tests)
+*   **Go 实现**: 模拟高并发应用 Token 与列表查询。
+    ```bash
+    go run tests/stress/main.go -c 50 -d 30s
+    ```
+*   **C++ 实现**: 验证 SDK 在多线程下的稳定性。
+    ```bash
+    cd sdk/cpp/build && ./tests/sdk_stress_test
+    ```
+
+### 3. 集成测试 (Integration Tests - WIP)
+目前的集成测试通过 `examples` 目录下的示例程序手动完成。
 
 ## 🤝 贡献
 
