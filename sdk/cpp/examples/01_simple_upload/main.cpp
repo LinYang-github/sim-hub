@@ -3,6 +3,9 @@
 #include <fstream>
 
 int main() {
+    // 全局初始化 (必须只需调用一次)
+    simhub::Client::GlobalInit();
+
     simhub::Client client("http://localhost:30030");
 
     // 1. 准备上传请求 (默认模式为 presigned)
@@ -50,5 +53,6 @@ int main() {
         std::cerr << "确认失败" << std::endl;
     }
 
+    simhub::Client::GlobalCleanup();
     return 0;
 }

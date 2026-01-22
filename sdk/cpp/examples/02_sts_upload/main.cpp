@@ -13,6 +13,9 @@ int main() {
     Aws::InitAPI(options);
     {
 #endif
+        // 全局初始化 SimHub SDK
+        simhub::Client::GlobalInit();
+
         simhub::Client client("http://localhost:30030");
 
         std::string dummyFile = "sts_test.zip";
@@ -60,6 +63,8 @@ int main() {
         } else {
             std::cerr << "[STS] 上传失败" << std::endl;
         }
+
+        simhub::Client::GlobalCleanup();
 
 #ifdef USE_AWS_SDK
     }

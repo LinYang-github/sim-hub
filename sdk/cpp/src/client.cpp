@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <sys/stat.h>
+#include <mutex>
 
 #ifdef USE_AWS_SDK
 #include <aws/core/Aws.h>
@@ -66,13 +67,25 @@ public:
     }
 };
 
+static std::once_flag init_flag;
+
+void Client::GlobalInit() {
+    std::call_once(init_flag, []() {
+        curl_global_init(CURL_GLOBAL_ALL);
+    });
+}
+
+void Client::GlobalCleanup() {
+    curl_global_cleanup();
+}
+
 Client::Client(const std::string& baseUrl) : impl_(std::make_unique<ClientImpl>()) {
     impl_->baseUrl = baseUrl;
-    curl_global_init(CURL_GLOBAL_ALL);
+    // curl_global_init 被移除，由 GlobalInit 管理
 }
 
 Client::~Client() {
-    curl_global_cleanup();
+    // curl_global_cleanup 被移除，由 GlobalCleanup 管理
 }
 
 UploadTicket Client::requestUploadToken(const UploadTokenRequest& req) {

@@ -4,6 +4,7 @@
 #include "types.h"
 #include <memory>
 #include <functional>
+#include <mutex>
 
 namespace simhub {
 
@@ -14,6 +15,18 @@ class ClientImpl;
  */
 class Client {
 public:
+    /**
+     * 全局初始化 SDK (线程安全)
+     * 必须在程序启动时调用一次
+     */
+    static void GlobalInit();
+
+    /**
+     * 全局清理 SDK
+     * 必须在程序退出前调用一次
+     */
+    static void GlobalCleanup();
+
     /**
      * @param baseUrl 后端基础 URL (例如 http://localhost:30030)
      */
