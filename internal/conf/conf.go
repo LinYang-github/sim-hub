@@ -1,8 +1,9 @@
 package conf
 
 type Data struct {
-	Database Database `mapstructure:"database" json:"database"`
-	MinIO    MinIO    `mapstructure:"minio" json:"minio"`
+	Database      Database       `mapstructure:"database" json:"database"`
+	MinIO         MinIO          `mapstructure:"minio" json:"minio"`
+	ResourceTypes []ResourceType `mapstructure:"resource_types" json:"resource_types"`
 }
 
 type Database struct {
@@ -16,4 +17,13 @@ type MinIO struct {
 	SecretKey string `mapstructure:"secret_key" json:"secret_key"`
 	UseSSL    bool   `mapstructure:"use_ssl" json:"use_ssl"`
 	Bucket    string `mapstructure:"bucket" json:"bucket"`
+}
+
+type ResourceType struct {
+	TypeKey      string         `mapstructure:"type_key" json:"type_key"`
+	TypeName     string         `mapstructure:"type_name" json:"type_name"`
+	SchemaDef    map[string]any `mapstructure:"schema_def" json:"schema_def"`
+	ViewerConf   map[string]any `mapstructure:"viewer_conf" json:"viewer_conf"`
+	ProcessConf  map[string]any `mapstructure:"process_conf" json:"process_conf"`
+	ProcessorCmd string         `mapstructure:"processor_cmd" json:"processor_cmd"`
 }

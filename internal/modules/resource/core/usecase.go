@@ -4,6 +4,12 @@ import (
 	"context"
 	"time"
 
+	"encoding/json"
+	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+
 	"github.com/google/uuid"
 	"github.com/liny/sim-hub/internal/data"
 	"github.com/liny/sim-hub/internal/model"
@@ -61,6 +67,7 @@ type ResourceVersionDTO struct {
 	VersionNum  int            `json:"version_num"`
 	FileSize    int64          `json:"file_size"`
 	MetaData    map[string]any `json:"meta_data"`
+	State       string         `json:"state"`
 	DownloadURL string         `json:"download_url,omitempty"`
 }
 
@@ -104,8 +111,8 @@ func (uc *UseCase) RequestUploadToken(ctx context.Context, req ApplyUploadTokenR
 // ConfirmUpload 确认上传完成
 func (uc *UseCase) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) error {
 	objectKey := ""
-	if len(req.TicketID) > 36 {
-		objectKey = req.TicketID[37:]
+	if len(req.TicketID) > 38 {
+		objectKey = req.TicketID[38:]
 	}
 
 	return uc.data.DB.Transaction(func(tx *gorm.DB) error {
@@ -124,13 +131,109 @@ func (uc *UseCase) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) 
 			FilePath:   objectKey,
 			FileSize:   req.Size,
 			MetaData:   req.ExtraMeta,
-			State:      "ACTIVE",
+			State:      "PENDING",
 		}
 		if err := tx.Create(&ver).Error; err != nil {
 			return err
 		}
+
+		// 触发异步处理
+		go uc.asyncProcessResource(context.Background(), req.TypeKey, objectKey, ver.ID)
+
 		return nil
 	})
+}
+
+// asyncProcessResource 异步处理资源逻辑
+func (uc *UseCase) asyncProcessResource(ctx context.Context, typeKey, objectKey, versionID string) {
+	log.Printf("[Processor] 开始处理资源: %s (Type: %s)", objectKey, typeKey)
+
+	// 1. 获取资源类型配置，检查是否有处理器
+	var rt model.ResourceType
+	if err := uc.data.DB.First(&rt, "type_key = ?", typeKey).Error; err != nil {
+		log.Printf("[Processor] 无法获取资源类型配置: %v", err)
+		return
+	}
+
+	// 更新状态为 PROCESSING
+	uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "PROCESSING")
+
+	// 如果没有处理器指令，直接设为 ACTIVE
+	if rt.ProcessorCmd == "" {
+		log.Printf("[Processor] 无需处理器，直接设为 ACTIVE")
+		uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "ACTIVE")
+		return
+	}
+
+	// 2. 准备临时工作目录与文件
+	tempDir, err := os.MkdirTemp("", "simhub-proc-*")
+	if err != nil {
+		log.Printf("[Processor] 创建临时目录失败: %v", err)
+		return
+	}
+	defer os.RemoveAll(tempDir)
+
+	localFile := filepath.Join(tempDir, filepath.Base(objectKey))
+	err = uc.tokenVendor.FGetObject(ctx, uc.minioConfig, objectKey, localFile)
+	if err != nil {
+		log.Printf("[Processor] 下载文件失败: %v", err)
+		uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "FAILED")
+		return
+	}
+
+	// 3. 执行外部处理器指令
+	// 契约：处理器通过环境变量或参数接收文件路径，通过 stdout 输出 JSON
+	cmd := exec.Command(rt.ProcessorCmd, "--file", localFile)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("[Processor] 驱动执行失败: %v, Output: %s", err, string(output))
+		uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "FAILED")
+		return
+	}
+
+	// 4. 解析输出结果并回填元数据
+	var result struct {
+		Status   string         `json:"status"`
+		Metadata map[string]any `json:"metadata"`
+		Error    string         `json:"error"`
+	}
+
+	if err := json.Unmarshal(output, &result); err != nil {
+		log.Printf("[Processor] 无法解析驱动输出 (预期JSON): %v, 原输出: %s", err, string(output))
+		uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "FAILED")
+		return
+	}
+
+	if result.Status == "failed" {
+		log.Printf("[Processor] 驱动反馈失败: %s", result.Error)
+		uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "FAILED")
+		return
+	}
+
+	// 合并元数据
+	err = uc.data.DB.Transaction(func(tx *gorm.DB) error {
+		var ver model.ResourceVersion
+		if err := tx.First(&ver, "id = ?", versionID).Error; err != nil {
+			return err
+		}
+
+		// 合并原始 MetaData 和驱动解析出的 Metadata
+		if ver.MetaData == nil {
+			ver.MetaData = make(map[string]any)
+		}
+		for k, v := range result.Metadata {
+			ver.MetaData[k] = v
+		}
+
+		ver.State = "ACTIVE"
+		return tx.Save(&ver).Error
+	})
+
+	if err != nil {
+		log.Printf("[Processor] 更新数据库记录失败: %v", err)
+	} else {
+		log.Printf("[Processor] 处理完成，资源已激活: %s", objectKey)
+	}
 }
 
 // GetResource 获取资源详情
@@ -183,6 +286,10 @@ func (uc *UseCase) ListResources(ctx context.Context, typeKey string, page, size
 
 	cw := make([]*ResourceDTO, 0, len(resources))
 	for _, r := range resources {
+		// 获取最新版本以显示状态
+		var v model.ResourceVersion
+		uc.data.DB.Order("version_num desc").First(&v, "resource_id = ?", r.ID)
+
 		cw = append(cw, &ResourceDTO{
 			ID:        r.ID,
 			TypeKey:   r.TypeKey,
@@ -190,6 +297,11 @@ func (uc *UseCase) ListResources(ctx context.Context, typeKey string, page, size
 			OwnerID:   r.OwnerID,
 			Tags:      r.Tags,
 			CreatedAt: r.CreatedAt,
+			LatestVer: &ResourceVersionDTO{
+				VersionNum: v.VersionNum,
+				State:      v.State, // 这一行需要确保 DTO 有 State 字段
+				MetaData:   v.MetaData,
+			},
 		})
 	}
 	return cw, total, nil

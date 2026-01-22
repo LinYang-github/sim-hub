@@ -96,3 +96,8 @@ func (v *TokenVendor) GenerateDownloadURL(ctx context.Context, bucket, objectNam
 	}
 	return url.String(), nil
 }
+
+// FGetObject 下载对象到本地文件
+func (v *TokenVendor) FGetObject(ctx context.Context, bucket, objectName, filePath string) error {
+	return v.client.FGetObject(ctx, bucket, objectName, filePath, minio.GetObjectOptions{})
+}

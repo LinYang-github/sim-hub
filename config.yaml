@@ -8,3 +8,38 @@ minio:
   secret_key: "minioadmin"
   use_ssl: false
   bucket: "simhub-raw"
+
+resource_types:
+  - type_key: "map_terrain"
+    type_name: "地形图 (TIF)"
+    schema_def:
+      type: "object"
+      properties:
+        resolution:
+          type: "string"
+    viewer_conf:
+      component: "CesiumViewer"
+      mode: "2D"
+    process_conf:
+      pipeline: ["gdal_retile"]
+    processor_cmd: ""
+  - type_key: "model_glb"
+    type_name: "3D 模型 (GLB)"
+    schema_def:
+      type: "object"
+      properties:
+        poly_count:
+          type: "integer"
+    viewer_conf:
+      component: "ThreeViewer"
+    process_conf:
+      pipeline: ["model_optimizer"]
+    processor_cmd: ""
+  - type_key: "scenario"
+    type_name: "仿真想定 (ZIP)"
+    schema_def:
+      type: "object"
+      properties:
+        engine:
+          type: "string"
+    processor_cmd: "./drivers/scenario-processor"

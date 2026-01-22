@@ -9,13 +9,14 @@ import (
 
 // ResourceType 资源类型定义
 type ResourceType struct {
-	TypeKey     string    `gorm:"primaryKey;type:varchar(50)" json:"type_key"`
-	TypeName    string    `gorm:"type:varchar(100);not null" json:"type_name"`
-	SchemaDef   []byte    `gorm:"serializer:json" json:"schema_def"`   // 前端表单定义的 JSON Schema
-	ViewerConf  []byte    `gorm:"serializer:json" json:"viewer_conf"`  // 前端预览组件配置
-	ProcessConf []byte    `gorm:"serializer:json" json:"process_conf"` // 后端处理管线配置
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	TypeKey      string    `gorm:"primaryKey;type:varchar(50)" json:"type_key"`
+	TypeName     string    `gorm:"type:varchar(100);not null" json:"type_name"`
+	SchemaDef    []byte    `gorm:"serializer:json" json:"schema_def"`      // 前端表单定义的 JSON Schema
+	ViewerConf   []byte    `gorm:"serializer:json" json:"viewer_conf"`     // 前端预览组件配置
+	ProcessConf  []byte    `gorm:"serializer:json" json:"process_conf"`    // 后端处理管线配置 (JSON)
+	ProcessorCmd string    `gorm:"type:varchar(255)" json:"processor_cmd"` // 处理器执行指令 (如: /usr/bin/scenario-processor)
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // Resource 资源主表

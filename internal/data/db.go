@@ -1,6 +1,7 @@
 package data
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 
@@ -53,8 +54,8 @@ func NewData(c *conf.Data) (*Data, func(), error) {
 		return nil, nil, fmt.Errorf("数据库迁移失败: %w", err)
 	}
 
-	// 若表为空，则注入基础类型数据
-	seedBasicTypes(db)
+	// 从配置中注入基础类型数据
+	seedBasicTypes(db, c.ResourceTypes)
 
 	cleanup := func() {
 		log.Println("正在关闭数据资源连接")
@@ -67,28 +68,29 @@ func NewData(c *conf.Data) (*Data, func(), error) {
 	return &Data{DB: db}, cleanup, nil
 }
 
-// seedBasicTypes 注入基础资源类型定义
-func seedBasicTypes(db *gorm.DB) {
+// seedBasicTypes 从配置中注入基础资源类型定义
+func seedBasicTypes(db *gorm.DB, configTypes []conf.ResourceType) {
 	var count int64
 	db.Model(&model.ResourceType{}).Count(&count)
 	if count == 0 {
-		types := []model.ResourceType{
-			{
-				TypeKey:     "map_terrain",
-				TypeName:    "地形图 (TIF)",
-				SchemaDef:   []byte(`{"type": "object", "properties": {"resolution": {"type": "string"}}}`),
-				ViewerConf:  []byte(`{"component": "CesiumViewer", "mode": "2D"}`),
-				ProcessConf: []byte(`{"pipeline": ["gdal_retile"]}`),
-			},
-			{
-				TypeKey:     "model_glb",
-				TypeName:    "3D 模型 (GLB)",
-				SchemaDef:   []byte(`{"type": "object", "properties": {"poly_count": {"type": "integer"}}}`),
-				ViewerConf:  []byte(`{"component": "ThreeViewer"}`),
-				ProcessConf: []byte(`{"pipeline": ["model_optimizer"]}`),
-			},
+		var types []model.ResourceType
+		for _, ct := range configTypes {
+			sd, _ := json.Marshal(ct.SchemaDef)
+			vc, _ := json.Marshal(ct.ViewerConf)
+			pc, _ := json.Marshal(ct.ProcessConf)
+
+			types = append(types, model.ResourceType{
+				TypeKey:      ct.TypeKey,
+				TypeName:     ct.TypeName,
+				SchemaDef:    sd,
+				ViewerConf:   vc,
+				ProcessConf:  pc,
+				ProcessorCmd: ct.ProcessorCmd,
+			})
 		}
-		db.Create(&types)
-		log.Println("已注入基础资源类型")
+		if len(types) > 0 {
+			db.Create(&types)
+			log.Printf("已从配置注入 %d 条资源类型定义", len(types))
+		}
 	}
 }

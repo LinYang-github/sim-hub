@@ -1,6 +1,7 @@
 #include <simhub/client.h>
 #include <iostream>
 #include <fstream>
+#include <sys/stat.h>
 
 #ifdef USE_AWS_SDK
 #include <aws/core/Aws.h>
@@ -14,10 +15,12 @@ int main() {
 #endif
         simhub::Client client("http://localhost:30030");
 
+        std::string dummyFile = "sts_test.zip";
+        
         // 1. 请求 STS 凭证
         simhub::UploadTokenRequest req;
         req.resource_type = "scenario";
-        req.filename = "sts_test.zip";
+        req.filename = dummyFile;
         req.mode = "sts";
 
         std::cout << "[STS] 正在请求凭证..." << std::endl;
@@ -28,11 +31,16 @@ int main() {
             return 1;
         }
 
-        // 2. 模拟本地文件
-        std::string dummyFile = "sts_test.zip";
-        std::ofstream out(dummyFile);
-        out << "STS Upload Data via AWS SDK" << std::endl;
-        out.close();
+        // 2. 准备文件 (如果不存在则创建，用于演示)
+        struct stat buffer;
+        if (stat(dummyFile.c_str(), &buffer) != 0) {
+            std::ofstream out(dummyFile);
+            out << "STS Upload Data via AWS SDK" << std::endl;
+            out.close();
+            std::cout << "[STS] 已创建虚拟文件: " << dummyFile << std::endl;
+        } else {
+            std::cout << "[STS] 使用已存在的文件: " << dummyFile << std::endl;
+        }
 
         // 3. 执行 STS 上传 (调用 AWS SDK)
         std::cout << "[STS] 正在通过 AWS SDK 上传至: " << ticket.bucket << "/" << ticket.object_key << std::endl;

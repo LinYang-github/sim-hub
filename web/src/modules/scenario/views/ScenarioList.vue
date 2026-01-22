@@ -31,10 +31,38 @@
               v{{ scope.row.latest_version?.version_num || 1 }}
           </template>
       </el-table-column>
-      <el-table-column prop="created_at" label="创建时间" />
-      <el-table-column label="操作" width="200">
+      <el-table-column label="状态" width="120">
         <template #default="scope">
-          <el-button type="primary" link size="small" @click="download(scope.row)">下载 ZIP</el-button>
+          <el-tag :type="getStatusType(scope.row.latest_version?.state)">
+            {{ scope.row.latest_version?.state || 'UNKNOWN' }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="created_at" label="创建时间" />
+      <el-table-column type="expand" label="详情">
+        <template #default="scope">
+          <div style="padding: 10px">
+            <p v-if="scope.row.latest_version?.meta_data?.scenario_type">
+              <b>场景类型:</b> {{ scope.row.latest_version.meta_data.scenario_type }}
+            </p>
+            <p v-if="scope.row.latest_version?.meta_data?.estimated_duration">
+              <b>预估时长:</b> {{ scope.row.latest_version.meta_data.estimated_duration }}s
+            </p>
+            <p v-if="scope.row.latest_version?.meta_data?.files_count">
+              <b>文件数量:</b> {{ scope.row.latest_version.meta_data.files_count }}
+            </p>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="150">
+        <template #default="scope">
+          <el-button 
+            type="primary" 
+            link 
+            size="small" 
+            :disabled="scope.row.latest_version?.state !== 'ACTIVE'"
+            @click="download(scope.row)"
+          >下载</el-button>
           <el-button type="danger" link size="small">删除</el-button>
         </template>
       </el-table-column>
@@ -43,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { Upload, Refresh } from '@element-plus/icons-vue'
 import axios from 'axios'
 import JSZip from 'jszip'
@@ -172,7 +200,34 @@ const download = async (row: any) => {
     }
 }
 
-onMounted(fetchList)
+const getStatusType = (state: string) => {
+    switch (state) {
+        case 'ACTIVE': return 'success'
+        case 'PROCESSING': return 'warning'
+        case 'PENDING': return 'info'
+        case 'FAILED': return 'danger'
+        default: return 'info'
+    }
+}
+
+let pollInterval: any = null
+
+onMounted(() => {
+    fetchList()
+    // 开启轮询，每 3 秒刷新一次列表以获取处理状态
+    pollInterval = setInterval(() => {
+        const hasProcessing = scenarios.value.some((s: any) => 
+            s.latest_version?.state === 'PROCESSING' || s.latest_version?.state === 'PENDING'
+        )
+        if (hasProcessing) {
+            fetchList()
+        }
+    }, 3000)
+})
+
+onUnmounted(() => {
+    if (pollInterval) clearInterval(pollInterval)
+})
 </script>
 
 <style scoped>

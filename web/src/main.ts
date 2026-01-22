@@ -6,36 +6,35 @@ import App from './App.vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import Workstation from './components/Workstation.vue'
 import { moduleManager } from './core/moduleManager'
-import resourceModule from './modules/resource'
 import scenarioModule from './modules/scenario'
 
-// Register Built-in Modules Implementations
-moduleManager.registerImplementation(resourceModule)
+// 注册内部模块实现
 moduleManager.registerImplementation(scenarioModule)
 
 const routes = [
   { path: '/', component: Workstation },
-  // Module routes are added dynamically
 ]
 
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-})
-
-const app = createApp(App)
-app.use(ElementPlus, {
-  locale: zhCn,
-})
-app.use(router)
-
 const initApp = async () => {
-  // Load External Modules Config
+  const app = createApp(App)
+  
+  app.use(ElementPlus, {
+    locale: zhCn,
+  })
+
+  // 1. 加载模块配置（异步）
   await moduleManager.loadConfig('/modules.json')
   
-  // Install Modules (after router is ready & config loaded)
+  // 2. 初始化 Router
+  const router = createRouter({
+    history: createWebHistory(),
+    routes,
+  })
+
+  // 3. 安装已加载模块的路由
   moduleManager.install(app, router)
   
+  app.use(router)
   app.mount('#app')
 }
 
