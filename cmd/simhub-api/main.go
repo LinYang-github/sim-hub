@@ -45,7 +45,7 @@ func main() {
 	// NewTokenVendor expects *minio.Client, which is inside our wrapper
 	var tokenVendor *sts.TokenVendor
 	if minioClientWrapper != nil {
-		tokenVendor = sts.NewTokenVendor(minioClientWrapper.Client)
+		tokenVendor = sts.NewTokenVendor(minioClientWrapper.Client, cfg.MinIO.AccessKey, cfg.MinIO.SecretKey)
 	}
 
 	// 5. Module Registration

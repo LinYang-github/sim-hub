@@ -4,7 +4,7 @@ database:
 
 minio:
   endpoint: "localhost:9000"
-  access_key: "minio_admin"
-  secret_key: "minio_password"
+  access_key: "minioadmin"
+  secret_key: "minioadmin"
   use_ssl: false
   bucket: "simhub-raw"

@@ -27,6 +27,7 @@ type ApplyUploadTokenRequest struct {
 	Checksum     string `json:"checksum"`
 	Size         int64  `json:"size"`
 	Filename     string `json:"filename"`
+	Mode         string `json:"mode"` // "presigned" (default) or "sts"
 }
 
 type ConfirmUploadRequest struct {
@@ -42,6 +43,8 @@ type UploadTicket struct {
 	TicketID     string              `json:"ticket_id"`
 	PresignedURL string              `json:"presigned_url"`
 	Credentials  *sts.STSCredentials `json:"credentials,omitempty"`
+	Bucket       string              `json:"bucket,omitempty"`
+	ObjectKey    string              `json:"object_key,omitempty"`
 }
 
 type ResourceDTO struct {
@@ -67,6 +70,24 @@ func (uc *UseCase) RequestUploadToken(ctx context.Context, req ApplyUploadTokenR
 	// objectKey: resources/{type}/{uuid}/{filename}
 	objectKey := "resources/" + req.ResourceType + "/" + ticketID + "/" + req.Filename
 
+	if uc.tokenVendor == nil {
+		return nil, gorm.ErrInvalidDB // Or custom error "Storage Service Unavailable"
+	}
+
+	if req.Mode == "sts" {
+		creds, err := uc.tokenVendor.GenerateUploadToken(ctx, uc.minioConfig, objectKey, time.Hour)
+		if err != nil {
+			return nil, err
+		}
+		return &UploadTicket{
+			TicketID:    ticketID + "::" + objectKey,
+			Credentials: creds,
+			Bucket:      uc.minioConfig,
+			ObjectKey:   objectKey,
+		}, nil
+	}
+
+	// Default: Presigned URL
 	url, err := uc.tokenVendor.GeneratePresignedUpload(ctx, uc.minioConfig, objectKey, time.Hour)
 	if err != nil {
 		return nil, err

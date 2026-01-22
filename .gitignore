@@ -48,3 +48,13 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# C++ SDK Examples
+examples/cpp-sdk/**/build/
+examples/cpp-sdk/**/cmake-build-*/
+examples/cpp-sdk/**/*.o
+examples/cpp-sdk/**/simhub_cli
+examples/cpp-sdk/**/sts_example
+examples/cpp-sdk/**/sts_example_bin
+examples/cpp-sdk/**/*.zip
+examples/cpp-sdk/**/json.hpp

@@ -7,15 +7,22 @@ import (
 	"time"
 
 	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 // TokenVendor handles generation of temporary credentials
 type TokenVendor struct {
-	client *minio.Client
+	client    *minio.Client
+	accessKey string
+	secretKey string
 }
 
-func NewTokenVendor(client *minio.Client) *TokenVendor {
-	return &TokenVendor{client: client}
+func NewTokenVendor(client *minio.Client, ak, sk string) *TokenVendor {
+	return &TokenVendor{
+		client:    client,
+		accessKey: ak,
+		secretKey: sk,
+	}
 }
 
 type STSCredentials struct {
@@ -25,11 +32,49 @@ type STSCredentials struct {
 	Expiration   time.Time `json:"expiration"`
 }
 
-// GenerateUploadToken generates a temporary token for uploading a specific object
+// GenerateUploadToken generates a temporary token via STS AssumeRole
 func (v *TokenVendor) GenerateUploadToken(ctx context.Context, bucket, prefix string, duration time.Duration) (*STSCredentials, error) {
-	// Policy definition removed as it was unused in Presigned URL implementation
-	// Using MinIO Admin or core client... (omitted comments)
-	return nil, fmt.Errorf("STS implementation pending clearer IAM setup; Use PresignedURL for specific object upload")
+	// Use MinIO SDK's STSAssumeRole provider to generate credentials
+	// We act as the "Parent" using our long-term keys
+
+	stsOpts := credentials.STSAssumeRoleOptions{
+		AccessKey:       v.accessKey,
+		SecretKey:       v.secretKey,
+		DurationSeconds: int(duration.Seconds()),
+	}
+
+	// Create a provider targeting our own MinIO server
+	if v.client == nil {
+		fmt.Println("DEBUG: v.client is nil")
+		return nil, fmt.Errorf("minio client is nil")
+	}
+	u := v.client.EndpointURL()
+	if u == nil {
+		fmt.Println("DEBUG: EndpointURL returned nil")
+		return nil, fmt.Errorf("endpoint url is nil")
+	}
+	endpoint := u.String()
+	fmt.Printf("DEBUG: STS Endpoint: %s\n", endpoint)
+
+	sts, err := credentials.NewSTSAssumeRole(endpoint, stsOpts)
+	if err != nil {
+		fmt.Printf("DEBUG: NewSTSAssumeRole error: %v\n", err)
+		return nil, fmt.Errorf("failed to init STS provider: %w", err)
+	}
+
+	// Fetch the credentials
+	creds, err := sts.Get()
+	if err != nil {
+		fmt.Printf("DEBUG: sts.Get error: %v\n", err)
+		return nil, fmt.Errorf("failed to fetch STS credentials: %w", err)
+	}
+
+	return &STSCredentials{
+		AccessKey:    creds.AccessKeyID,
+		SecretKey:    creds.SecretAccessKey,
+		SessionToken: creds.SessionToken,
+		Expiration:   time.Now().Add(duration), // Approximation
+	}, nil
 }
 
 // GeneratePresignedUpload generates a PUT URL
