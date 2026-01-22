@@ -111,6 +111,11 @@ func (v *TokenVendor) ListObjects(ctx context.Context, bucket, prefix string) <-
 	})
 }
 
+// StatObject 获取对象元数据 (检查是否存在)
+func (v *TokenVendor) StatObject(ctx context.Context, bucket, objectName string) (minio.ObjectInfo, error) {
+	return v.client.StatObject(ctx, bucket, objectName, minio.StatObjectOptions{})
+}
+
 // RemoveObject 删除存储对象
 func (v *TokenVendor) RemoveObject(ctx context.Context, bucket, objectName string) error {
 	return v.client.RemoveObject(ctx, bucket, objectName, minio.RemoveObjectOptions{})

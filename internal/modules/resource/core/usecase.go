@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -158,6 +159,14 @@ func (uc *UseCase) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) 
 		objectKey = req.TicketID[38:]
 	}
 
+	// 0. 验证 MinIO 中对象是否存在
+	objInfo, err := uc.tokenVendor.StatObject(ctx, uc.minioConfig, objectKey)
+	if err != nil {
+		log.Printf("[Confirm] 无法获取对象信息 %s: %v", objectKey, err)
+		return fmt.Errorf("uploaded file not found: %w", err)
+	}
+	actualSize := objInfo.Size
+
 	return uc.data.DB.Transaction(func(tx *gorm.DB) error {
 		res := model.Resource{
 			TypeKey:    req.TypeKey,
@@ -174,7 +183,7 @@ func (uc *UseCase) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) 
 			ResourceID: res.ID,
 			VersionNum: 1,
 			FilePath:   objectKey,
-			FileSize:   req.Size,
+			FileSize:   actualSize, // 使用 MinIO 实际大小
 			MetaData:   req.ExtraMeta,
 			State:      "PENDING",
 		}
