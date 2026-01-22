@@ -21,13 +21,13 @@ func NewUseCase(d *data.Data, tv *sts.TokenVendor, bucket string) *UseCase {
 	return &UseCase{data: d, tokenVendor: tv, minioConfig: bucket}
 }
 
-// DTOs
+// DTOs 数据传输对象
 type ApplyUploadTokenRequest struct {
 	ResourceType string `json:"resource_type"`
 	Checksum     string `json:"checksum"`
 	Size         int64  `json:"size"`
 	Filename     string `json:"filename"`
-	Mode         string `json:"mode"` // "presigned" (default) or "sts"
+	Mode         string `json:"mode"` // "presigned" (默认) 或 "sts"
 }
 
 type ConfirmUploadRequest struct {
@@ -64,14 +64,16 @@ type ResourceVersionDTO struct {
 	DownloadURL string         `json:"download_url,omitempty"`
 }
 
-// Logic Methods
+// Logic Methods 业务逻辑方法
+
+// RequestUploadToken 请求上传令牌
 func (uc *UseCase) RequestUploadToken(ctx context.Context, req ApplyUploadTokenRequest) (*UploadTicket, error) {
 	ticketID := uuid.New().String()
-	// objectKey: resources/{type}/{uuid}/{filename}
+	// objectKey 格式: resources/{type}/{uuid}/{filename}
 	objectKey := "resources/" + req.ResourceType + "/" + ticketID + "/" + req.Filename
 
 	if uc.tokenVendor == nil {
-		return nil, gorm.ErrInvalidDB // Or custom error "Storage Service Unavailable"
+		return nil, gorm.ErrInvalidDB // 或者返回自定义错误 "Storage Service Unavailable"
 	}
 
 	if req.Mode == "sts" {
@@ -87,18 +89,19 @@ func (uc *UseCase) RequestUploadToken(ctx context.Context, req ApplyUploadTokenR
 		}, nil
 	}
 
-	// Default: Presigned URL
+	// 默认模式: 预签名 URL
 	url, err := uc.tokenVendor.GeneratePresignedUpload(ctx, uc.minioConfig, objectKey, time.Hour)
 	if err != nil {
 		return nil, err
 	}
 
 	return &UploadTicket{
-		TicketID:     ticketID + "::" + objectKey, // Simple storage for stateless verify (in prod use Redis)
+		TicketID:     ticketID + "::" + objectKey, // 简易存储以实现无状态验证（生产环境建议使用 Redis）
 		PresignedURL: url,
 	}, nil
 }
 
+// ConfirmUpload 确认上传完成
 func (uc *UseCase) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) error {
 	objectKey := ""
 	if len(req.TicketID) > 36 {
@@ -130,6 +133,7 @@ func (uc *UseCase) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) 
 	})
 }
 
+// GetResource 获取资源详情
 func (uc *UseCase) GetResource(ctx context.Context, id string) (*ResourceDTO, error) {
 	var r model.Resource
 	if err := uc.data.DB.First(&r, "id = ?", id).Error; err != nil {
@@ -162,6 +166,7 @@ func (uc *UseCase) GetResource(ctx context.Context, id string) (*ResourceDTO, er
 	}, nil
 }
 
+// ListResources 列出资源
 func (uc *UseCase) ListResources(ctx context.Context, typeKey string, page, size int) ([]*ResourceDTO, int64, error) {
 	var resources []model.Resource
 	var total int64

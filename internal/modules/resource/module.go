@@ -10,7 +10,7 @@ import (
 	"github.com/liny/sim-hub/pkg/sts"
 )
 
-// Module implements module.Module
+// Module 实现了 module.Module 接口
 type Module struct {
 	uc *core.UseCase
 }
@@ -22,14 +22,14 @@ func NewModule(d *data.Data, tv *sts.TokenVendor, bucket string) module.Module {
 }
 
 func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
-	// /api/v1/integration/upload/...
+	// /api/v1/integration/upload/... 路径组
 	integration := g.Group("/integration")
 	{
 		integration.POST("/upload/token", m.ApplyUploadToken)
 		integration.POST("/upload/confirm", m.ConfirmUpload)
 	}
 
-	// /api/v1/resources
+	// /api/v1/resources 路径组
 	resources := g.Group("/resources")
 	{
 		resources.GET("", m.ListResources)
@@ -37,6 +37,7 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 	}
 }
 
+// ApplyUploadToken 申请上传令牌
 func (m *Module) ApplyUploadToken(c *gin.Context) {
 	var req core.ApplyUploadTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -52,6 +53,7 @@ func (m *Module) ApplyUploadToken(c *gin.Context) {
 	c.JSON(http.StatusOK, ticket)
 }
 
+// ConfirmUpload 确认上传已完成
 func (m *Module) ConfirmUpload(c *gin.Context) {
 	var req core.ConfirmUploadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -66,6 +68,7 @@ func (m *Module) ConfirmUpload(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Processing started"})
 }
 
+// GetResource 获取资源详情
 func (m *Module) GetResource(c *gin.Context) {
 	id := c.Param("id")
 	res, err := m.uc.GetResource(c.Request.Context(), id)
@@ -76,9 +79,10 @@ func (m *Module) GetResource(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
+// ListResources 列出资源
 func (m *Module) ListResources(c *gin.Context) {
-	page := 1  // TODO: parse page from query
-	size := 20 // TODO: parse size from query
+	page := 1  // TODO: 从查询参数解析页码
+	size := 20 // TODO: 从查询参数解析每页大小
 	typeKey := c.Query("type")
 
 	list, total, err := m.uc.ListResources(c.Request.Context(), typeKey, page, size)

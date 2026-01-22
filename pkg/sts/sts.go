@@ -10,7 +10,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-// TokenVendor handles generation of temporary credentials
+// TokenVendor 处理临时凭证的生成
 type TokenVendor struct {
 	client    *minio.Client
 	accessKey string
@@ -32,10 +32,10 @@ type STSCredentials struct {
 	Expiration   time.Time `json:"expiration"`
 }
 
-// GenerateUploadToken generates a temporary token via STS AssumeRole
+// GenerateUploadToken 通过 STS AssumeRole 生成临时令牌
 func (v *TokenVendor) GenerateUploadToken(ctx context.Context, bucket, prefix string, duration time.Duration) (*STSCredentials, error) {
-	// Use MinIO SDK's STSAssumeRole provider to generate credentials
-	// We act as the "Parent" using our long-term keys
+	// 使用 MinIO SDK 的 STSAssumeRole 提供程序生成凭证
+	// 我们使用长期密钥作为“父级”进行操作
 
 	stsOpts := credentials.STSAssumeRoleOptions{
 		AccessKey:       v.accessKey,
@@ -43,29 +43,29 @@ func (v *TokenVendor) GenerateUploadToken(ctx context.Context, bucket, prefix st
 		DurationSeconds: int(duration.Seconds()),
 	}
 
-	// Create a provider targeting our own MinIO server
+	// 创建针对我们自己 MinIO 服务器的提供程序
 	if v.client == nil {
-		fmt.Println("DEBUG: v.client is nil")
+		fmt.Println("DEBUG: v.client 为 nil")
 		return nil, fmt.Errorf("minio client is nil")
 	}
 	u := v.client.EndpointURL()
 	if u == nil {
-		fmt.Println("DEBUG: EndpointURL returned nil")
+		fmt.Println("DEBUG: EndpointURL 返回了 nil")
 		return nil, fmt.Errorf("endpoint url is nil")
 	}
 	endpoint := u.String()
-	fmt.Printf("DEBUG: STS Endpoint: %s\n", endpoint)
+	fmt.Printf("DEBUG: STS 端点: %s\n", endpoint)
 
 	sts, err := credentials.NewSTSAssumeRole(endpoint, stsOpts)
 	if err != nil {
-		fmt.Printf("DEBUG: NewSTSAssumeRole error: %v\n", err)
+		fmt.Printf("DEBUG: NewSTSAssumeRole 错误: %v\n", err)
 		return nil, fmt.Errorf("failed to init STS provider: %w", err)
 	}
 
-	// Fetch the credentials
+	// 获取凭证
 	creds, err := sts.Get()
 	if err != nil {
-		fmt.Printf("DEBUG: sts.Get error: %v\n", err)
+		fmt.Printf("DEBUG: sts.Get 错误: %v\n", err)
 		return nil, fmt.Errorf("failed to fetch STS credentials: %w", err)
 	}
 
@@ -73,11 +73,11 @@ func (v *TokenVendor) GenerateUploadToken(ctx context.Context, bucket, prefix st
 		AccessKey:    creds.AccessKeyID,
 		SecretKey:    creds.SecretAccessKey,
 		SessionToken: creds.SessionToken,
-		Expiration:   time.Now().Add(duration), // Approximation
+		Expiration:   time.Now().Add(duration), // 近似值
 	}, nil
 }
 
-// GeneratePresignedUpload generates a PUT URL
+// GeneratePresignedUpload 生成一个 PUT URL
 func (v *TokenVendor) GeneratePresignedUpload(ctx context.Context, bucket, objectName string, expiry time.Duration) (string, error) {
 	url, err := v.client.PresignedPutObject(ctx, bucket, objectName, expiry)
 	if err != nil {
@@ -86,7 +86,7 @@ func (v *TokenVendor) GeneratePresignedUpload(ctx context.Context, bucket, objec
 	return url.String(), nil
 }
 
-// GenerateDownloadURL generates a GET URL
+// GenerateDownloadURL 生成一个 GET URL
 func (v *TokenVendor) GenerateDownloadURL(ctx context.Context, bucket, objectName string, expiry time.Duration) (string, error) {
 	reqParams := make(url.Values)
 	// reqParams.Set("response-content-disposition", "attachment; filename=\"your-filename.txt\"")

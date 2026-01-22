@@ -24,28 +24,27 @@ func NewMinIO(c *conf.MinIO) (*MinIOClient, error) {
 		return nil, err
 	}
 
-	// Check connection
+	// 连通性测试
 	if _, err := minioClient.ListBuckets(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to connect to minio: %w", err)
 	}
 
-	// Ensure bucket exists
+	// 确保存储桶 (Bucket) 已存在
 	ctx := context.Background()
 	exists, err := minioClient.BucketExists(ctx, c.Bucket)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check bucket existence: %w", err)
 	}
 	if !exists {
-		log.Printf("Bucket %s does not exist, attempting to create...", c.Bucket)
+		log.Printf("存储桶 %s 不存在，正在尝试创建...", c.Bucket)
 		err = minioClient.MakeBucket(ctx, c.Bucket, minio.MakeBucketOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create bucket: %w", err)
 		}
-		log.Printf("Bucket %s created successfully", c.Bucket)
+		log.Printf("存储桶 %s 创建成功", c.Bucket)
 
-		// Set policy to download (public read for processed/preview? or keep all private?)
-		// Spec says: MinIO 桶策略设置为 Private，仅通过 STS 或预签名 URL 访问。
-		// So no need to set public policy here.
+		// 说明：MinIO 桶策略默认为 Private，仅通过 STS 或预签名 URL 访问，
+		// 因此此处无需显式设置公共策略。
 	}
 
 	return &MinIOClient{

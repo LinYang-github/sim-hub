@@ -4,15 +4,15 @@ import { SimHubModule } from './types'
 import IframeContainer from './views/IframeContainer.vue'
 
 class ModuleManager {
-  // Configured (Active) Modules
+  // 已配置（活跃）的模块列表
   private activeModules: SimHubModule[] = []
   
-  // Available Code Implementations (Internal Modules)
+  // 可用的代码实现（内部模块映射表）
   private implementations: Map<string, SimHubModule> = new Map()
 
   /**
-   * Register a code module (Internal)
-   * This makes the module available to be activated by modules.json
+   * 注册代码模块实现（内部）
+   * 使该模块可以被 modules.json 中的配置激活
    */
   registerImplementation(module: SimHubModule) {
     this.implementations.set(module.key, module)
@@ -20,12 +20,12 @@ class ModuleManager {
 
   install(app: App, router: Router) {
     this.activeModules.forEach(m => {
-      // 1. Internal Routes
+      // 1. 内部路由注册
       if (m.routes) {
         m.routes.forEach(r => router.addRoute(r))
       }
 
-      // 2. External Routes (Auto-generate if iframe mode)
+      // 2. 外部路由注册 (若为 iframe 模式则自动生成容器路由)
       if (m.externalUrl && m.integrationMode === 'iframe') {
         router.addRoute({
           path: `/ext/${m.key}`,
@@ -38,16 +38,16 @@ class ModuleManager {
 
   getMenus() {
     return this.activeModules.flatMap(m => {
-      // Case 1: Explicit Menu (Internal) - Override label if config exists
+      // 情况 1: 显式菜单（内部模块）- 若配置中有 label 则进行覆盖
       if (m.menu) {
-          // If config provided a label, override the first menu item (Simple override logic)
+          // 若配置文件提供了 label，则覆盖菜单项的显示文本（简易覆盖逻辑）
           if (m.label && m.menu.length > 0) {
               return m.menu.map(item => ({ ...item, label: m.label }))
           }
           return m.menu
       }
 
-      // Case 2: Generated Menu (External)
+      // 情况 2: 生成的菜单（外部模块）
       if (m.externalUrl && m.label) {
         const path = m.integrationMode === 'new-tab' ? m.externalUrl : `/ext/${m.key}`
         return [{
@@ -63,33 +63,33 @@ class ModuleManager {
     try {
       const response = await fetch(url)
       if (!response.ok) {
-        console.warn(`Failed to load module config: ${response.statusText}`)
+        console.warn(`加载模块配置失败: ${response.statusText}`)
         return
       }
       const configItems: SimHubModule[] = await response.json()
       
-      this.activeModules = [] // Reset active modules
+      this.activeModules = [] // 重置活跃模块列表
 
       configItems.forEach(item => {
         if (item.integrationMode === 'internal') {
-            // Activate Internal Module
+            // 激活内部模块实现
             const impl = this.implementations.get(item.key)
             if (impl) {
-                // Merge config (label) into implementation
+                // 将配置项（如 label）合并到代码实现中
                 const merged = { ...impl, ...item } 
-                // Note: We keep impl routes/menu but override top-level props like label
+                // 注意：保留实现中的 routes/menu，但覆盖 label 等顶层属性
                 this.activeModules.push(merged)
             } else {
-                console.warn(`Internal module implementation '${item.key}' not found.`)
+                console.warn(`未找到内部模块 '${item.key}' 的代码实现。`)
             }
         } else {
-            // Activate External Module
+            // 激活外部模块
             this.activeModules.push(item)
         }
       })
-      console.log(`Loaded ${this.activeModules.length} active modules`)
+      console.log(`已成功加载 ${this.activeModules.length} 个活跃模块`)
     } catch (e) {
-      console.error("Failed to load module configuration", e)
+      console.error("加载模块配置时发生异常", e)
     }
   }
 }

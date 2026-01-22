@@ -18,7 +18,7 @@
       </div>
     </div>
 
-    <!-- Upload Progress -->
+    <!-- 上传进度展示 -->
     <div v-if="uploading" class="upload-status">
       <p v-if="compressing">正在打包文件夹: {{ currentFile }} ({{ progress }}%)</p>
       <el-progress v-else :percentage="uploadPercent" />
@@ -26,7 +26,7 @@
 
     <el-table :data="scenarios" style="width: 100%" v-loading="loading">
       <el-table-column prop="name" label="想定名称" />
-      <el-table-column prop="version" label="Ver">
+      <el-table-column prop="version" label="版本" width="80">
           <template #default="scope">
               v{{ scope.row.latest_version?.version_num || 1 }}
           </template>
@@ -57,6 +57,7 @@ const progress = ref(0)
 const uploadPercent = ref(0)
 const currentFile = ref('')
 
+// 获取资源列表
 const fetchList = async () => {
     loading.value = true
     try {
@@ -67,25 +68,28 @@ const fetchList = async () => {
     }
 }
 
+// 触发隐藏的文件夹输入框
 const triggerFolderUpload = () => {
     document.getElementById('folderInput')?.click()
 }
 
+// 处理文件夹选择
 const handleFolderSelect = async (event: Event) => {
     const input = event.target as HTMLInputElement
     if (!input.files || input.files.length === 0) return
 
     const files = Array.from(input.files)
-    // Assume root folder name is the scenario name
-    // files[0].webkitRelativePath e.g. "MyScenario/data.json"
+    // 假定根文件夹名称即为想定名称
+    // files[0].webkitRelativePath 示例: "MyScenario/data.json"
     const rootFolderName = files[0].webkitRelativePath.split('/')[0]
     
     await uploadFolderAsZip(rootFolderName, files)
     
-    // Reset input
+    // 重置输入框以便再次触发变更事件
     input.value = ''
 }
 
+// 将文件夹打包为 ZIP 并上传
 const uploadFolderAsZip = async (name: string, files: File[]) => {
     uploading.value = true
     compressing.value = true
@@ -93,18 +97,14 @@ const uploadFolderAsZip = async (name: string, files: File[]) => {
 
     try {
         const zip = new JSZip()
-        let processed = 0
         
-        // Add files to ZIP
+        // 将文件添加到 ZIP
         files.forEach(file => {
-            // Remove root folder from path to keep zip structure clean inside
-            // Or keep it? Let's keep relative path structure.
-            // But usually users expect zip content to be inside the folder?
-            // Let's store the relative path as is.
+            // 保留相对路径结构
             zip.file(file.webkitRelativePath, file)
         })
 
-        // Generate ZIP
+        // 生成 ZIP 二进制对象 (Blob)
         const content = await zip.generateAsync({ 
             type: 'blob',
             compression: 'DEFLATE',
@@ -115,31 +115,32 @@ const uploadFolderAsZip = async (name: string, files: File[]) => {
         })
 
         compressing.value = false
-        // Start Upload Process
+        // 开始上传流程
         await uploadZip(name, content)
         
         ElMessage.success('上传成功')
         fetchList()
     } catch (e: any) {
         console.error(e)
-        ElMessage.error('处理失败: ' + e.message)
+        ElMessage.error('处理失败: ' + (e.message || '未知错误'))
     } finally {
         uploading.value = false
     }
 }
 
+// 执行 ZIP 文件上传
 const uploadZip = async (name: string, blob: Blob) => {
-    // 1. Get Token
+    // 1. 获取上传令牌
     const res = await axios.post('/api/v1/integration/upload/token', {
         resource_type: 'scenario',
-        checksum: 'skip-for-now',
+        checksum: 'skip-for-now', // 暂时跳过校验码
         size: blob.size,
         filename: name + '.zip'
     })
     
     const { ticket_id, presigned_url } = res.data
 
-    // 2. Upload to MinIO
+    // 2. 直接上传到 MinIO
     await axios.put(presigned_url, blob, {
         headers: { 'Content-Type': 'application/zip' },
         onUploadProgress: (p) => {
@@ -149,17 +150,18 @@ const uploadZip = async (name: string, blob: Blob) => {
         }
     })
 
-    // 3. Confirm
+    // 3. 确认上传完成
     await axios.post('/api/v1/integration/upload/confirm', {
         ticket_id,
         type_key: 'scenario',
         name: name,
-        owner_id: 'admin', // mocked
+        owner_id: 'admin', // 模拟管理员 ID
         size: blob.size,
         extra_meta: {}
     })
 }
 
+// 处理下载请求
 const download = async (row: any) => {
     const res = await axios.get(`/api/v1/resources/${row.id}`)
     const url = res.data.latest_version?.download_url

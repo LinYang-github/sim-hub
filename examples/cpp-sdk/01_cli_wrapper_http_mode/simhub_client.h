@@ -23,7 +23,7 @@ private:
 public:
     SimHubClient(std::string url) : baseUrl(url) {}
 
-    // POST Request
+    // POST 请求
     json post(std::string endpoint, json body) {
         CURL* curl;
         CURLcode res;
@@ -45,10 +45,11 @@ public:
             curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
 
             long http_code = 0;
+            res = curl_easy_perform(curl);
             curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
             
             if(res != CURLE_OK) {
-                fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+                fprintf(stderr, "curl_easy_perform() 失败: %s\n", curl_easy_strerror(res));
                 return json{{"error", "Network error"}};
             }
 
@@ -58,14 +59,14 @@ public:
             try {
                 return json::parse(readBuffer);
             } catch (const std::exception& e) {
-                std::cerr << "JSON Parse Error on: " << readBuffer << std::endl;
+                std::cerr << "JSON 解析错误，内容为: " << readBuffer << std::endl;
                 return json{{"error", "Failed to parse response: " + readBuffer}};
             }
         }
         return json{{"error", "Failed to init curl"}};
     }
 
-    // PUT File (Upload)
+    // PUT 文件 (上传)
     bool uploadFile(std::string url, std::string filePath) {
         CURL* curl;
         CURLcode res;
@@ -93,52 +94,52 @@ public:
         return res == CURLE_OK;
     }
     
-    // Helper: Upload Scenario
+    // 辅助方法：上传场景
     void uploadScenario(std::string name, std::string zipPath) {
-        std::cout << "[Step 1] Requesting Upload Token for: " << name << std::endl;
+        std::cout << "[步骤 1] 正在请求上传令牌: " << name << std::endl;
         
-        // 1. Get Token
+        // 1. 获取令牌
         json reqToken = {
             {"resource_type", "scenario"},
             {"filename", name + ".zip"},
-            {"size", 0}, // Optional in MVP
+            {"size", 0}, // 在 MVP 版本中可选
             {"checksum", ""}
         };
         
         json resToken = post("/api/v1/integration/upload/token", reqToken);
         if (resToken.contains("error")) {
-            std::cerr << "Error getting token: " << resToken["error"] << std::endl;
+            std::cerr << "获取令牌错误: " << resToken["error"] << std::endl;
             return;
         }
 
         std::string ticketId = resToken["ticket_id"];
         std::string presignedUrl = resToken["presigned_url"];
         
-        std::cout << "[Step 2] Uploading file to storage..." << std::endl;
+        std::cout << "[步骤 2] 正在上传文件到存储..." << std::endl;
         
-        // 2. Upload to MinIO
+        // 2. 上传到 MinIO
         if (!uploadFile(presignedUrl, zipPath)) {
-            std::cerr << "Failed to upload file." << std::endl;
+            std::cerr << "文件上传失败。" << std::endl;
             return;
         }
-        std::cout << "Upload completed." << std::endl;
+        std::cout << "上传完成。" << std::endl;
 
-        // 3. Confirm
-        std::cout << "[Step 3] Confirming upload..." << std::endl;
+        // 3. 确认
+        std::cout << "[步骤 3] 正在确认上传..." << std::endl;
         json reqConfirm = {
             {"ticket_id", ticketId},
             {"type_key", "scenario"},
             {"name", name},
             {"owner_id", "cpp-client"},
-            {"size", 1024}, // Mock size
+            {"size", 1024}, // 虚拟大小
             {"extra_meta", {{"source", "cpp-sdk"}}}
         };
         
         json resConfirm = post("/api/v1/integration/upload/confirm", reqConfirm);
         if (resConfirm.contains("code") && resConfirm["code"] == 200) {
-            std::cout << "Success! Scenario registered." << std::endl;
+            std::cout << "成功！场景已注册。" << std::endl;
         } else {
-            std::cerr << "Confirmation failed." << std::endl;
+            std::cerr << "确认失败。" << std::endl;
         }
     }
 };
