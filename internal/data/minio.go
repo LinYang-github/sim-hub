@@ -3,7 +3,7 @@ package data
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/liny/sim-hub/internal/conf"
 	"github.com/minio/minio-go/v7"
@@ -36,12 +36,12 @@ func NewMinIO(c *conf.MinIO) (*MinIOClient, error) {
 		return nil, fmt.Errorf("failed to check bucket existence: %w", err)
 	}
 	if !exists {
-		log.Printf("存储桶 %s 不存在，正在尝试创建...", c.Bucket)
+		slog.Info("存储桶不存在，正在尝试创建", "bucket", c.Bucket)
 		err = minioClient.MakeBucket(ctx, c.Bucket, minio.MakeBucketOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create bucket: %w", err)
 		}
-		log.Printf("存储桶 %s 创建成功", c.Bucket)
+		slog.Info("存储桶创建成功", "bucket", c.Bucket)
 
 		// 说明：MinIO 桶策略默认为 Private，仅通过 STS 或预签名 URL 访问，
 		// 因此此处无需显式设置公共策略。

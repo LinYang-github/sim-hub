@@ -318,7 +318,7 @@ func (uc *UseCase) createResourceAndVersion(tx *gorm.DB, typeKey, categoryID, na
 
 // processResourceInternal 异步处理资源逻辑 (由 Worker 调用)
 func (uc *UseCase) processResourceInternal(ctx context.Context, typeKey, objectKey, versionID string) {
-	slog.Info("开始处理资源", "key", objectKey, "type", typeKey)
+	slog.Debug("开始处理资源", "key", objectKey, "type", typeKey)
 
 	// 1. 获取资源类型配置，检查是否有处理器
 	var rt model.ResourceType
@@ -344,7 +344,7 @@ func (uc *UseCase) processResourceInternal(ctx context.Context, typeKey, objectK
 		// 3. 执行外部处理器指令
 		// 需求变更：移除本地脚本执行，改为消息队列模式
 		// TODO: 后续集成消息队列 (如 Kafka/RabbitMQ) 发送处理事件
-		slog.Info("待发送处理消息至 MQ", "type", rt.TypeKey, "key", objectKey)
+		slog.Debug("待发送处理消息至 MQ", "type", rt.TypeKey, "key", objectKey)
 
 		// 模拟异步处理耗时
 		time.Sleep(500 * time.Millisecond)
@@ -388,10 +388,10 @@ func (uc *UseCase) processResourceInternal(ctx context.Context, typeKey, objectK
 		// 序列化 Sidecar 数据
 		if sidecarBytes, err := json.Marshal(sidecarData); err == nil {
 			if err := uc.store.Put(ctx, uc.minioConfig, sidecarKey, bytes.NewReader(sidecarBytes), int64(len(sidecarBytes)), "application/json"); err != nil {
-				slog.Warn("写入 Sidecar 失败", "key", sidecarKey, "error", err)
+				slog.Error("写入 Sidecar 失败", "key", sidecarKey, "error", err)
 			}
 		} else {
-			slog.Warn("序列化 Sidecar 失败", "error", err)
+			slog.Error("序列化 Sidecar 失败", "error", err)
 		}
 
 		return nil
@@ -400,7 +400,7 @@ func (uc *UseCase) processResourceInternal(ctx context.Context, typeKey, objectK
 	if err != nil {
 		slog.Error("数据库更新失败", "error", err)
 	} else {
-		slog.Info("全流程处理完成", "key", objectKey)
+		slog.Debug("全流程处理完成", "key", objectKey)
 	}
 }
 
@@ -427,7 +427,7 @@ func (uc *UseCase) syncSidecarInternal(ctx context.Context, objectKey, versionID
 
 	if sidecarBytes, err := json.Marshal(sidecarData); err == nil {
 		if err := uc.store.Put(ctx, uc.minioConfig, sidecarKey, bytes.NewReader(sidecarBytes), int64(len(sidecarBytes)), "application/json"); err != nil {
-			slog.Warn("更新 Sidecar 失败", "key", sidecarKey, "error", err)
+			slog.Error("更新 Sidecar 失败", "key", sidecarKey, "error", err)
 		} else {
 			slog.Debug("Sidecar 刷新成功", "key", sidecarKey)
 		}
