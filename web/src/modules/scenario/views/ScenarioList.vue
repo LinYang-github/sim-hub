@@ -42,6 +42,9 @@
           <el-button type="primary" @click="triggerFolderUpload">
             <el-icon><Upload /></el-icon> 上传想定包
           </el-button>
+          <el-button @click="syncFromStorage" :loading="syncing">
+            <el-icon><Connection /></el-icon> 同步 MinIO 文件
+          </el-button>
           <el-button @click="fetchList"><el-icon><Refresh /></el-icon></el-button>
         </div>
       </div>
@@ -143,7 +146,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { Upload, Refresh, Plus, Folder, FolderOpened, Delete, PriceTag } from '@element-plus/icons-vue'
+import { Upload, Refresh, Plus, Folder, FolderOpened, Delete, PriceTag, Connection } from '@element-plus/icons-vue'
 import axios from 'axios'
 import JSZip from 'jszip'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -169,6 +172,7 @@ interface Resource {
 const scenarios = ref<Resource[]>([])
 const categories = ref<Category[]>([])
 const loading = ref(false)
+const syncing = ref(false)
 const uploading = ref(false)
 const compressing = ref(false)
 const progress = ref(0)
@@ -239,6 +243,18 @@ const fetchList = async () => {
         scenarios.value = res.data.items || []
     } finally {
         loading.value = false
+    }
+}
+
+// 同步存储
+const syncFromStorage = async () => {
+    syncing.value = true
+    try {
+        const res = await axios.post('/api/v1/resources/sync')
+        ElMessage.success(`同步完成，共恢复 ${res.data.count} 个资源`)
+        fetchList()
+    } finally {
+        syncing.value = false
     }
 }
 

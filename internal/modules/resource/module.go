@@ -33,6 +33,7 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 	resources := g.Group("/resources")
 	{
 		resources.GET("", m.ListResources)
+		resources.POST("/sync", m.SyncFromStorage) // 新增：同步存储
 		resources.GET("/:id", m.GetResource)
 		resources.PATCH("/:id/tags", m.UpdateResourceTags) // 新增：更新标签
 	}
@@ -159,4 +160,14 @@ func (m *Module) UpdateResourceTags(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Tags updated"})
+}
+
+// SyncFromStorage 同步存储中的文件到数据库
+func (m *Module) SyncFromStorage(c *gin.Context) {
+	count, err := m.uc.SyncFromStorage(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Sync completed", "count": count})
 }

@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"encoding/json"
@@ -21,10 +22,36 @@ type UseCase struct {
 	data        *data.Data
 	tokenVendor *sts.TokenVendor
 	minioConfig string
+	jobChan     chan processJob // 任务队列
+}
+
+type processJob struct {
+	TypeKey   string
+	ObjectKey string
+	VersionID string
 }
 
 func NewUseCase(d *data.Data, tv *sts.TokenVendor, bucket string) *UseCase {
-	return &UseCase{data: d, tokenVendor: tv, minioConfig: bucket}
+	uc := &UseCase{
+		data:        d,
+		tokenVendor: tv,
+		minioConfig: bucket,
+		jobChan:     make(chan processJob, 1000), // 缓冲区
+	}
+
+	// 启动固定数量的 Worker (例如 4 个并发)
+	for i := 0; i < 4; i++ {
+		go uc.startWorker(i)
+	}
+
+	return uc
+}
+
+func (uc *UseCase) startWorker(id int) {
+	log.Printf("[Worker %d] 启动", id)
+	for job := range uc.jobChan {
+		uc.processResourceInternal(context.Background(), job.TypeKey, job.ObjectKey, job.VersionID)
+	}
 }
 
 // DTOs 数据传输对象
@@ -158,102 +185,110 @@ func (uc *UseCase) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) 
 			return err
 		}
 
-		// 触发异步处理
-		go uc.asyncProcessResource(context.Background(), req.TypeKey, objectKey, ver.ID)
+		// 发送任务到队列，而不是开启匿名 goroutine
+		uc.jobChan <- processJob{
+			TypeKey:   req.TypeKey,
+			ObjectKey: objectKey,
+			VersionID: ver.ID,
+		}
 
 		return nil
 	})
 }
 
-// asyncProcessResource 异步处理资源逻辑
-func (uc *UseCase) asyncProcessResource(ctx context.Context, typeKey, objectKey, versionID string) {
-	log.Printf("[Processor] 开始处理资源: %s (Type: %s)", objectKey, typeKey)
+// processResourceInternal 异步处理资源逻辑 (由 Worker 调用)
+func (uc *UseCase) processResourceInternal(ctx context.Context, typeKey, objectKey, versionID string) {
+	log.Printf("[Worker] 开始处理资源: %s (Type: %s)", objectKey, typeKey)
 
 	// 1. 获取资源类型配置，检查是否有处理器
 	var rt model.ResourceType
 	if err := uc.data.DB.First(&rt, "type_key = ?", typeKey).Error; err != nil {
-		log.Printf("[Processor] 无法获取资源类型配置: %v", err)
+		log.Printf("[Worker] 无法获取资源类型配置: %v", typeKey)
 		return
 	}
 
 	// 更新状态为 PROCESSING
 	uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "PROCESSING")
 
-	// 如果没有处理器指令，直接设为 ACTIVE
-	if rt.ProcessorCmd == "" {
-		log.Printf("[Processor] 无需处理器，直接设为 ACTIVE")
-		uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "ACTIVE")
-		return
+	var finalMeta map[string]any
+
+	// 2. 如果有处理器，则执行处理
+	if rt.ProcessorCmd != "" {
+		tempDir, err := os.MkdirTemp("", "simhub-proc-*")
+		if err != nil {
+			log.Printf("[Worker] 创建临时目录失败: %v", err)
+			return
+		}
+		defer os.RemoveAll(tempDir)
+
+		localFile := filepath.Join(tempDir, filepath.Base(objectKey))
+		err = uc.tokenVendor.FGetObject(ctx, uc.minioConfig, objectKey, localFile)
+		if err != nil {
+			log.Printf("[Worker] 下载文件失败: %v", err)
+			uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "FAILED")
+			return
+		}
+
+		cmd := exec.Command(rt.ProcessorCmd, "--file", localFile)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Printf("[Worker] 驱动执行失败: %v, Output: %s", err, string(output))
+			uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "FAILED")
+			return
+		}
+
+		var result struct {
+			Status   string         `json:"status"`
+			Metadata map[string]any `json:"metadata"`
+			Error    string         `json:"error"`
+		}
+		if err := json.Unmarshal(output, &result); err != nil || result.Status == "failed" {
+			log.Printf("[Worker] 处理失败: %v, %s", err, result.Error)
+			uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "FAILED")
+			return
+		}
+		finalMeta = result.Metadata
 	}
 
-	// 2. 准备临时工作目录与文件
-	tempDir, err := os.MkdirTemp("", "simhub-proc-*")
-	if err != nil {
-		log.Printf("[Processor] 创建临时目录失败: %v", err)
-		return
-	}
-	defer os.RemoveAll(tempDir)
-
-	localFile := filepath.Join(tempDir, filepath.Base(objectKey))
-	err = uc.tokenVendor.FGetObject(ctx, uc.minioConfig, objectKey, localFile)
-	if err != nil {
-		log.Printf("[Processor] 下载文件失败: %v", err)
-		uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "FAILED")
-		return
-	}
-
-	// 3. 执行外部处理器指令
-	// 契约：处理器通过环境变量或参数接收文件路径，通过 stdout 输出 JSON
-	cmd := exec.Command(rt.ProcessorCmd, "--file", localFile)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("[Processor] 驱动执行失败: %v, Output: %s", err, string(output))
-		uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "FAILED")
-		return
-	}
-
-	// 4. 解析输出结果并回填元数据
-	var result struct {
-		Status   string         `json:"status"`
-		Metadata map[string]any `json:"metadata"`
-		Error    string         `json:"error"`
-	}
-
-	if err := json.Unmarshal(output, &result); err != nil {
-		log.Printf("[Processor] 无法解析驱动输出 (预期JSON): %v, 原输出: %s", err, string(output))
-		uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "FAILED")
-		return
-	}
-
-	if result.Status == "failed" {
-		log.Printf("[Processor] 驱动反馈失败: %s", result.Error)
-		uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "FAILED")
-		return
-	}
-
-	// 合并元数据
-	err = uc.data.DB.Transaction(func(tx *gorm.DB) error {
+	// 3. 更新数据库并持久化 Sidecar 元数据到存储
+	err := uc.data.DB.Transaction(func(tx *gorm.DB) error {
 		var ver model.ResourceVersion
 		if err := tx.First(&ver, "id = ?", versionID).Error; err != nil {
 			return err
 		}
 
-		// 合并原始 MetaData 和驱动解析出的 Metadata
 		if ver.MetaData == nil {
 			ver.MetaData = make(map[string]any)
 		}
-		for k, v := range result.Metadata {
+		for k, v := range finalMeta {
 			ver.MetaData[k] = v
 		}
-
 		ver.State = "ACTIVE"
-		return tx.Save(&ver).Error
+		if err := tx.Save(&ver).Error; err != nil {
+			return err
+		}
+
+		// --- 工程级改进：写入 Metadata Sidecar ---
+		// 存储位置: resources/{type}/{res_id}/{filename}.meta.json
+		sidecarKey := objectKey + ".meta.json"
+		sidecarData := map[string]any{
+			"resource_id": ver.ResourceID,
+			"version_id":  ver.ID,
+			"type_key":    typeKey,
+			"metadata":    ver.MetaData,
+			"synced_at":   time.Now().Format(time.RFC3339),
+		}
+		if err := uc.tokenVendor.PutObjectJSON(ctx, uc.minioConfig, sidecarKey, sidecarData); err != nil {
+			log.Printf("[Worker] 写入 Sidecar 失败 (不影响主业务): %v", err)
+		}
+
+		return nil
 	})
 
 	if err != nil {
-		log.Printf("[Processor] 更新数据库记录失败: %v", err)
+		log.Printf("[Worker] 数据库更新失败: %v", err)
 	} else {
-		log.Printf("[Processor] 处理完成，资源已激活: %s", objectKey)
+		log.Printf("[Worker] 处理完成: %s", objectKey)
 	}
 }
 
@@ -369,4 +404,77 @@ func (uc *UseCase) DeleteCategory(ctx context.Context, id string) error {
 // UpdateResourceTags 更新资源标签
 func (uc *UseCase) UpdateResourceTags(ctx context.Context, id string, tags []string) error {
 	return uc.data.DB.Model(&model.Resource{}).Where("id = ?", id).Update("tags", tags).Error
+}
+
+// SyncFromStorage 从存储扫描并同步资源到数据库
+func (uc *UseCase) SyncFromStorage(ctx context.Context) (int, error) {
+	bucketName := uc.minioConfig
+	// 1. 列出所有对象
+	// 期望路径格式: resources/{type_key}/{resource_id}/{filename}
+	objectCh := uc.tokenVendor.ListObjects(ctx, bucketName, "resources/")
+
+	syncedCount := 0
+	for object := range objectCh {
+		if object.Err != nil {
+			return syncedCount, object.Err
+		}
+
+		// 解析路径
+		slashParts := strings.Split(object.Key, "/")
+		if len(slashParts) < 4 {
+			continue // 路径格式不对
+		}
+
+		typeKey := slashParts[1]
+		resourceID := slashParts[2]
+		fileName := slashParts[3]
+
+		// 2. 检查数据库是否已存在该版本
+		var exists int64
+		uc.data.DB.Model(&model.ResourceVersion{}).Where("file_path = ?", object.Key).Count(&exists)
+		if exists > 0 {
+			continue
+		}
+
+		// 3. 尝试恢复资源主表
+		var res model.Resource
+		if err := uc.data.DB.First(&res, "id = ?", resourceID).Error; err != nil {
+			// 如果主表不存在，创建它
+			res = model.Resource{
+				ID:      resourceID,
+				TypeKey: typeKey,
+				Name:    fileName, // 默认使用文件名作为资源名
+				OwnerID: "system-sync",
+			}
+			if err := uc.data.DB.Create(&res).Error; err != nil {
+				log.Printf("[Sync] 无法创建资源主表: %v", err)
+				continue
+			}
+		}
+
+		// 4. 创建版本记录
+		ver := model.ResourceVersion{
+			ResourceID: resourceID,
+			VersionNum: 1, // 简单处理，同步默认为 v1
+			FileSize:   object.Size,
+			FilePath:   object.Key,
+			State:      "PENDING",
+			MetaData:   map[string]any{"source": "storage_sync"},
+		}
+
+		if err := uc.data.DB.Create(&ver).Error; err != nil {
+			log.Printf("[Sync] 无法创建版本记录: %v", err)
+			continue
+		}
+
+		// 5. 触发异步处理器（重新提取元数据和分类）
+		uc.jobChan <- processJob{
+			TypeKey:   typeKey,
+			ObjectKey: object.Key,
+			VersionID: ver.ID,
+		}
+		syncedCount++
+	}
+
+	return syncedCount, nil
 }

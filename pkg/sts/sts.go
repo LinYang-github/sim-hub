@@ -1,7 +1,9 @@
 package sts
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"time"
@@ -100,4 +102,24 @@ func (v *TokenVendor) GenerateDownloadURL(ctx context.Context, bucket, objectNam
 // FGetObject 下载对象到本地文件
 func (v *TokenVendor) FGetObject(ctx context.Context, bucket, objectName, filePath string) error {
 	return v.client.FGetObject(ctx, bucket, objectName, filePath, minio.GetObjectOptions{})
+}
+
+// ListObjects 列出前缀下的所有对象
+func (v *TokenVendor) ListObjects(ctx context.Context, bucket, prefix string) <-chan minio.ObjectInfo {
+	return v.client.ListObjects(ctx, bucket, minio.ListObjectsOptions{
+		Prefix:    prefix,
+		Recursive: true,
+	})
+}
+
+// PutObjectJSON 将对象作为 JSON 上传到存储
+func (v *TokenVendor) PutObjectJSON(ctx context.Context, bucket, objectName string, data any) error {
+	b, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	_, err = v.client.PutObject(ctx, bucket, objectName, bytes.NewReader(b), int64(len(b)), minio.PutObjectOptions{
+		ContentType: "application/json",
+	})
+	return err
 }

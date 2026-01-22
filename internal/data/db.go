@@ -1,7 +1,6 @@
 package data
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 
@@ -76,16 +75,12 @@ func seedBasicTypes(db *gorm.DB, configTypes []conf.ResourceType) {
 	if count == 0 {
 		var types []model.ResourceType
 		for _, ct := range configTypes {
-			sd, _ := json.Marshal(ct.SchemaDef)
-			vc, _ := json.Marshal(ct.ViewerConf)
-			pc, _ := json.Marshal(ct.ProcessConf)
-
 			types = append(types, model.ResourceType{
 				TypeKey:      ct.TypeKey,
 				TypeName:     ct.TypeName,
-				SchemaDef:    sd,
-				ViewerConf:   vc,
-				ProcessConf:  pc,
+				SchemaDef:    ct.SchemaDef,
+				ViewerConf:   ct.ViewerConf,
+				ProcessConf:  ct.ProcessConf,
 				ProcessorCmd: ct.ProcessorCmd,
 				CategoryMode: ct.CategoryMode,
 			})
