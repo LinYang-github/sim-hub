@@ -5,6 +5,13 @@ type Data struct {
 	MinIO         MinIO          `mapstructure:"minio" json:"minio"`
 	ResourceTypes []ResourceType `mapstructure:"resource_types" json:"resource_types"`
 	Log           Log            `mapstructure:"log" json:"log"`
+	NATS          NATS           `mapstructure:"nats" json:"nats"`
+}
+
+type NATS struct {
+	Enabled bool   `mapstructure:"enabled" json:"enabled"`
+	URL     string `mapstructure:"url" json:"url"`
+	Subject string `mapstructure:"subject" json:"subject"` // 消息主题，例如 simhub.jobs
 }
 
 type Log struct {

@@ -52,6 +52,14 @@ func main() {
 		slog.Info("MinIO 连接成功")
 	}
 
+	// 3.5 初始化 NATS 客户端 (如果开启)
+	natsClient, err := data.NewNATS(&cfg.NATS)
+	if err != nil {
+		slog.Warn("NATS 初始化失败", "error", err)
+	} else if natsClient != nil {
+		defer natsClient.Close()
+	}
+
 	// 4. 初始化存储层 (MinIO Adapter)
 	// MinIOStore 同时实现了 MultipartBlobStore 和 SecurityTokenProvider
 	var blobStore storage.MultipartBlobStore
@@ -65,7 +73,7 @@ func main() {
 
 	// 5. 业务模块注册
 	registry := module.NewRegistry()
-	registry.Register(resource.NewModule(dbConn, blobStore, stsProvider, cfg.MinIO.Bucket))
+	registry.Register(resource.NewModule(dbConn, blobStore, stsProvider, cfg.MinIO.Bucket, natsClient))
 
 	// 6. 配置 HTTP 路由
 	r := gin.Default()

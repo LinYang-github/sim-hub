@@ -15,9 +15,9 @@ type Module struct {
 	uc *core.UseCase
 }
 
-func NewModule(d *data.Data, store storage.MultipartBlobStore, stsProvider storage.SecurityTokenProvider, bucket string) module.Module {
+func NewModule(d *data.Data, store storage.MultipartBlobStore, stsProvider storage.SecurityTokenProvider, bucket string, natsClient *data.NATSClient) module.Module {
 	return &Module{
-		uc: core.NewUseCase(d, store, stsProvider, bucket),
+		uc: core.NewUseCase(d, store, stsProvider, bucket, natsClient),
 	}
 }
 

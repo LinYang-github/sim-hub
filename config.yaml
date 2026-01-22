@@ -55,3 +55,8 @@ log:
   max_age: 28
   compress: true
   format: "text"
+
+nats:
+  enabled: false
+  url: "nats://localhost:4222"
+  subject: "simhub.jobs"

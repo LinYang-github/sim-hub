@@ -22,7 +22,8 @@ type UseCase struct {
 	store       storage.MultipartBlobStore
 	stsProvider storage.SecurityTokenProvider
 	minioConfig string
-	jobChan     chan processJob // 任务队列
+	jobChan     chan processJob // 任务队列 (本地模式使用)
+	nats        *data.NATSClient
 }
 
 const (
@@ -37,32 +38,64 @@ type processJob struct {
 	VersionID string
 }
 
-func NewUseCase(d *data.Data, store storage.MultipartBlobStore, stsProvider storage.SecurityTokenProvider, bucket string) *UseCase {
+func NewUseCase(d *data.Data, store storage.MultipartBlobStore, stsProvider storage.SecurityTokenProvider, bucket string, natsClient *data.NATSClient) *UseCase {
 	uc := &UseCase{
 		data:        d,
 		store:       store,
 		stsProvider: stsProvider,
 		minioConfig: bucket,
 		jobChan:     make(chan processJob, 1000), // 缓冲区
+		nats:        natsClient,
 	}
 
-	// 启动固定数量的 Worker (例如 4 个并发)
-	for i := 0; i < 4; i++ {
-		go uc.startWorker(i)
+	if natsClient != nil && natsClient.Config.Enabled {
+		// 分布式模式：启动 NATS 订阅者
+		go uc.startNATSSubscriber()
+	} else {
+		// 本地模式：启动内部 Worker
+		for i := 0; i < 4; i++ {
+			go uc.startWorker(i)
+		}
 	}
 
 	return uc
 }
 
-func (uc *UseCase) startWorker(id int) {
-	slog.Info("Worker 启动", "worker_id", id)
-	for job := range uc.jobChan {
-		switch job.Action {
-		case ActionProcess:
-			uc.processResourceInternal(context.Background(), job.TypeKey, job.ObjectKey, job.VersionID)
-		case ActionRefresh:
-			uc.syncSidecarInternal(context.Background(), job.ObjectKey, job.VersionID)
+func (uc *UseCase) dispatchJob(job processJob) {
+	if uc.nats != nil && uc.nats.Config.Enabled {
+		if err := uc.nats.Encoded.Publish(uc.nats.Config.Subject, &job); err != nil {
+			slog.Error("发送 NATS 消息失败，回退到本地队列", "error", err)
+			uc.jobChan <- job
 		}
+		return
+	}
+	uc.jobChan <- job
+}
+
+func (uc *UseCase) startNATSSubscriber() {
+	slog.Info("NATS 订阅者已启动", "subject", uc.nats.Config.Subject)
+	_, err := uc.nats.Encoded.Subscribe(uc.nats.Config.Subject, func(job *processJob) {
+		slog.Debug("接收到 NATS 任务", "action", job.Action, "key", job.ObjectKey)
+		uc.handleJob(context.Background(), *job)
+	})
+	if err != nil {
+		slog.Error("NATS 订阅失败", "error", err)
+	}
+}
+
+func (uc *UseCase) startWorker(id int) {
+	slog.Info("本地 Worker 启动", "worker_id", id)
+	for job := range uc.jobChan {
+		uc.handleJob(context.Background(), job)
+	}
+}
+
+func (uc *UseCase) handleJob(ctx context.Context, job processJob) {
+	switch job.Action {
+	case ActionProcess:
+		uc.processResourceInternal(ctx, job.TypeKey, job.ObjectKey, job.VersionID)
+	case ActionRefresh:
+		uc.syncSidecarInternal(ctx, job.ObjectKey, job.VersionID)
 	}
 }
 
@@ -307,12 +340,12 @@ func (uc *UseCase) createResourceAndVersion(tx *gorm.DB, typeKey, categoryID, na
 	}
 
 	// 触发异步处理
-	uc.jobChan <- processJob{
+	uc.dispatchJob(processJob{
 		Action:    ActionProcess,
 		TypeKey:   typeKey,
 		ObjectKey: objectKey,
 		VersionID: ver.ID,
-	}
+	})
 	return nil
 }
 
@@ -553,11 +586,11 @@ func (uc *UseCase) UpdateResourceTags(ctx context.Context, id string, tags []str
 		// 触发异步刷新 Sidecar (获取最新版本)
 		var v model.ResourceVersion
 		if err := tx.Order("version_num desc").First(&v, "resource_id = ?", id).Error; err == nil {
-			uc.jobChan <- processJob{
+			uc.dispatchJob(processJob{
 				Action:    ActionRefresh,
 				ObjectKey: v.FilePath,
 				VersionID: v.ID,
-			}
+			})
 		}
 		return nil
 	})
@@ -642,12 +675,12 @@ func (uc *UseCase) SyncFromStorage(ctx context.Context) (int, error) {
 		}
 
 		// 5. 触发异步处理器（重新提取元数据和分类）
-		uc.jobChan <- processJob{
+		uc.dispatchJob(processJob{
 			Action:    ActionProcess,
 			TypeKey:   typeKey,
 			ObjectKey: object.Key,
 			VersionID: ver.ID,
-		}
+		})
 		syncedCount++
 	}
 
