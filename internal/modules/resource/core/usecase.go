@@ -5,11 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"encoding/json"
 	"log"
 	"os"
-	"os/exec"
-	"path/filepath"
 
 	"github.com/google/uuid"
 	"github.com/liny/sim-hub/internal/data"
@@ -221,33 +218,19 @@ func (uc *UseCase) processResourceInternal(ctx context.Context, typeKey, objectK
 		}
 		defer os.RemoveAll(tempDir)
 
-		localFile := filepath.Join(tempDir, filepath.Base(objectKey))
-		err = uc.tokenVendor.FGetObject(ctx, uc.minioConfig, objectKey, localFile)
-		if err != nil {
-			log.Printf("[Worker] 下载文件失败: %v", err)
-			uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "FAILED")
-			return
-		}
+		// 3. 执行外部处理器指令
+		// 需求变更：移除本地脚本执行，改为消息队列模式
+		// TODO: 后续集成消息队列 (如 Kafka/RabbitMQ) 发送处理事件
+		log.Printf("[Worker] 待发送处理消息至 MQ: Type=%s, Key=%s", rt.TypeKey, objectKey)
 
-		cmd := exec.Command(rt.ProcessorCmd, "--file", localFile)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			log.Printf("[Worker] 驱动执行失败: %v, Output: %s", err, string(output))
-			uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "FAILED")
-			return
-		}
+		// 模拟异步处理耗时
+		time.Sleep(500 * time.Millisecond)
 
-		var result struct {
-			Status   string         `json:"status"`
-			Metadata map[string]any `json:"metadata"`
-			Error    string         `json:"error"`
+		// 暂时只做简单的元数据填充
+		finalMeta = map[string]any{
+			"processed_by": "simhub-core-mq-pending",
+			"status":       "queued",
 		}
-		if err := json.Unmarshal(output, &result); err != nil || result.Status == "failed" {
-			log.Printf("[Worker] 处理失败: %v, %s", err, result.Error)
-			uc.data.DB.Model(&model.ResourceVersion{}).Where("id = ?", versionID).Update("state", "FAILED")
-			return
-		}
-		finalMeta = result.Metadata
 	}
 
 	// 3. 更新数据库并持久化 Sidecar 元数据到存储
