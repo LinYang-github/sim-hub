@@ -7,7 +7,7 @@ import (
 	"github.com/liny/sim-hub/internal/core/module"
 	"github.com/liny/sim-hub/internal/data"
 	"github.com/liny/sim-hub/internal/modules/resource/core"
-	"github.com/liny/sim-hub/pkg/sts"
+	"github.com/liny/sim-hub/pkg/storage"
 )
 
 // Module 实现了 module.Module 接口
@@ -15,9 +15,9 @@ type Module struct {
 	uc *core.UseCase
 }
 
-func NewModule(d *data.Data, tv *sts.TokenVendor, bucket string) module.Module {
+func NewModule(d *data.Data, store storage.MultipartBlobStore, stsProvider storage.SecurityTokenProvider, bucket string) module.Module {
 	return &Module{
-		uc: core.NewUseCase(d, tv, bucket),
+		uc: core.NewUseCase(d, store, stsProvider, bucket),
 	}
 }
 

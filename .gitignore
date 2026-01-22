@@ -23,7 +23,7 @@ simhub.db
 *.db
 *.sqlite
 minio_data/
-storage/
+/storage/
 temp/
 tmp/
 *.zip

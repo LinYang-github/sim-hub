@@ -2,8 +2,6 @@ package module
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/liny/sim-hub/internal/data"
-	"github.com/liny/sim-hub/pkg/sts"
 )
 
 // Module defines the interface for a pluggable backend module
@@ -33,6 +31,3 @@ func (r *Registry) MapRoutes(g *gin.RouterGroup) {
 		m.RegisterRoutes(g)
 	}
 }
-
-// Factory defines a function that creates a Module
-type Factory func(d *data.Data, tv *sts.TokenVendor, minioBucket string) Module

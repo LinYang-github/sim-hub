@@ -4,13 +4,16 @@ import (
 	"log"
 	"log/slog"
 
+	"os"
+
 	"github.com/gin-gonic/gin"
 	"github.com/liny/sim-hub/internal/conf"
 	"github.com/liny/sim-hub/internal/core/module"
 	"github.com/liny/sim-hub/internal/data"
 	"github.com/liny/sim-hub/internal/modules/resource"
 	"github.com/liny/sim-hub/pkg/logger"
-	"github.com/liny/sim-hub/pkg/sts"
+	"github.com/liny/sim-hub/pkg/storage"
+	"github.com/liny/sim-hub/pkg/storage/minio"
 	"github.com/spf13/viper"
 )
 
@@ -20,12 +23,14 @@ func main() {
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("读取配置文件出错: %s", err)
+		slog.Error("读取配置文件出错", "error", err)
+		os.Exit(1)
 	}
 
 	var cfg conf.Data
 	if err := viper.Unmarshal(&cfg); err != nil {
-		log.Fatalf("将配置解码为结构体时出错: %v", err)
+		slog.Error("配置解码失败", "error", err)
+		os.Exit(1)
 	}
 
 	// 1.5 初始化日志系统
@@ -34,29 +39,33 @@ func main() {
 	// 2. 初始化核心数据组件 (数据库与 MinIO)
 	dbConn, cleanup, err := data.NewData(&cfg)
 	if err != nil {
-		log.Fatalf("数据库初始化失败: %v", err)
+		slog.Error("数据库初始化失败", "error", err)
+		os.Exit(1)
 	}
 	defer cleanup()
 
 	// 3. 初始化 MinIO 客户端
 	minioClientWrapper, err := data.NewMinIO(&cfg.MinIO)
 	if err != nil {
-		log.Printf("警告: MinIO 初始化失败: %v", err)
+		slog.Warn("MinIO 初始化失败", "error", err)
 	} else {
-		log.Println("MinIO 连接成功")
+		slog.Info("MinIO 连接成功")
 	}
 
-	// 4. 初始化令牌分发器 (TokenVendor)
-	// NewTokenVendor 需要 *minio.Client，该客户端位于包装类中
-	var tokenVendor *sts.TokenVendor
+	// 4. 初始化存储层 (MinIO Adapter)
+	// MinIOStore 同时实现了 MultipartBlobStore 和 SecurityTokenProvider
+	var blobStore storage.MultipartBlobStore
+	var stsProvider storage.SecurityTokenProvider
+
 	if minioClientWrapper != nil {
-		tokenVendor = sts.NewTokenVendor(minioClientWrapper.Client, cfg.MinIO.AccessKey, cfg.MinIO.SecretKey)
+		store := minio.NewMinIOStore(minioClientWrapper.Client, cfg.MinIO.AccessKey, cfg.MinIO.SecretKey)
+		blobStore = store
+		stsProvider = store
 	}
 
 	// 5. 业务模块注册
 	registry := module.NewRegistry()
-	// NewModule 需要 *data.Data、*sts.TokenVendor 以及 bucket 名称
-	registry.Register(resource.NewModule(dbConn, tokenVendor, cfg.MinIO.Bucket))
+	registry.Register(resource.NewModule(dbConn, blobStore, stsProvider, cfg.MinIO.Bucket))
 
 	// 6. 配置 HTTP 路由
 	r := gin.Default()

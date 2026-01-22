@@ -1,9 +1,10 @@
 package core
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"strings"
@@ -12,13 +13,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/liny/sim-hub/internal/data"
 	"github.com/liny/sim-hub/internal/model"
-	"github.com/liny/sim-hub/pkg/sts"
+	"github.com/liny/sim-hub/pkg/storage"
 	"gorm.io/gorm"
 )
 
 type UseCase struct {
 	data        *data.Data
-	tokenVendor *sts.TokenVendor
+	store       storage.MultipartBlobStore
+	stsProvider storage.SecurityTokenProvider
 	minioConfig string
 	jobChan     chan processJob // 任务队列
 }
@@ -29,10 +31,11 @@ type processJob struct {
 	VersionID string
 }
 
-func NewUseCase(d *data.Data, tv *sts.TokenVendor, bucket string) *UseCase {
+func NewUseCase(d *data.Data, store storage.MultipartBlobStore, stsProvider storage.SecurityTokenProvider, bucket string) *UseCase {
 	uc := &UseCase{
 		data:        d,
-		tokenVendor: tv,
+		store:       store,
+		stsProvider: stsProvider,
 		minioConfig: bucket,
 		jobChan:     make(chan processJob, 1000), // 缓冲区
 	}
@@ -89,11 +92,11 @@ type CreateCategoryRequest struct {
 }
 
 type UploadTicket struct {
-	TicketID     string              `json:"ticket_id"`
-	PresignedURL string              `json:"presigned_url"`
-	Credentials  *sts.STSCredentials `json:"credentials,omitempty"`
-	Bucket       string              `json:"bucket,omitempty"`
-	ObjectKey    string              `json:"object_key,omitempty"`
+	TicketID     string                  `json:"ticket_id"`
+	PresignedURL string                  `json:"presigned_url"`
+	Credentials  *storage.STSCredentials `json:"credentials,omitempty"`
+	Bucket       string                  `json:"bucket,omitempty"`
+	ObjectKey    string                  `json:"object_key,omitempty"`
 }
 
 type ResourceDTO struct {
@@ -123,12 +126,12 @@ func (uc *UseCase) RequestUploadToken(ctx context.Context, req ApplyUploadTokenR
 	// objectKey 格式: resources/{type}/{uuid}/{filename}
 	objectKey := "resources/" + req.ResourceType + "/" + ticketID + "/" + req.Filename
 
-	if uc.tokenVendor == nil {
-		return nil, gorm.ErrInvalidDB // 或者返回自定义错误 "Storage Service Unavailable"
+	if uc.stsProvider == nil {
+		return nil, gorm.ErrInvalidDB // 或者返回自定义错误
 	}
 
 	if req.Mode == "sts" {
-		creds, err := uc.tokenVendor.GenerateUploadToken(ctx, uc.minioConfig, objectKey, time.Hour)
+		creds, err := uc.stsProvider.GenerateSTSToken(ctx, uc.minioConfig, objectKey, time.Hour)
 		if err != nil {
 			return nil, err
 		}
@@ -141,7 +144,7 @@ func (uc *UseCase) RequestUploadToken(ctx context.Context, req ApplyUploadTokenR
 	}
 
 	// 默认模式: 预签名 URL
-	url, err := uc.tokenVendor.GeneratePresignedUpload(ctx, uc.minioConfig, objectKey, time.Hour)
+	url, err := uc.store.PresignPut(ctx, uc.minioConfig, objectKey, time.Hour)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +163,7 @@ func (uc *UseCase) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) 
 	}
 
 	// 0. 验证 MinIO 中对象是否存在
-	objInfo, err := uc.tokenVendor.StatObject(ctx, uc.minioConfig, objectKey)
+	objInfo, err := uc.store.Stat(ctx, uc.minioConfig, objectKey)
 	if err != nil {
 		slog.Error("无法获取对象信息", "key", objectKey, "error", err)
 		return fmt.Errorf("uploaded file not found: %w", err)
@@ -270,17 +273,23 @@ func (uc *UseCase) processResourceInternal(ctx context.Context, typeKey, objectK
 			"metadata":    ver.MetaData,
 			"synced_at":   time.Now().Format(time.RFC3339),
 		}
-		if err := uc.tokenVendor.PutObjectJSON(ctx, uc.minioConfig, sidecarKey, sidecarData); err != nil {
-			log.Printf("[Worker] 写入 Sidecar 失败 (不影响主业务): %v", err)
+
+		// 序列化 Sidecar 数据
+		if sidecarBytes, err := json.Marshal(sidecarData); err == nil {
+			if err := uc.store.Put(ctx, uc.minioConfig, sidecarKey, bytes.NewReader(sidecarBytes), int64(len(sidecarBytes)), "application/json"); err != nil {
+				slog.Warn("写入 Sidecar 失败", "key", sidecarKey, "error", err)
+			}
+		} else {
+			slog.Warn("序列化 Sidecar 失败", "error", err)
 		}
 
 		return nil
 	})
 
 	if err != nil {
-		log.Printf("[Worker] 数据库更新失败: %v", err)
+		slog.Error("数据库更新失败", "error", err)
 	} else {
-		log.Printf("[Worker] 处理完成: %s", objectKey)
+		slog.Info("处理完成", "key", objectKey)
 	}
 }
 
@@ -296,7 +305,7 @@ func (uc *UseCase) GetResource(ctx context.Context, id string) (*ResourceDTO, er
 		return nil, err
 	}
 
-	url, err := uc.tokenVendor.GenerateDownloadURL(ctx, uc.minioConfig, v.FilePath, time.Hour)
+	url, err := uc.store.PresignGet(ctx, uc.minioConfig, v.FilePath, time.Hour)
 	if err != nil {
 		return nil, err
 	}
@@ -403,13 +412,10 @@ func (uc *UseCase) SyncFromStorage(ctx context.Context) (int, error) {
 	bucketName := uc.minioConfig
 	// 1. 列出所有对象
 	// 期望路径格式: resources/{type_key}/{resource_id}/{filename}
-	objectCh := uc.tokenVendor.ListObjects(ctx, bucketName, "resources/")
+	objectCh := uc.store.ListObjects(ctx, bucketName, "resources/", true)
 
 	syncedCount := 0
 	for object := range objectCh {
-		if object.Err != nil {
-			return syncedCount, object.Err
-		}
 
 		// 解析路径
 		slashParts := strings.Split(object.Key, "/")
@@ -439,7 +445,7 @@ func (uc *UseCase) SyncFromStorage(ctx context.Context) (int, error) {
 				OwnerID: "system-sync",
 			}
 			if err := uc.data.DB.Create(&res).Error; err != nil {
-				log.Printf("[Sync] 无法创建资源主表: %v", err)
+				slog.Error("无法创建资源主表", "error", err)
 				continue
 			}
 		}
@@ -489,13 +495,13 @@ func (uc *UseCase) DeleteResource(ctx context.Context, id string) error {
 	// 3. 删除 MinIO 中的文件 (包括元数据 Sidecar)
 	for _, v := range versions {
 		// 删除主文件
-		if err := uc.tokenVendor.RemoveObject(ctx, uc.minioConfig, v.FilePath); err != nil {
+		if err := uc.store.Delete(ctx, uc.minioConfig, v.FilePath); err != nil {
 			slog.Error("无法删除 MinIO 文件", "path", v.FilePath, "error", err)
 			continue
 		}
 		// 删除 Sidecar 元数据文件
 		sidecarKey := v.FilePath + ".meta.json"
-		if err := uc.tokenVendor.RemoveObject(ctx, uc.minioConfig, sidecarKey); err != nil {
+		if err := uc.store.Delete(ctx, uc.minioConfig, sidecarKey); err != nil {
 			slog.Error("无法删除 Sidecar", "path", sidecarKey, "error", err)
 			continue
 		}
