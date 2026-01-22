@@ -25,7 +25,13 @@ type UseCase struct {
 	jobChan     chan processJob // 任务队列
 }
 
+const (
+	ActionProcess = "PROCESS" // 全流程处理 (执行 Processor + 写 Sidecar)
+	ActionRefresh = "REFRESH" // 仅刷新元数据 (重新生成 Sidecar)
+)
+
 type processJob struct {
+	Action    string
 	TypeKey   string
 	ObjectKey string
 	VersionID string
@@ -51,7 +57,12 @@ func NewUseCase(d *data.Data, store storage.MultipartBlobStore, stsProvider stor
 func (uc *UseCase) startWorker(id int) {
 	slog.Info("Worker 启动", "worker_id", id)
 	for job := range uc.jobChan {
-		uc.processResourceInternal(context.Background(), job.TypeKey, job.ObjectKey, job.VersionID)
+		switch job.Action {
+		case ActionProcess:
+			uc.processResourceInternal(context.Background(), job.TypeKey, job.ObjectKey, job.VersionID)
+		case ActionRefresh:
+			uc.syncSidecarInternal(context.Background(), job.ObjectKey, job.VersionID)
+		}
 	}
 }
 
@@ -297,6 +308,7 @@ func (uc *UseCase) createResourceAndVersion(tx *gorm.DB, typeKey, categoryID, na
 
 	// 触发异步处理
 	uc.jobChan <- processJob{
+		Action:    ActionProcess,
 		TypeKey:   typeKey,
 		ObjectKey: objectKey,
 		VersionID: ver.ID,
@@ -388,7 +400,37 @@ func (uc *UseCase) processResourceInternal(ctx context.Context, typeKey, objectK
 	if err != nil {
 		slog.Error("数据库更新失败", "error", err)
 	} else {
-		slog.Info("处理完成", "key", objectKey)
+		slog.Info("全流程处理完成", "key", objectKey)
+	}
+}
+
+// syncSidecarInternal 仅执行元数据同步到存储 (不涉及外部 Processor)
+func (uc *UseCase) syncSidecarInternal(ctx context.Context, objectKey, versionID string) {
+	var ver model.ResourceVersion
+	var res model.Resource
+	if err := uc.data.DB.Preload("Resource").First(&ver, "id = ?", versionID).Error; err != nil {
+		slog.Error("同步 Sidecar 时找不到版本记录", "id", versionID, "error", err)
+		return
+	}
+	res = ver.Resource
+
+	sidecarKey := objectKey + ".meta.json"
+	sidecarData := map[string]any{
+		"resource_id":   res.ID,
+		"resource_name": res.Name,
+		"tags":          res.Tags,
+		"version_id":    ver.ID,
+		"type_key":      res.TypeKey,
+		"metadata":      ver.MetaData,
+		"synced_at":     time.Now().Format(time.RFC3339),
+	}
+
+	if sidecarBytes, err := json.Marshal(sidecarData); err == nil {
+		if err := uc.store.Put(ctx, uc.minioConfig, sidecarKey, bytes.NewReader(sidecarBytes), int64(len(sidecarBytes)), "application/json"); err != nil {
+			slog.Warn("更新 Sidecar 失败", "key", sidecarKey, "error", err)
+		} else {
+			slog.Debug("Sidecar 刷新成功", "key", sidecarKey)
+		}
 	}
 }
 
@@ -501,9 +543,24 @@ func (uc *UseCase) DeleteCategory(ctx context.Context, id string) error {
 	return uc.data.DB.Delete(&model.Category{}, "id = ?", id).Error
 }
 
-// UpdateResourceTags 更新资源标签
+// UpdateResourceTags 更新资源标签 并同步刷新 Sidecar
 func (uc *UseCase) UpdateResourceTags(ctx context.Context, id string, tags []string) error {
-	return uc.data.DB.Model(&model.Resource{}).Where("id = ?", id).Select("Tags").Updates(model.Resource{Tags: tags}).Error
+	return uc.data.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.Resource{}).Where("id = ?", id).Select("Tags").Updates(model.Resource{Tags: tags}).Error; err != nil {
+			return err
+		}
+
+		// 触发异步刷新 Sidecar (获取最新版本)
+		var v model.ResourceVersion
+		if err := tx.Order("version_num desc").First(&v, "resource_id = ?", id).Error; err == nil {
+			uc.jobChan <- processJob{
+				Action:    ActionRefresh,
+				ObjectKey: v.FilePath,
+				VersionID: v.ID,
+			}
+		}
+		return nil
+	})
 }
 
 // SyncFromStorage 从存储扫描并同步资源到数据库
@@ -515,6 +572,9 @@ func (uc *UseCase) SyncFromStorage(ctx context.Context) (int, error) {
 
 	syncedCount := 0
 	for object := range objectCh {
+		if strings.HasSuffix(object.Key, ".meta.json") {
+			continue // 跳过 Sidecar 文件本身，它们在处理主文件时被读取
+		}
 
 		// 解析路径
 		slashParts := strings.Split(object.Key, "/")
@@ -549,7 +609,6 @@ func (uc *UseCase) SyncFromStorage(ctx context.Context) (int, error) {
 			}
 		}
 
-		// 4. 创建版本记录
 		ver := model.ResourceVersion{
 			ResourceID: resourceID,
 			VersionNum: 1, // 简单处理，同步默认为 v1
@@ -559,6 +618,24 @@ func (uc *UseCase) SyncFromStorage(ctx context.Context) (int, error) {
 			MetaData:   map[string]any{"source": "storage_sync"},
 		}
 
+		// --- 关键：通过 Sidecar 恢复元数据 ---
+		sidecarKey := object.Key + ".meta.json"
+		if rc, err := uc.store.Get(ctx, bucketName, sidecarKey); err == nil {
+			var sd struct {
+				ResourceName string         `json:"resource_name"`
+				Tags         []string       `json:"tags"`
+				Metadata     map[string]any `json:"metadata"`
+			}
+			if decodeErr := json.NewDecoder(rc).Decode(&sd); decodeErr == nil {
+				res.Name = sd.ResourceName
+				res.Tags = sd.Tags
+				ver.MetaData = sd.Metadata
+			}
+			rc.Close()
+			// 更新主表（如果已创建）
+			uc.data.DB.Save(&res)
+		}
+
 		if err := uc.data.DB.Create(&ver).Error; err != nil {
 			slog.Error("无法创建版本记录", "error", err)
 			continue
@@ -566,6 +643,7 @@ func (uc *UseCase) SyncFromStorage(ctx context.Context) (int, error) {
 
 		// 5. 触发异步处理器（重新提取元数据和分类）
 		uc.jobChan <- processJob{
+			Action:    ActionProcess,
 			TypeKey:   typeKey,
 			ObjectKey: object.Key,
 			VersionID: ver.ID,
