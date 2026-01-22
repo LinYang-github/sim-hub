@@ -7,9 +7,11 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Workstation from './components/Workstation.vue'
 import { moduleManager } from './core/moduleManager'
 import resourceModule from './modules/resource'
+import scenarioModule from './modules/scenario'
 
 // Register Built-in Modules Implementations
 moduleManager.registerImplementation(resourceModule)
+moduleManager.registerImplementation(scenarioModule)
 
 const routes = [
   { path: '/', component: Workstation },

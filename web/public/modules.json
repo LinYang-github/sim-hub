@@ -1,7 +1,7 @@
 [
   {
-    "key": "resource",
-    "label": "基础资源库",
+    "key": "scenario",
+    "label": "想定资源库",
     "integrationMode": "internal"
   },
   {

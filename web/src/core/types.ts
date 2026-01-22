@@ -1,9 +1,10 @@
 import { RouteRecordRaw } from 'vue-router'
+import { Component } from 'vue'
 
 export interface MenuOption {
   label: string
   path: string
-  icon?: string
+  icon?: string | Component
 }
 
 export interface SimHubModule {
