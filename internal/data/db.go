@@ -48,6 +48,7 @@ func NewData(c *conf.Data) (*Data, func(), error) {
 	// 执行自动迁移，同步数据库表结构
 	if err := db.AutoMigrate(
 		&model.ResourceType{},
+		&model.Category{},
 		&model.Resource{},
 		&model.ResourceVersion{},
 	); err != nil {

@@ -37,12 +37,25 @@ type ApplyUploadTokenRequest struct {
 }
 
 type ConfirmUploadRequest struct {
-	TicketID  string         `json:"ticket_id"`
-	TypeKey   string         `json:"type_key"`
-	Name      string         `json:"name"`
-	OwnerID   string         `json:"owner_id"`
-	Size      int64          `json:"size"`
-	ExtraMeta map[string]any `json:"extra_meta"`
+	TicketID   string         `json:"ticket_id"`
+	TypeKey    string         `json:"type_key"`
+	CategoryID string         `json:"category_id"` // 新增：所属分类 ID
+	Name       string         `json:"name"`
+	OwnerID    string         `json:"owner_id"`
+	Size       int64          `json:"size"`
+	ExtraMeta  map[string]any `json:"extra_meta"`
+}
+
+type CategoryDTO struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	ParentID string `json:"parent_id"`
+}
+
+type CreateCategoryRequest struct {
+	TypeKey  string `json:"type_key"`
+	Name     string `json:"name"`
+	ParentID string `json:"parent_id"`
 }
 
 type UploadTicket struct {
@@ -54,13 +67,14 @@ type UploadTicket struct {
 }
 
 type ResourceDTO struct {
-	ID        string              `json:"id"`
-	TypeKey   string              `json:"type_key"`
-	Name      string              `json:"name"`
-	OwnerID   string              `json:"owner_id"`
-	Tags      []string            `json:"tags"`
-	CreatedAt time.Time           `json:"created_at"`
-	LatestVer *ResourceVersionDTO `json:"latest_version,omitempty"`
+	ID         string              `json:"id"`
+	TypeKey    string              `json:"type_key"`
+	CategoryID string              `json:"category_id,omitempty"`
+	Name       string              `json:"name"`
+	OwnerID    string              `json:"owner_id"`
+	Tags       []string            `json:"tags"`
+	CreatedAt  time.Time           `json:"created_at"`
+	LatestVer  *ResourceVersionDTO `json:"latest_version,omitempty"`
 }
 
 type ResourceVersionDTO struct {
@@ -117,9 +131,10 @@ func (uc *UseCase) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) 
 
 	return uc.data.DB.Transaction(func(tx *gorm.DB) error {
 		res := model.Resource{
-			TypeKey: req.TypeKey,
-			Name:    req.Name,
-			OwnerID: req.OwnerID,
+			TypeKey:    req.TypeKey,
+			CategoryID: req.CategoryID,
+			Name:       req.Name,
+			OwnerID:    req.OwnerID,
 		}
 		if err := tx.Create(&res).Error; err != nil {
 			return err
@@ -254,23 +269,25 @@ func (uc *UseCase) GetResource(ctx context.Context, id string) (*ResourceDTO, er
 	}
 
 	return &ResourceDTO{
-		ID:        r.ID,
-		TypeKey:   r.TypeKey,
-		Name:      r.Name,
-		OwnerID:   r.OwnerID,
-		Tags:      r.Tags,
-		CreatedAt: r.CreatedAt,
+		ID:         r.ID,
+		TypeKey:    r.TypeKey,
+		CategoryID: r.CategoryID,
+		Name:       r.Name,
+		OwnerID:    r.OwnerID,
+		Tags:       r.Tags,
+		CreatedAt:  r.CreatedAt,
 		LatestVer: &ResourceVersionDTO{
 			VersionNum:  v.VersionNum,
 			FileSize:    v.FileSize,
 			MetaData:    v.MetaData,
+			State:       v.State,
 			DownloadURL: url,
 		},
 	}, nil
 }
 
 // ListResources 列出资源
-func (uc *UseCase) ListResources(ctx context.Context, typeKey string, page, size int) ([]*ResourceDTO, int64, error) {
+func (uc *UseCase) ListResources(ctx context.Context, typeKey string, categoryID string, page, size int) ([]*ResourceDTO, int64, error) {
 	var resources []model.Resource
 	var total int64
 	offset := (page - 1) * size
@@ -278,6 +295,9 @@ func (uc *UseCase) ListResources(ctx context.Context, typeKey string, page, size
 	query := uc.data.DB.Model(&model.Resource{})
 	if typeKey != "" {
 		query = query.Where("type_key = ?", typeKey)
+	}
+	if categoryID != "" {
+		query = query.Where("category_id = ?", categoryID)
 	}
 
 	if err := query.Count(&total).Limit(size).Offset(offset).Order("created_at desc").Find(&resources).Error; err != nil {
@@ -291,18 +311,51 @@ func (uc *UseCase) ListResources(ctx context.Context, typeKey string, page, size
 		uc.data.DB.Order("version_num desc").First(&v, "resource_id = ?", r.ID)
 
 		cw = append(cw, &ResourceDTO{
-			ID:        r.ID,
-			TypeKey:   r.TypeKey,
-			Name:      r.Name,
-			OwnerID:   r.OwnerID,
-			Tags:      r.Tags,
-			CreatedAt: r.CreatedAt,
+			ID:         r.ID,
+			TypeKey:    r.TypeKey,
+			CategoryID: r.CategoryID,
+			Name:       r.Name,
+			OwnerID:    r.OwnerID,
+			Tags:       r.Tags,
+			CreatedAt:  r.CreatedAt,
 			LatestVer: &ResourceVersionDTO{
 				VersionNum: v.VersionNum,
-				State:      v.State, // 这一行需要确保 DTO 有 State 字段
+				State:      v.State,
 				MetaData:   v.MetaData,
 			},
 		})
 	}
 	return cw, total, nil
+}
+
+// CreateCategory 创建分类
+func (uc *UseCase) CreateCategory(ctx context.Context, req CreateCategoryRequest) (*CategoryDTO, error) {
+	cat := model.Category{
+		TypeKey:  req.TypeKey,
+		Name:     req.Name,
+		ParentID: req.ParentID,
+	}
+	if err := uc.data.DB.Create(&cat).Error; err != nil {
+		return nil, err
+	}
+	return &CategoryDTO{ID: cat.ID, Name: cat.Name, ParentID: cat.ParentID}, nil
+}
+
+// ListCategories 列出分类
+func (uc *UseCase) ListCategories(ctx context.Context, typeKey string) ([]*CategoryDTO, error) {
+	var cats []model.Category
+	if err := uc.data.DB.Where("type_key = ?", typeKey).Find(&cats).Error; err != nil {
+		return nil, err
+	}
+
+	res := make([]*CategoryDTO, 0, len(cats))
+	for _, c := range cats {
+		res = append(res, &CategoryDTO{ID: c.ID, Name: c.Name, ParentID: c.ParentID})
+	}
+	return res, nil
+}
+
+// DeleteCategory 删除分类
+func (uc *UseCase) DeleteCategory(ctx context.Context, id string) error {
+	return uc.data.DB.Delete(&model.Category{}, "id = ?", id).Error
 }

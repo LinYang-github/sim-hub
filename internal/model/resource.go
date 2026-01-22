@@ -19,11 +19,30 @@ type ResourceType struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+// Category 资源分类（虚拟文件夹）
+type Category struct {
+	ID        string    `gorm:"primaryKey;type:varchar(36)" json:"id"`
+	TypeKey   string    `gorm:"type:varchar(50);not null;index" json:"type_key"` // 属于哪种资源类型的分类
+	Name      string    `gorm:"type:varchar(100);not null" json:"name"`
+	ParentID  string    `gorm:"type:varchar(36);index" json:"parent_id"` // 支持层级目录
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (c *Category) BeforeCreate(tx *gorm.DB) (err error) {
+	if c.ID == "" {
+		c.ID = uuid.New().String()
+	}
+	return
+}
+
 // Resource 资源主表
 type Resource struct {
 	ID           string       `gorm:"primaryKey;type:varchar(36)" json:"id"`
 	TypeKey      string       `gorm:"type:varchar(50);not null;index" json:"type_key"`
 	ResourceType ResourceType `gorm:"foreignKey:TypeKey;references:TypeKey" json:"resource_type,omitempty"`
+	CategoryID   string       `gorm:"type:varchar(36);index" json:"category_id"` // 所属分类
+	Category     *Category    `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 	Name         string       `gorm:"type:varchar(200);not null" json:"name"`
 	OwnerID      string       `gorm:"type:varchar(50);index" json:"owner_id"`
 	Tags         []string     `gorm:"serializer:json" json:"tags"` // SQLite/MySQL doesn't support array type natively, use JSON serializer

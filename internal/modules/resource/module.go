@@ -35,6 +35,14 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 		resources.GET("", m.ListResources)
 		resources.GET("/:id", m.GetResource)
 	}
+
+	// /api/v1/categories 路径组
+	categories := g.Group("/categories")
+	{
+		categories.GET("", m.ListCategories)
+		categories.POST("", m.CreateCategory)
+		categories.DELETE("/:id", m.DeleteCategory)
+	}
 }
 
 // ApplyUploadToken 申请上传令牌
@@ -81,11 +89,12 @@ func (m *Module) GetResource(c *gin.Context) {
 
 // ListResources 列出资源
 func (m *Module) ListResources(c *gin.Context) {
-	page := 1  // TODO: 从查询参数解析页码
-	size := 20 // TODO: 从查询参数解析每页大小
+	page := 1
+	size := 20
 	typeKey := c.Query("type")
+	categoryID := c.Query("category_id")
 
-	list, total, err := m.uc.ListResources(c.Request.Context(), typeKey, page, size)
+	list, total, err := m.uc.ListResources(c.Request.Context(), typeKey, categoryID, page, size)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -96,4 +105,41 @@ func (m *Module) ListResources(c *gin.Context) {
 		"page":  page,
 		"size":  size,
 	})
+}
+
+// CreateCategory 创建分类
+func (m *Module) CreateCategory(c *gin.Context) {
+	var req core.CreateCategoryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	res, err := m.uc.CreateCategory(c.Request.Context(), req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, res)
+}
+
+// ListCategories 列出分类
+func (m *Module) ListCategories(c *gin.Context) {
+	typeKey := c.Query("type")
+	list, err := m.uc.ListCategories(c.Request.Context(), typeKey)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, list)
+}
+
+// DeleteCategory 删除分类
+func (m *Module) DeleteCategory(c *gin.Context) {
+	id := c.Param("id")
+	if err := m.uc.DeleteCategory(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"msg": "Category deleted"})
 }
