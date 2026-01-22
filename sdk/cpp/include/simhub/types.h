@@ -4,8 +4,34 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <optional>
 
 namespace simhub {
+
+enum class ErrorCode {
+    Success = 0,
+    NetworkError,
+    ServerError,
+    InvalidParam,
+    FileSystemError,
+    StorageError,
+    Unknown
+};
+
+template <typename T>
+struct Result {
+    T value;
+    ErrorCode code = ErrorCode::Success;
+    std::string message;
+
+    bool ok() const { return code == ErrorCode::Success; }
+    
+    static Result<T> Success(T val) { return {val, ErrorCode::Success, ""}; }
+    static Result<T> Fail(ErrorCode c, std::string msg) { return {T(), c, msg}; }
+};
+
+// Also specify Result<bool> helper
+using Status = Result<bool>;
 
 struct STSCredentials {
     std::string access_key;

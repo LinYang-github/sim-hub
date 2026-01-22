@@ -40,17 +40,17 @@ public:
     /**
      * 申请上传令牌 (Token/Ticket)
      */
-    UploadTicket requestUploadToken(const UploadTokenRequest& req);
+    Result<UploadTicket> requestUploadToken(const UploadTokenRequest& req);
 
     /**
      * 确认上传完成
      */
-    bool confirmUpload(const ConfirmUploadRequest& req);
+    Status confirmUpload(const ConfirmUploadRequest& req);
 
     /**
      * 获取资源详情
      */
-    ResourceDTO getResource(const std::string& id);
+    Result<ResourceDTO> getResource(const std::string& id);
 
     /**
      * 基础 HTTP 上传 (PUT 方法，适用于 Presigned URL)
@@ -58,24 +58,24 @@ public:
      * @param filePath 本地文件路径
      * @param progressCallback 进度回调 (0.0 - 1.0)
      */
-    bool uploadFileSimple(const std::string& url, 
-                         const std::string& filePath,
-                         std::function<void(double)> progressCallback = nullptr);
+    Status uploadFileSimple(const std::string& url, 
+                          const std::string& filePath,
+                          std::function<void(double)> progressCallback = nullptr);
 
     /**
      * 初始化分片上传
      */
-    MultipartInitResponse initMultipartUpload(const MultipartInitRequest& req);
+    Result<MultipartInitResponse> initMultipartUpload(const MultipartInitRequest& req);
 
     /**
      * 获取分片上传预签名 URL
      */
-    std::string getMultipartPartURL(const std::string& ticketId, const std::string& uploadId, int partNumber);
+    Result<std::string> getMultipartPartURL(const std::string& ticketId, const std::string& uploadId, int partNumber);
 
     /**
      * 完成分片上传
      */
-    bool completeMultipartUpload(const MultipartCompleteRequest& req);
+    Status completeMultipartUpload(const MultipartCompleteRequest& req);
 
     /**
      * 直接执行大文件分片上传 (自动切片、并发上传、合并确认)
@@ -83,19 +83,21 @@ public:
      * @param filePath 本地文件路径
      * @param name 资源名称
      * @param progressCallback 进度回调
+     * @param maxRetries 每个分片最大重试次数
      */
-    bool uploadFileMultipart(const std::string& typeKey, 
+    Status uploadFileMultipart(const std::string& typeKey, 
                              const std::string& filePath,
                              const std::string& name,
-                             std::function<void(double)> progressCallback = nullptr);
+                             std::function<void(double)> progressCallback = nullptr,
+                             int maxRetries = 3);
 
     /**
      * 使用 STS 凭证进行 S3 原生上传 (需要 AWS SDK)
      * 注意：此方法仅在链接了 AWS SDK 的情况下可用，否则将抛出异常或返回失败。
      */
-    bool uploadFileSTS(const UploadTicket& ticket, 
-                      const std::string& filePath,
-                      const std::string& endpoint = "localhost:9000");
+    Status uploadFileSTS(const UploadTicket& ticket, 
+                       const std::string& filePath,
+                       const std::string& endpoint = "localhost:9000");
 
 private:
     std::unique_ptr<ClientImpl> impl_;

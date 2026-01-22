@@ -13,6 +13,10 @@
 #include <aws/s3/model/PutObjectRequest.h>
 #endif
 
+#include <thread>
+#include <chrono>
+#include <cmath>
+
 using json = nlohmann::json;
 
 namespace simhub {
@@ -56,13 +60,28 @@ public:
         curl_slist_free_all(headers);
 
         if(res != CURLE_OK) {
-            return {{"error", std::string("Network error: ") + curl_easy_strerror(res)}};
+            return {
+                {"error", std::string("Network error: ") + curl_easy_strerror(res)},
+                {"error_code", (int)ErrorCode::NetworkError}
+            };
+        }
+
+        if (http_code >= 400) {
+            return {
+                {"error", "HTTP Server error: " + std::to_string(http_code)},
+                {"error_code", (int)ErrorCode::ServerError},
+                {"http_code", http_code},
+                {"body", readBuffer}
+            };
         }
 
         try {
             return json::parse(readBuffer);
         } catch (...) {
-            return {{"error", "Failed to parse JSON response"}};
+            return {
+                {"error", "Failed to parse JSON response"},
+                {"error_code", (int)ErrorCode::ServerError}
+            };
         }
     }
 };
@@ -81,14 +100,12 @@ void Client::GlobalCleanup() {
 
 Client::Client(const std::string& baseUrl) : impl_(std::make_unique<ClientImpl>()) {
     impl_->baseUrl = baseUrl;
-    // curl_global_init 被移除，由 GlobalInit 管理
 }
 
 Client::~Client() {
-    // curl_global_cleanup 被移除，由 GlobalCleanup 管理
 }
 
-UploadTicket Client::requestUploadToken(const UploadTokenRequest& req) {
+Result<UploadTicket> Client::requestUploadToken(const UploadTokenRequest& req) {
     json body = {
         {"resource_type", req.resource_type},
         {"filename", req.filename},
@@ -99,12 +116,12 @@ UploadTicket Client::requestUploadToken(const UploadTokenRequest& req) {
 
     auto res = impl_->post("/api/v1/integration/upload/token", body);
     
-    UploadTicket ticket;
     if (res.contains("error")) {
-        ticket.ticket_id = ""; // Error indicator
-        return ticket;
+        auto code = static_cast<ErrorCode>(res.value("error_code", (int)ErrorCode::Unknown));
+        return Result<UploadTicket>::Fail(code, res["error"]);
     }
 
+    UploadTicket ticket;
     ticket.ticket_id = res.value("ticket_id", "");
     ticket.presigned_url = res.value("presigned_url", "");
     ticket.bucket = res.value("bucket", "");
@@ -121,10 +138,10 @@ UploadTicket Client::requestUploadToken(const UploadTokenRequest& req) {
         ticket.has_credentials = false;
     }
 
-    return ticket;
+    return Result<UploadTicket>::Success(ticket);
 }
 
-bool Client::confirmUpload(const ConfirmUploadRequest& req) {
+Status Client::confirmUpload(const ConfirmUploadRequest& req) {
     json body = {
         {"ticket_id", req.ticket_id},
         {"type_key", req.type_key},
@@ -135,36 +152,54 @@ bool Client::confirmUpload(const ConfirmUploadRequest& req) {
     };
 
     auto res = impl_->post("/api/v1/integration/upload/confirm", body);
-    return res.contains("code") && (res["code"] == 200 || res["code"] == 201);
+    if (res.contains("error")) {
+        return Status::Fail(static_cast<ErrorCode>(res.value("error_code", (int)ErrorCode::ServerError)), res["error"]);
+    }
+
+    bool success = res.contains("code") && (res["code"] == 200 || res["code"] == 201);
+    return success ? Status::Success(true) : Status::Fail(ErrorCode::ServerError, "Server returned failure code");
 }
 
-ResourceDTO Client::getResource(const std::string& id) {
+Result<ResourceDTO> Client::getResource(const std::string& id) {
     CURL* curl = curl_easy_init();
     std::string readBuffer;
-    ResourceDTO dto;
+    
+    if(!curl) return Result<ResourceDTO>::Fail(ErrorCode::Unknown, "CURL init failed");
 
-    if(curl) {
-        std::string url = impl_->baseUrl + "/api/v1/resources/" + id;
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ClientImpl::WriteCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-        
-        auto res = curl_easy_perform(curl);
-        curl_easy_cleanup(curl);
+    std::string url = impl_->baseUrl + "/api/v1/resources/" + id;
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ClientImpl::WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+    
+    auto res = curl_easy_perform(curl);
+    
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    curl_easy_cleanup(curl);
 
-        if(res == CURLE_OK) {
-            auto j = json::parse(readBuffer);
-            dto.id = j.value("id", "");
-            dto.name = j.value("name", "");
-            dto.type_key = j.value("type_key", "");
-            if (j.contains("latest_version")) {
-                auto v = j["latest_version"];
-                dto.latest_version.version_num = v.value("version_num", 0);
-                dto.latest_version.download_url = v.value("download_url", "");
-            }
-        }
+    if(res != CURLE_OK) {
+        return Result<ResourceDTO>::Fail(ErrorCode::NetworkError, curl_easy_strerror(res));
     }
-    return dto;
+
+    if (http_code == 404) {
+        return Result<ResourceDTO>::Fail(ErrorCode::InvalidParam, "Resource not found");
+    }
+
+    try {
+        auto j = json::parse(readBuffer);
+        ResourceDTO dto;
+        dto.id = j.value("id", "");
+        dto.name = j.value("name", "");
+        dto.type_key = j.value("type_key", "");
+        if (j.contains("latest_version")) {
+            auto v = j["latest_version"];
+            dto.latest_version.version_num = v.value("version_num", 0);
+            dto.latest_version.download_url = v.value("download_url", "");
+        }
+        return Result<ResourceDTO>::Success(dto);
+    } catch (...) {
+        return Result<ResourceDTO>::Fail(ErrorCode::ServerError, "JSON parse error");
+    }
 }
 
 static size_t ProgressCallbackProxy(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow) {
@@ -175,18 +210,22 @@ static size_t ProgressCallbackProxy(void* clientp, curl_off_t dltotal, curl_off_
     return 0;
 }
 
-bool Client::uploadFileSimple(const std::string& url, const std::string& filePath, std::function<void(double)> progressCallback) {
+Status Client::uploadFileSimple(const std::string& url, const std::string& filePath, std::function<void(double)> progressCallback) {
     CURL* curl = curl_easy_init();
-    if(!curl) return false;
+    if(!curl) return Status::Fail(ErrorCode::Unknown, "CURL init failed");
 
     FILE* fd = fopen(filePath.c_str(), "rb");
     if(!fd) {
         curl_easy_cleanup(curl);
-        return false;
+        return Status::Fail(ErrorCode::FileSystemError, "Failed to open file: " + filePath);
     }
 
     struct stat file_info;
-    fstat(fileno(fd), &file_info);
+    if (fstat(fileno(fd), &file_info) != 0) {
+        fclose(fd);
+        curl_easy_cleanup(curl);
+        return Status::Fail(ErrorCode::FileSystemError, "Failed to stat file");
+    }
 
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
@@ -201,9 +240,16 @@ bool Client::uploadFileSimple(const std::string& url, const std::string& filePat
 
     auto res = curl_easy_perform(curl);
     
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
     fclose(fd);
     curl_easy_cleanup(curl);
-    return res == CURLE_OK;
+
+    if (res != CURLE_OK) return Status::Fail(ErrorCode::NetworkError, curl_easy_strerror(res));
+    if (http_code >= 400) return Status::Fail(ErrorCode::StorageError, "HTTP " + std::to_string(http_code));
+    
+    return Status::Success(true);
 }
 
 // Helper for capturing ETag from headers
@@ -213,34 +259,39 @@ static size_t HeaderCallback(char* buffer, size_t size, size_t nitems, void* use
     return size * nitems;
 }
 
-MultipartInitResponse Client::initMultipartUpload(const MultipartInitRequest& req) {
+Result<MultipartInitResponse> Client::initMultipartUpload(const MultipartInitRequest& req) {
     json body = {
         {"resource_type", req.resource_type},
         {"filename", req.filename}
     };
     auto res = impl_->post("/api/v1/integration/upload/multipart/init", body);
     
-    MultipartInitResponse resp;
-    if (res.contains("error")) return resp;
+    if (res.contains("error")) {
+        return Result<MultipartInitResponse>::Fail(static_cast<ErrorCode>(res.value("error_code", (int)ErrorCode::ServerError)), res["error"]);
+    }
     
+    MultipartInitResponse resp;
     resp.ticket_id = res.value("ticket_id", "");
     resp.upload_id = res.value("upload_id", "");
     resp.bucket = res.value("bucket", "");
     resp.object_key = res.value("object_key", "");
-    return resp;
+    return Result<MultipartInitResponse>::Success(resp);
 }
 
-std::string Client::getMultipartPartURL(const std::string& ticketId, const std::string& uploadId, int partNumber) {
+Result<std::string> Client::getMultipartPartURL(const std::string& ticketId, const std::string& uploadId, int partNumber) {
     json body = {
         {"ticket_id", ticketId},
         {"upload_id", uploadId},
         {"part_number", partNumber}
     };
     auto res = impl_->post("/api/v1/integration/upload/multipart/part-url", body);
-    return res.value("url", "");
+    if (res.contains("error")) {
+        return Result<std::string>::Fail(static_cast<ErrorCode>(res.value("error_code", (int)ErrorCode::ServerError)), res["error"]);
+    }
+    return Result<std::string>::Success(res.value("url", ""));
 }
 
-bool Client::completeMultipartUpload(const MultipartCompleteRequest& req) {
+Status Client::completeMultipartUpload(const MultipartCompleteRequest& req) {
     json parts = json::array();
     for (const auto& p : req.parts) {
         parts.push_back({{"part_number", p.part_number}, {"etag", p.etag}});
@@ -257,18 +308,23 @@ bool Client::completeMultipartUpload(const MultipartCompleteRequest& req) {
     };
     
     auto res = impl_->post("/api/v1/integration/upload/multipart/complete", body);
-    return res.contains("code") && (res["code"] == 200 || res["code"] == 201);
+    if (res.contains("error")) {
+        return Status::Fail(static_cast<ErrorCode>(res.value("error_code", (int)ErrorCode::ServerError)), res["error"]);
+    }
+    bool success = res.contains("code") && (res["code"] == 200 || res["code"] == 201);
+    return success ? Status::Success(true) : Status::Fail(ErrorCode::ServerError, "Complete call failed on server");
 }
 
-bool Client::uploadFileMultipart(const std::string& typeKey, const std::string& filePath, const std::string& name, std::function<void(double)> progressCallback) {
+Status Client::uploadFileMultipart(const std::string& typeKey, const std::string& filePath, const std::string& name, std::function<void(double)> progressCallback, int maxRetries) {
     // 1. Init
     std::string filename = filePath.substr(filePath.find_last_of("/\\") + 1);
-    MultipartInitResponse initResp = initMultipartUpload({typeKey, filename});
-    if (initResp.upload_id.empty()) return false;
+    auto initRes = initMultipartUpload({typeKey, filename});
+    if (!initRes.ok()) return Status::Fail(initRes.code, "Init failed: " + initRes.message);
+    auto& initResp = initRes.value;
 
     // 2. File size check
     std::ifstream file(filePath, std::ios::binary | std::ios::ate);
-    if (!file.is_open()) return false;
+    if (!file.is_open()) return Status::Fail(ErrorCode::FileSystemError, "Cannot open file: " + filePath);
     std::streamsize fileSize = file.tellg();
     file.seekg(0, std::ios::beg);
 
@@ -281,43 +337,64 @@ bool Client::uploadFileMultipart(const std::string& typeKey, const std::string& 
         std::streamsize toRead = std::min((std::streamsize)CHUNK_SIZE, fileSize - (std::streamsize)file.tellg());
         file.read(buffer.data(), toRead);
 
-        std::string partURL = getMultipartPartURL(initResp.ticket_id, initResp.upload_id, i);
-        if (partURL.empty()) return false;
+        std::string etag;
+        bool partSuccess = false;
+        std::string lastError;
 
-        // Perform Upload
-        CURL* curl = curl_easy_init();
-        std::string headerBuffer;
-        curl_easy_setopt(curl, CURLOPT_URL, partURL.c_str());
-        curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, buffer.data());
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)toRead);
-        curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, HeaderCallback);
-        curl_easy_setopt(curl, CURLOPT_HEADERDATA, &headerBuffer);
-        
-        // Disable Expect: 100-continue for small chunks if needed, but 5MB is better with it usually
-        
-        auto res = curl_easy_perform(curl);
-        if (res != CURLE_OK) {
+        // Retry loop for each part
+        for (int retry = 0; retry <= maxRetries; ++retry) {
+            if (retry > 0) {
+                // Exponential backoff
+                int delay = static_cast<int>(std::pow(2, retry - 1) * 1000);
+                std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+            }
+
+            auto urlRes = getMultipartPartURL(initResp.ticket_id, initResp.upload_id, i);
+            if (!urlRes.ok()) {
+                lastError = "Get URL failed: " + urlRes.message;
+                continue;
+            }
+
+            // Perform Upload
+            CURL* curl = curl_easy_init();
+            std::string headerBuffer;
+            curl_easy_setopt(curl, CURLOPT_URL, urlRes.value.c_str());
+            curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, buffer.data());
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)toRead);
+            curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, HeaderCallback);
+            curl_easy_setopt(curl, CURLOPT_HEADERDATA, &headerBuffer);
+            
+            auto res = curl_easy_perform(curl);
+            long http_code = 0;
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
             curl_easy_cleanup(curl);
-            return false;
+
+            if (res == CURLE_OK && http_code < 400) {
+                // Extract ETag
+                size_t etagPos = headerBuffer.find("ETag: ");
+                if (etagPos != std::string::npos) {
+                    size_t start = etagPos + 6;
+                    size_t end = headerBuffer.find("\r\n", start);
+                    etag = headerBuffer.substr(start, end - start);
+                    if (etag.size() >= 2 && etag.front() == '"' && etag.back() == '"') {
+                        etag = etag.substr(1, etag.size() - 2);
+                    }
+                    partSuccess = true;
+                    break;
+                } else {
+                    lastError = "ETag missing in response";
+                }
+            } else {
+                lastError = (res != CURLE_OK) ? curl_easy_strerror(res) : ("HTTP " + std::to_string(http_code));
+            }
         }
 
-        // Extract ETag from headers
-        std::string etag;
-        size_t etagPos = headerBuffer.find("ETag: ");
-        if (etagPos != std::string::npos) {
-            size_t start = etagPos + 6;
-            size_t end = headerBuffer.find("\r\n", start);
-            etag = headerBuffer.substr(start, end - start);
-            // Remove quotes if present
-            if (etag.size() >= 2 && etag.front() == '"' && etag.back() == '"') {
-                etag = etag.substr(1, etag.size() - 2);
-            }
+        if (!partSuccess) {
+            return Status::Fail(ErrorCode::NetworkError, "Failed to upload part " + std::to_string(i) + " after retries: " + lastError);
         }
         
         completedParts.push_back({i, etag});
-        curl_easy_cleanup(curl);
-        
         if (progressCallback) {
             progressCallback((double)i / totalParts);
         }
@@ -335,9 +412,9 @@ bool Client::uploadFileMultipart(const std::string& typeKey, const std::string& 
     return completeMultipartUpload(completeReq);
 }
 
-bool Client::uploadFileSTS(const UploadTicket& ticket, const std::string& filePath, const std::string& endpoint) {
+Status Client::uploadFileSTS(const UploadTicket& ticket, const std::string& filePath, const std::string& endpoint) {
 #ifdef USE_AWS_SDK
-    if (!ticket.has_credentials) return false;
+    if (!ticket.has_credentials) return Status::Fail(ErrorCode::InvalidParam, "Ticket has no STS credentials");
 
     Aws::Auth::AWSCredentials awsCreds(
         ticket.credentials.access_key.c_str(), 
@@ -361,13 +438,17 @@ bool Client::uploadFileSTS(const UploadTicket& ticket, const std::string& filePa
         filePath.c_str(), 
         std::ios_base::in | std::ios_base::binary);
 
+    if (!inputData->is_open()) return Status::Fail(ErrorCode::FileSystemError, "AWS SDK failed to open file");
+
     request.SetBody(inputData);
 
     auto outcome = s3_client.PutObject(request);
-    return outcome.IsSuccess();
+    if (!outcome.IsSuccess()) {
+        return Status::Fail(ErrorCode::StorageError, outcome.GetError().GetMessage().c_str());
+    }
+    return Status::Success(true);
 #else
-    std::cerr << "SDK Error: uploadFileSTS requires AWS SDK. Rebuild with -DUSE_AWS_SDK=ON" << std::endl;
-    return false;
+    return Status::Fail(ErrorCode::Unknown, "SDK not built with AWS support");
 #endif
 }
 
