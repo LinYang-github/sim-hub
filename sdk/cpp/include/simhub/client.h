@@ -63,6 +63,33 @@ public:
                          std::function<void(double)> progressCallback = nullptr);
 
     /**
+     * 初始化分片上传
+     */
+    MultipartInitResponse initMultipartUpload(const MultipartInitRequest& req);
+
+    /**
+     * 获取分片上传预签名 URL
+     */
+    std::string getMultipartPartURL(const std::string& ticketId, const std::string& uploadId, int partNumber);
+
+    /**
+     * 完成分片上传
+     */
+    bool completeMultipartUpload(const MultipartCompleteRequest& req);
+
+    /**
+     * 直接执行大文件分片上传 (自动切片、并发上传、合并确认)
+     * @param typeKey 资源类型 (如 map_terrain)
+     * @param filePath 本地文件路径
+     * @param name 资源名称
+     * @param progressCallback 进度回调
+     */
+    bool uploadFileMultipart(const std::string& typeKey, 
+                             const std::string& filePath,
+                             const std::string& name,
+                             std::function<void(double)> progressCallback = nullptr);
+
+    /**
      * 使用 STS 凭证进行 S3 原生上传 (需要 AWS SDK)
      * 注意：此方法仅在链接了 AWS SDK 的情况下可用，否则将抛出异常或返回失败。
      */

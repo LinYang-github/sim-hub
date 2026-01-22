@@ -79,6 +79,41 @@ type UpdateResourceTagsRequest struct {
 	Tags []string `json:"tags"`
 }
 
+// Multipart Upload DTOs
+type InitMultipartUploadRequest struct {
+	ResourceType string `json:"resource_type"`
+	Filename     string `json:"filename"`
+}
+
+type InitMultipartUploadResponse struct {
+	TicketID  string `json:"ticket_id"`
+	UploadID  string `json:"upload_id"`
+	Bucket    string `json:"bucket"`
+	ObjectKey string `json:"object_key"`
+}
+
+type GetPartURLRequest struct {
+	TicketID   string `json:"ticket_id"`
+	UploadID   string `json:"upload_id"`
+	PartNumber int    `json:"part_number"`
+}
+
+type GetPartURLResponse struct {
+	URL string `json:"url"`
+}
+
+type CompleteMultipartUploadRequest struct {
+	TicketID   string         `json:"ticket_id"`
+	UploadID   string         `json:"upload_id"`
+	Parts      []storage.Part `json:"parts"`
+	TypeKey    string         `json:"type_key"`
+	CategoryID string         `json:"category_id"`
+	Name       string         `json:"name"`
+	OwnerID    string         `json:"owner_id"`
+	Tags       []string       `json:"tags"`
+	ExtraMeta  map[string]any `json:"extra_meta"`
+}
+
 type CategoryDTO struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
@@ -155,6 +190,67 @@ func (uc *UseCase) RequestUploadToken(ctx context.Context, req ApplyUploadTokenR
 	}, nil
 }
 
+// InitMultipartUpload 初始化分片上传
+func (uc *UseCase) InitMultipartUpload(ctx context.Context, req InitMultipartUploadRequest) (*InitMultipartUploadResponse, error) {
+	ticketID := uuid.New().String()
+	objectKey := "resources/" + req.ResourceType + "/" + ticketID + "/" + req.Filename
+
+	uploadID, err := uc.store.InitMultipart(ctx, uc.minioConfig, objectKey)
+	if err != nil {
+		slog.Error("初始化分片上传失败", "error", err, "key", objectKey)
+		return nil, err
+	}
+
+	return &InitMultipartUploadResponse{
+		TicketID:  ticketID + "::" + objectKey,
+		UploadID:  uploadID,
+		Bucket:    uc.minioConfig,
+		ObjectKey: objectKey,
+	}, nil
+}
+
+// GetMultipartUploadPartURL 获取分片上传的预签名 URL
+func (uc *UseCase) GetMultipartUploadPartURL(ctx context.Context, req GetPartURLRequest) (*GetPartURLResponse, error) {
+	objectKey := ""
+	if len(req.TicketID) > 38 {
+		objectKey = req.TicketID[38:]
+	}
+
+	url, err := uc.store.PresignPart(ctx, uc.minioConfig, objectKey, req.UploadID, req.PartNumber, time.Hour)
+	if err != nil {
+		slog.Error("生成分片上传 URL 失败", "error", err, "key", objectKey, "part", req.PartNumber)
+		return nil, err
+	}
+
+	return &GetPartURLResponse{URL: url}, nil
+}
+
+// CompleteMultipartUpload 完成分片上传并注册资源
+func (uc *UseCase) CompleteMultipartUpload(ctx context.Context, req CompleteMultipartUploadRequest) error {
+	objectKey := ""
+	if len(req.TicketID) > 38 {
+		objectKey = req.TicketID[38:]
+	}
+
+	// 1. 在存储层完成分片合并
+	if err := uc.store.CompleteMultipart(ctx, uc.minioConfig, objectKey, req.UploadID, req.Parts); err != nil {
+		slog.Error("完成分片上传失败", "error", err, "key", objectKey, "upload_id", req.UploadID)
+		return err
+	}
+
+	// 2. 获取最终对象信息（获取真实大小）
+	objInfo, err := uc.store.Stat(ctx, uc.minioConfig, objectKey)
+	if err != nil {
+		slog.Error("无法获取合并后对象信息", "key", objectKey, "error", err)
+		return fmt.Errorf("uploaded file not found after completion: %w", err)
+	}
+
+	// 3. 注册到数据库
+	return uc.data.DB.Transaction(func(tx *gorm.DB) error {
+		return uc.createResourceAndVersion(tx, req.TypeKey, req.CategoryID, req.Name, req.OwnerID, objectKey, objInfo.Size, req.Tags, req.ExtraMeta)
+	})
+}
+
 // ConfirmUpload 确认上传完成
 func (uc *UseCase) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) error {
 	objectKey := ""
@@ -168,41 +264,44 @@ func (uc *UseCase) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) 
 		slog.Error("无法获取对象信息", "key", objectKey, "error", err)
 		return fmt.Errorf("uploaded file not found: %w", err)
 	}
-	actualSize := objInfo.Size
 
 	return uc.data.DB.Transaction(func(tx *gorm.DB) error {
-		res := model.Resource{
-			TypeKey:    req.TypeKey,
-			CategoryID: req.CategoryID,
-			Name:       req.Name,
-			OwnerID:    req.OwnerID,
-			Tags:       req.Tags,
-		}
-		if err := tx.Create(&res).Error; err != nil {
-			return err
-		}
-
-		ver := model.ResourceVersion{
-			ResourceID: res.ID,
-			VersionNum: 1,
-			FilePath:   objectKey,
-			FileSize:   actualSize, // 使用 MinIO 实际大小
-			MetaData:   req.ExtraMeta,
-			State:      "PENDING",
-		}
-		if err := tx.Create(&ver).Error; err != nil {
-			return err
-		}
-
-		// 发送任务到队列，而不是开启匿名 goroutine
-		uc.jobChan <- processJob{
-			TypeKey:   req.TypeKey,
-			ObjectKey: objectKey,
-			VersionID: ver.ID,
-		}
-
-		return nil
+		return uc.createResourceAndVersion(tx, req.TypeKey, req.CategoryID, req.Name, req.OwnerID, objectKey, objInfo.Size, req.Tags, req.ExtraMeta)
 	})
+}
+
+// createResourceAndVersion 内部统一资源注册逻辑
+func (uc *UseCase) createResourceAndVersion(tx *gorm.DB, typeKey, categoryID, name, ownerID, objectKey string, size int64, tags []string, meta map[string]any) error {
+	res := model.Resource{
+		TypeKey:    typeKey,
+		CategoryID: categoryID,
+		Name:       name,
+		OwnerID:    ownerID,
+		Tags:       tags,
+	}
+	if err := tx.Create(&res).Error; err != nil {
+		return err
+	}
+
+	ver := model.ResourceVersion{
+		ResourceID: res.ID,
+		VersionNum: 1,
+		FilePath:   objectKey,
+		FileSize:   size,
+		MetaData:   meta,
+		State:      "PENDING",
+	}
+	if err := tx.Create(&ver).Error; err != nil {
+		return err
+	}
+
+	// 触发异步处理
+	uc.jobChan <- processJob{
+		TypeKey:   typeKey,
+		ObjectKey: objectKey,
+		VersionID: ver.ID,
+	}
+	return nil
 }
 
 // processResourceInternal 异步处理资源逻辑 (由 Worker 调用)

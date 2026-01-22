@@ -27,6 +27,11 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 	{
 		integration.POST("/upload/token", m.ApplyUploadToken)
 		integration.POST("/upload/confirm", m.ConfirmUpload)
+
+		// 分片上传子路由
+		integration.POST("/upload/multipart/init", m.InitMultipartUpload)
+		integration.POST("/upload/multipart/part-url", m.GetMultipartUploadPartURL)
+		integration.POST("/upload/multipart/complete", m.CompleteMultipartUpload)
 	}
 
 	// /api/v1/resources 路径组
@@ -77,6 +82,53 @@ func (m *Module) ConfirmUpload(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Processing started"})
+}
+
+// InitMultipartUpload 初始化分片上传
+func (m *Module) InitMultipartUpload(c *gin.Context) {
+	var req core.InitMultipartUploadRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	resp, err := m.uc.InitMultipartUpload(c.Request.Context(), req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetMultipartUploadPartURL 获取分片 URL
+func (m *Module) GetMultipartUploadPartURL(c *gin.Context) {
+	var req core.GetPartURLRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	resp, err := m.uc.GetMultipartUploadPartURL(c.Request.Context(), req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// CompleteMultipartUpload 完成分片上传
+func (m *Module) CompleteMultipartUpload(c *gin.Context) {
+	var req core.CompleteMultipartUploadRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := m.uc.CompleteMultipartUpload(c.Request.Context(), req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Multipart upload completed and processing started"})
 }
 
 // GetResource 获取资源详情

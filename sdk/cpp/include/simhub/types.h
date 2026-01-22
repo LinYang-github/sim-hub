@@ -40,6 +40,34 @@ struct ConfirmUploadRequest {
     std::map<std::string, std::string> extra_meta;
 };
 
+// Multipart Upload Types
+struct MultipartInitRequest {
+    std::string resource_type;
+    std::string filename;
+};
+
+struct MultipartInitResponse {
+    std::string ticket_id;
+    std::string upload_id;
+    std::string bucket;
+    std::string object_key;
+};
+
+struct PartInfo {
+    int part_number;
+    std::string etag;
+};
+
+struct MultipartCompleteRequest {
+    std::string ticket_id;
+    std::string upload_id;
+    std::vector<PartInfo> parts;
+    std::string type_key;
+    std::string name;
+    std::string owner_id;
+    std::map<std::string, std::string> extra_meta;
+};
+
 struct ResourceVersionDTO {
     int version_num;
     long long file_size;

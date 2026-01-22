@@ -180,7 +180,10 @@ bool Client::uploadFileSimple(const std::string& url, const std::string& filePat
     if(!curl) return false;
 
     FILE* fd = fopen(filePath.c_str(), "rb");
-    if(!fd) return false;
+    if(!fd) {
+        curl_easy_cleanup(curl);
+        return false;
+    }
 
     struct stat file_info;
     fstat(fileno(fd), &file_info);
@@ -201,6 +204,135 @@ bool Client::uploadFileSimple(const std::string& url, const std::string& filePat
     fclose(fd);
     curl_easy_cleanup(curl);
     return res == CURLE_OK;
+}
+
+// Helper for capturing ETag from headers
+static size_t HeaderCallback(char* buffer, size_t size, size_t nitems, void* userdata) {
+    std::string* headers = static_cast<std::string*>(userdata);
+    headers->append(buffer, size * nitems);
+    return size * nitems;
+}
+
+MultipartInitResponse Client::initMultipartUpload(const MultipartInitRequest& req) {
+    json body = {
+        {"resource_type", req.resource_type},
+        {"filename", req.filename}
+    };
+    auto res = impl_->post("/api/v1/integration/upload/multipart/init", body);
+    
+    MultipartInitResponse resp;
+    if (res.contains("error")) return resp;
+    
+    resp.ticket_id = res.value("ticket_id", "");
+    resp.upload_id = res.value("upload_id", "");
+    resp.bucket = res.value("bucket", "");
+    resp.object_key = res.value("object_key", "");
+    return resp;
+}
+
+std::string Client::getMultipartPartURL(const std::string& ticketId, const std::string& uploadId, int partNumber) {
+    json body = {
+        {"ticket_id", ticketId},
+        {"upload_id", uploadId},
+        {"part_number", partNumber}
+    };
+    auto res = impl_->post("/api/v1/integration/upload/multipart/part-url", body);
+    return res.value("url", "");
+}
+
+bool Client::completeMultipartUpload(const MultipartCompleteRequest& req) {
+    json parts = json::array();
+    for (const auto& p : req.parts) {
+        parts.push_back({{"part_number", p.part_number}, {"etag", p.etag}});
+    }
+    
+    json body = {
+        {"ticket_id", req.ticket_id},
+        {"upload_id", req.upload_id},
+        {"parts", parts},
+        {"type_key", req.type_key},
+        {"name", req.name},
+        {"owner_id", req.owner_id},
+        {"extra_meta", req.extra_meta}
+    };
+    
+    auto res = impl_->post("/api/v1/integration/upload/multipart/complete", body);
+    return res.contains("code") && (res["code"] == 200 || res["code"] == 201);
+}
+
+bool Client::uploadFileMultipart(const std::string& typeKey, const std::string& filePath, const std::string& name, std::function<void(double)> progressCallback) {
+    // 1. Init
+    std::string filename = filePath.substr(filePath.find_last_of("/\\") + 1);
+    MultipartInitResponse initResp = initMultipartUpload({typeKey, filename});
+    if (initResp.upload_id.empty()) return false;
+
+    // 2. File size check
+    std::ifstream file(filePath, std::ios::binary | std::ios::ate);
+    if (!file.is_open()) return false;
+    std::streamsize fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    const size_t CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+    std::vector<PartInfo> completedParts;
+    int totalParts = (fileSize + CHUNK_SIZE - 1) / CHUNK_SIZE;
+
+    std::vector<char> buffer(CHUNK_SIZE);
+    for (int i = 1; i <= totalParts; ++i) {
+        std::streamsize toRead = std::min((std::streamsize)CHUNK_SIZE, fileSize - (std::streamsize)file.tellg());
+        file.read(buffer.data(), toRead);
+
+        std::string partURL = getMultipartPartURL(initResp.ticket_id, initResp.upload_id, i);
+        if (partURL.empty()) return false;
+
+        // Perform Upload
+        CURL* curl = curl_easy_init();
+        std::string headerBuffer;
+        curl_easy_setopt(curl, CURLOPT_URL, partURL.c_str());
+        curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, buffer.data());
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)toRead);
+        curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, HeaderCallback);
+        curl_easy_setopt(curl, CURLOPT_HEADERDATA, &headerBuffer);
+        
+        // Disable Expect: 100-continue for small chunks if needed, but 5MB is better with it usually
+        
+        auto res = curl_easy_perform(curl);
+        if (res != CURLE_OK) {
+            curl_easy_cleanup(curl);
+            return false;
+        }
+
+        // Extract ETag from headers
+        std::string etag;
+        size_t etagPos = headerBuffer.find("ETag: ");
+        if (etagPos != std::string::npos) {
+            size_t start = etagPos + 6;
+            size_t end = headerBuffer.find("\r\n", start);
+            etag = headerBuffer.substr(start, end - start);
+            // Remove quotes if present
+            if (etag.size() >= 2 && etag.front() == '"' && etag.back() == '"') {
+                etag = etag.substr(1, etag.size() - 2);
+            }
+        }
+        
+        completedParts.push_back({i, etag});
+        curl_easy_cleanup(curl);
+        
+        if (progressCallback) {
+            progressCallback((double)i / totalParts);
+        }
+    }
+
+    // 3. Complete
+    MultipartCompleteRequest completeReq;
+    completeReq.ticket_id = initResp.ticket_id;
+    completeReq.upload_id = initResp.upload_id;
+    completeReq.parts = completedParts;
+    completeReq.type_key = typeKey;
+    completeReq.name = name;
+    completeReq.owner_id = "cpp_sdk_multipart";
+    
+    return completeMultipartUpload(completeReq);
 }
 
 bool Client::uploadFileSTS(const UploadTicket& ticket, const std::string& filePath, const std::string& endpoint) {
