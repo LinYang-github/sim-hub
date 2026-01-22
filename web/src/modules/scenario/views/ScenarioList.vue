@@ -1,51 +1,58 @@
 <template>
-  <div class="scenario-container">
-    <!-- 左侧分类树 -->
+  <div class="scenario-layout">
+    <!-- 侧边栏：Glassmorphism 设计 -->
     <div class="category-sidebar">
       <div class="sidebar-header">
-        <span>分类目录</span>
-        <el-button type="primary" link @click="promptAddCategory">
+        <el-icon><FolderOpened /></el-icon>
+        <span>资源分类</span>
+        <el-button link type="primary" @click="promptAddCategory">
           <el-icon><Plus /></el-icon>
         </el-button>
       </div>
-      <el-tree 
-        :data="categoryTree" 
-        :props="defaultProps" 
-        @node-click="handleCategoryClick"
-        highlight-current
-        default-expand-all
-      >
-        <template #default="{ node, data }">
-          <span class="custom-tree-node">
-            <span><el-icon><FolderOpened v-if="node.expanded"/><Folder v-else/></el-icon> {{ node.label }}</span>
-            <span class="node-actions" v-if="data.id !== 'all'">
-              <el-icon @click.stop="confirmDeleteCategory(data)"><Delete /></el-icon>
+      
+      <el-scrollbar>
+        <el-tree
+          :data="categoryTree"
+          :props="defaultProps"
+          node-key="id"
+          class="custom-tree"
+          @node-click="handleCategoryClick"
+          highlight-current
+          :default-expanded-keys="['all']"
+        >
+          <template #default="{ node, data }">
+            <span class="custom-tree-node">
+              <el-icon v-if="data.id === 'all'"><Grid /></el-icon>
+              <el-icon v-else><Folder /></el-icon>
+              <span class="node-label">{{ node.label }}</span>
+              <span class="node-actions" v-if="data.id !== 'all'">
+                <el-icon class="delete-icon" @click.stop="confirmDeleteCategory(data.id)"><Delete /></el-icon>
+              </span>
             </span>
-          </span>
-        </template>
-      </el-tree>
+          </template>
+        </el-tree>
+      </el-scrollbar>
     </div>
 
-    <!-- 右侧列表 -->
+    <!-- 主内容区 -->
     <div class="scenario-main">
-      <div class="toolbar">
-        <h3>{{ currentCategoryName }} 想定库</h3>
-        <div class="actions">
-          <input
-            type="file"
-            id="folderInput"
-            webkitdirectory
-            directory
-            style="display: none"
-            @change="handleFolderSelect"
-          />
-          <el-button type="primary" @click="triggerFolderUpload">
-            <el-icon><Upload /></el-icon> 上传想定包
+      <div class="premium-header">
+        <div class="title-group">
+          <h2>{{ currentCategoryName }} <small>想定资源库</small></h2>
+        </div>
+        
+        <div class="action-group">
+          <el-button-group>
+            <el-button type="primary" class="upload-btn" @click="triggerFolderUpload">
+              <el-icon><Upload /></el-icon> 导入想定包
+            </el-button>
+            <el-button class="sync-btn" @click="syncFromStorage" :loading="syncing">
+              <el-icon><Connection /></el-icon> 同步存储
+            </el-button>
+          </el-button-group>
+          <el-button circle @click="fetchList" class="refresh-btn">
+            <el-icon><Refresh /></el-icon>
           </el-button>
-          <el-button @click="syncFromStorage" :loading="syncing">
-            <el-icon><Connection /></el-icon> 同步 MinIO 文件
-          </el-button>
-          <el-button @click="fetchList"><el-icon><Refresh /></el-icon></el-button>
         </div>
       </div>
 
@@ -55,67 +62,70 @@
         <el-progress v-else :percentage="uploadPercent" />
       </div>
 
-      <el-table :data="scenarios" style="width: 100%" v-loading="loading">
-      <el-table-column prop="name" label="想定名称" />
-      <el-table-column label="标签" width="180">
-        <template #default="scope">
-          <div class="tag-cell">
-            <el-tag 
-              v-for="tag in scope.row.tags" 
-              :key="tag" 
-              size="small" 
-              effect="plain"
-              class="mx-1"
-            >
-              {{ tag }}
-            </el-tag>
-            <el-button type="primary" link @click="openTagEditor(scope.row)">
-              <el-icon><PriceTag /></el-icon>
-            </el-button>
-          </div>
-        </template>
-      </el-table-column>
-      <el-table-column prop="version" label="版本" width="80">
-          <template #default="scope">
-              v{{ scope.row.latest_version?.version_num || 1 }}
-          </template>
-      </el-table-column>
-      <el-table-column label="状态" width="120">
-        <template #default="scope">
-          <el-tag :type="getStatusType(scope.row.latest_version?.state)">
-            {{ scope.row.latest_version?.state || 'UNKNOWN' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="created_at" label="创建时间" />
-      <el-table-column type="expand" label="详情">
-        <template #default="scope">
-          <div style="padding: 10px">
-            <p v-if="scope.row.latest_version?.meta_data?.scenario_type">
-              <b>场景类型:</b> {{ scope.row.latest_version.meta_data.scenario_type }}
-            </p>
-            <p v-if="scope.row.latest_version?.meta_data?.estimated_duration">
-              <b>预估时长:</b> {{ scope.row.latest_version.meta_data.estimated_duration }}s
-            </p>
-            <p v-if="scope.row.latest_version?.meta_data?.files_count">
-              <b>文件数量:</b> {{ scope.row.latest_version.meta_data.files_count }}
-            </p>
-          </div>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="150">
-        <template #default="scope">
-          <el-button 
-            type="primary" 
-            link 
-            size="small" 
-            :disabled="scope.row.latest_version?.state !== 'ACTIVE'"
-            @click="download(scope.row)"
-          >下载</el-button>
-          <el-button type="danger" link size="small">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+      <!-- 列表区 -->
+      <div class="content-container">
+        <el-table :data="scenarios" style="width: 100%" v-loading="loading" class="premium-table">
+          <el-table-column label="想定详情" min-width="250">
+            <template #default="scope">
+              <div class="scenario-info-cell">
+                <div class="scenario-icon">
+                  <el-icon><Files /></el-icon>
+                </div>
+                <div class="scenario-text">
+                  <div class="scenario-name">{{ scope.row.name }}</div>
+                  <div class="scenario-meta">
+                    <span><el-icon><Clock /></el-icon> {{ formatDate(scope.row.created_at) }}</span>
+                    <span><el-icon><DataLine /></el-icon> {{ formatSize(scope.row.latest_version?.file_size) }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="标签" width="220">
+            <template #default="scope">
+              <div class="tag-wrap">
+                <el-tag 
+                  v-for="tag in scope.row.tags" 
+                  :key="tag" 
+                  round
+                  size="small"
+                  class="premium-tag"
+                >
+                  {{ tag }}
+                </el-tag>
+                <el-button circle size="small" class="add-tag-btn" @click="openTagEditor(scope.row)">
+                  <el-icon><PriceTag /></el-icon>
+                </el-button>
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="版本" width="100">
+            <template #default="scope">
+              <span class="version-badge">v{{ scope.row.latest_version?.version_num || 1 }}</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="状态" width="140">
+            <template #default="scope">
+              <div class="status-cell">
+                <div :class="['status-dot', scope.row.latest_version?.state.toLowerCase()]"></div>
+                <span class="status-text">{{ statusMap[scope.row.latest_version?.state] || scope.row.latest_version?.state }}</span>
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="操作" width="120" fixed="right">
+            <template #default="scope">
+              <el-button type="primary" link :disabled="scope.row.latest_version?.state !== 'ACTIVE'" @click="download(scope.row)">
+                <el-icon><Download /></el-icon> 下载
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </div>
 
     <!-- 标签编辑对话框 -->
     <el-dialog v-model="tagDialogVisible" title="管理标签" width="400px">
@@ -140,13 +150,16 @@
         <el-button type="primary" @click="saveTags" :loading="tagLoading">保存</el-button>
       </template>
     </el-dialog>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { Upload, Refresh, Plus, Folder, FolderOpened, Delete, PriceTag, Connection } from '@element-plus/icons-vue'
+import { 
+  Upload, Refresh, Plus, Folder, FolderOpened, Delete, 
+  PriceTag, Connection, Grid, Clock, Files, DataLine, 
+  Download, Search 
+} from '@element-plus/icons-vue'
 import axios from 'axios'
 import JSZip from 'jszip'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -162,10 +175,12 @@ interface Resource {
   id: string
   name: string
   tags: string[]
+  created_at: string
   latest_version?: {
     version_num: number
     state: string
     meta_data?: any
+    file_size?: number
   }
 }
 
@@ -231,6 +246,29 @@ const currentCategoryName = computed(() => {
     return cat ? cat.name : ''
 })
 
+const statusMap: Record<string, string> = {
+  ACTIVE: '已激活',
+  PROCESSING: '处理中',
+  PENDING: '待处理',
+  FAILED: '失败',
+  UNKNOWN: '未知'
+}
+
+const formatDate = (dateString: string) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleString()
+}
+
+const formatSize = (bytes?: number) => {
+  if (bytes === undefined || bytes === null) return 'N/A'
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
 // 获取资源列表
 const fetchList = async () => {
     loading.value = true
@@ -241,6 +279,8 @@ const fetchList = async () => {
         }
         const res = await axios.get('/api/v1/resources', { params })
         scenarios.value = res.data.items || []
+    } catch (err: any) {
+        ElMessage.error('获取列表失败: ' + (err.response?.data?.error || err.message))
     } finally {
         loading.value = false
     }
@@ -253,6 +293,8 @@ const syncFromStorage = async () => {
         const res = await axios.post('/api/v1/resources/sync')
         ElMessage.success(`同步完成，共恢复 ${res.data.count} 个资源`)
         fetchList()
+    } catch (err: any) {
+        ElMessage.error('同步失败: ' + (err.response?.data?.error || err.message))
     } finally {
         syncing.value = false
     }
@@ -285,13 +327,16 @@ const promptAddCategory = () => {
     })
 }
 
-const confirmDeleteCategory = (data: any) => {
-    ElMessageBox.confirm(`确定要删除分类 "${data.name}" 吗？`, '警告', {
+const confirmDeleteCategory = (id: string) => {
+    const categoryToDelete = categories.value.find(c => c.id === id);
+    const categoryName = categoryToDelete ? categoryToDelete.name : '该分类';
+
+    ElMessageBox.confirm(`确定要删除分类 "${categoryName}" 吗？`, '警告', {
         type: 'warning'
     }).then(async () => {
-        await axios.delete(`/api/v1/categories/${data.id}`)
+        await axios.delete(`/api/v1/categories/${id}`)
         ElMessage.success('删除成功')
-        if (selectedCategoryId.value === data.id) {
+        if (selectedCategoryId.value === id) {
             selectedCategoryId.value = 'all'
             fetchList()
         }
@@ -392,16 +437,6 @@ const download = async (row: any) => {
     }
 }
 
-const getStatusType = (state: string) => {
-    switch (state) {
-        case 'ACTIVE': return 'success'
-        case 'PROCESSING': return 'warning'
-        case 'PENDING': return 'info'
-        case 'FAILED': return 'danger'
-        default: return 'info'
-    }
-}
-
 let pollInterval: any = null
 
 onMounted(() => {
@@ -423,77 +458,235 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.scenario-container {
+.scenario-layout {
   display: flex;
-  height: calc(100vh - 120px);
-  gap: 20px;
+  height: calc(100vh - 84px); /* 减去顶部 Workstation 导航 */
+  padding: 16px;
+  background-color: #f5f7fa;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  gap: 16px;
 }
 
+/* 侧边栏：Glassmorphism */
 .category-sidebar {
   width: 240px;
-  background: #fff;
-  border-right: 1px solid #ebeef5;
-  padding: 15px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
 }
 
 .sidebar-header {
+  padding: 20px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
-  font-weight: bold;
-  font-size: 14px;
+  gap: 8px;
+  font-weight: 600;
+  color: #1e293b;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.sidebar-header span {
+  flex: 1;
+}
+
+.custom-tree {
+  background: transparent;
+  padding: 8px;
 }
 
 .custom-tree-node {
-  flex: 1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  font-size: 14px;
+  width: 100%;
   padding-right: 8px;
 }
 
+.node-label {
+  margin-left: 8px;
+  flex: 1;
+  font-size: 13.5px;
+}
+
 .node-actions {
-  display: none;
-  font-size: 12px;
-  color: #f56c6c;
+  opacity: 0;
+  transition: opacity 0.2s;
 }
 
 .custom-tree-node:hover .node-actions {
-  display: block;
+  opacity: 1;
 }
 
+.delete-icon {
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.delete-icon:hover {
+  color: #f43f5e;
+}
+
+/* 主内容区 */
 .scenario-main {
   flex: 1;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
 }
 
-.toolbar {
+.premium-header {
+  background: #ffffff;
+  padding: 12px 24px;
+  border-radius: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.tag-cell {
+.premium-header h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 20px;
+}
+
+.premium-header h2 small {
+  font-weight: 400;
+  color: #64748b;
+  font-size: 14px;
+  margin-left: 8px;
+}
+
+.action-group {
+  display: flex;
+  gap: 12px;
+}
+
+.content-container {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+/* 表格定制 */
+.premium-table {
+  --el-table-header-bg-color: #f8fafc;
+}
+
+.scenario-info-cell {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.scenario-icon {
+  width: 40px;
+  height: 40px;
+  background: #eff6ff;
+  color: #3b82f6;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.scenario-name {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 14px;
+}
+
+.scenario-meta {
+  font-size: 12px;
+  color: #94a3b8;
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.scenario-meta span {
+  display: flex;
+  align-items: center;
   gap: 4px;
 }
 
-.mx-1 {
-  margin: 2px;
+.tag-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
 }
 
+.premium-tag {
+  border: none;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.add-tag-btn {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  color: #64748b;
+}
+
+.version-badge {
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.status-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cbd5e1;
+}
+
+.status-dot.active {
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.status-dot.processing {
+  background: #3b82f6;
+  animation: pulse 1.5s infinite;
+}
+
+.status-dot.failed {
+  background: #f43f5e;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+.status-text {
+  font-size: 13px;
+  color: #475569;
+}
+
+/* 进度条定制 */
 .upload-status {
-    margin: 10px 0;
-    padding: 10px;
-    background: #f0f9eb;
-    border: 1px solid #e1f3d8;
-    border-radius: 4px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  margin-top: 10px;
 }
 </style>

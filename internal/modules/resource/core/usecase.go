@@ -403,7 +403,7 @@ func (uc *UseCase) DeleteCategory(ctx context.Context, id string) error {
 
 // UpdateResourceTags 更新资源标签
 func (uc *UseCase) UpdateResourceTags(ctx context.Context, id string, tags []string) error {
-	return uc.data.DB.Model(&model.Resource{}).Where("id = ?", id).Update("tags", tags).Error
+	return uc.data.DB.Model(&model.Resource{}).Where("id = ?", id).Select("Tags").Updates(model.Resource{Tags: tags}).Error
 }
 
 // SyncFromStorage 从存储扫描并同步资源到数据库
