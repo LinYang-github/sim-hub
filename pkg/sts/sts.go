@@ -107,9 +107,13 @@ func (v *TokenVendor) FGetObject(ctx context.Context, bucket, objectName, filePa
 // ListObjects 列出前缀下的所有对象
 func (v *TokenVendor) ListObjects(ctx context.Context, bucket, prefix string) <-chan minio.ObjectInfo {
 	return v.client.ListObjects(ctx, bucket, minio.ListObjectsOptions{
-		Prefix:    prefix,
-		Recursive: true,
+		Prefix: prefix,
 	})
+}
+
+// RemoveObject 删除存储对象
+func (v *TokenVendor) RemoveObject(ctx context.Context, bucket, objectName string) error {
+	return v.client.RemoveObject(ctx, bucket, objectName, minio.RemoveObjectOptions{})
 }
 
 // PutObjectJSON 将对象作为 JSON 上传到存储

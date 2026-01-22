@@ -35,6 +35,7 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 		resources.GET("", m.ListResources)
 		resources.POST("/sync", m.SyncFromStorage) // 新增：同步存储
 		resources.GET("/:id", m.GetResource)
+		resources.DELETE("/:id", m.DeleteResource)         // 新增：删除资源
 		resources.PATCH("/:id/tags", m.UpdateResourceTags) // 新增：更新标签
 	}
 
@@ -170,4 +171,14 @@ func (m *Module) SyncFromStorage(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Sync completed", "count": count})
+}
+
+// DeleteResource 删除资源
+func (m *Module) DeleteResource(c *gin.Context) {
+	id := c.Param("id")
+	if err := m.uc.DeleteResource(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Resource deleted"})
 }

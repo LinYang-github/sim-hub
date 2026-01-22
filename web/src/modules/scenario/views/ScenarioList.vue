@@ -121,6 +121,9 @@
               <el-button type="primary" link :disabled="scope.row.latest_version?.state !== 'ACTIVE'" @click="download(scope.row)">
                 <el-icon><Download /></el-icon> 下载
               </el-button>
+              <el-button type="danger" link @click="confirmDelete(scope.row)">
+                <el-icon><Delete /></el-icon> 删除
+              </el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -423,6 +426,22 @@ const uploadZip = async (name: string, blob: Blob) => {
         owner_id: 'admin',
         size: blob.size,
         extra_meta: {}
+    })
+}
+
+const confirmDelete = (row: any) => {
+    ElMessageBox.confirm(`确定要删除资源 "${row.name}" 吗？`, '警告', {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消'
+    }).then(async () => {
+        try {
+            await axios.delete(`/api/v1/resources/${row.id}`)
+            ElMessage.success('删除成功')
+            fetchList()
+        } catch (err: any) {
+            ElMessage.error('删除失败: ' + (err.response?.data?.error || err.message))
+        }
     })
 }
 

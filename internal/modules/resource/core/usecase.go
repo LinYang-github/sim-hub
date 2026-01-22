@@ -478,3 +478,47 @@ func (uc *UseCase) SyncFromStorage(ctx context.Context) (int, error) {
 
 	return syncedCount, nil
 }
+
+// DeleteResource 删除资源 (软删除)
+// DeleteResource 删除资源 (物理删除 + 存储清理)
+func (uc *UseCase) DeleteResource(ctx context.Context, id string) error {
+	// 1. 获取资源信息
+	var res model.Resource
+	if err := uc.data.DB.First(&res, "id = ?", id).Error; err != nil {
+		return err
+	}
+
+	// 2. 获取所有版本
+	var versions []model.ResourceVersion
+	if err := uc.data.DB.Find(&versions, "resource_id = ?", id).Error; err != nil {
+		return err
+	}
+
+	// 3. 删除 MinIO 中的文件 (包括元数据 Sidecar)
+	for _, v := range versions {
+		// 删除主文件
+		if err := uc.tokenVendor.RemoveObject(ctx, uc.minioConfig, v.FilePath); err != nil {
+			log.Printf("[Delete] 无法删除 MinIO 文件 %s: %v", v.FilePath, err)
+			continue
+		}
+		// 删除 Sidecar 元数据文件
+		sidecarKey := v.FilePath + ".meta.json"
+		if err := uc.tokenVendor.RemoveObject(ctx, uc.minioConfig, sidecarKey); err != nil {
+			log.Printf("[Delete] 无法删除 Sidecar %s: %v", sidecarKey, err)
+			continue
+		}
+	}
+
+	// 4. 数据库级联删除
+	return uc.data.DB.Transaction(func(tx *gorm.DB) error {
+		// 删除所有版本记录
+		if err := tx.Delete(&model.ResourceVersion{}, "resource_id = ?", id).Error; err != nil {
+			return err
+		}
+		// 删除资源主表记录
+		if err := tx.Delete(&model.Resource{}, "id = ?", id).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
