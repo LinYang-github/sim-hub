@@ -2,6 +2,9 @@ package model
 
 import (
 	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // ResourceType 资源类型定义
@@ -17,7 +20,7 @@ type ResourceType struct {
 
 // Resource 资源主表
 type Resource struct {
-	ID           string       `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"` // SQLite compatibility needs care, UUID handling
+	ID           string       `gorm:"primaryKey;type:varchar(36)" json:"id"`
 	TypeKey      string       `gorm:"type:varchar(50);not null;index" json:"type_key"`
 	ResourceType ResourceType `gorm:"foreignKey:TypeKey;references:TypeKey" json:"resource_type,omitempty"`
 	Name         string       `gorm:"type:varchar(200);not null" json:"name"`
@@ -28,10 +31,17 @@ type Resource struct {
 	UpdatedAt    time.Time    `json:"updated_at"`
 }
 
+func (r *Resource) BeforeCreate(tx *gorm.DB) (err error) {
+	if r.ID == "" {
+		r.ID = uuid.New().String()
+	}
+	return
+}
+
 // ResourceVersion 资源版本表
 type ResourceVersion struct {
-	ID         string         `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
-	ResourceID string         `gorm:"type:uuid;not null;index:idx_res_ver,unique" json:"resource_id"`
+	ID         string         `gorm:"primaryKey;type:varchar(36)" json:"id"`
+	ResourceID string         `gorm:"type:varchar(36);not null;index:idx_res_ver,unique" json:"resource_id"`
 	Resource   Resource       `gorm:"foreignKey:ResourceID" json:"resource,omitempty"`
 	VersionNum int            `gorm:"not null;index:idx_res_ver,unique" json:"version_num"`
 	FilePath   string         `gorm:"type:varchar(500);not null" json:"file_path"`
@@ -40,4 +50,11 @@ type ResourceVersion struct {
 	MetaData   map[string]any `gorm:"serializer:json" json:"meta_data"`                // 动态扩展属性
 	State      string         `gorm:"type:varchar(20);default:'PENDING'" json:"state"` // PENDING, ACTIVE, ARCHIVED
 	CreatedAt  time.Time      `json:"created_at"`
+}
+
+func (rv *ResourceVersion) BeforeCreate(tx *gorm.DB) (err error) {
+	if rv.ID == "" {
+		rv.ID = uuid.New().String()
+	}
+	return
 }

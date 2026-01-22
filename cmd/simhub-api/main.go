@@ -4,10 +4,10 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
-	"github.com/liny/sim-hub/internal/biz"
 	"github.com/liny/sim-hub/internal/conf"
+	"github.com/liny/sim-hub/internal/core/module"
 	"github.com/liny/sim-hub/internal/data"
-	"github.com/liny/sim-hub/internal/service"
+	"github.com/liny/sim-hub/internal/modules/resource"
 	"github.com/liny/sim-hub/pkg/sts"
 	"github.com/spf13/viper"
 )
@@ -33,56 +33,40 @@ func main() {
 	}
 	defer cleanup()
 
-	minioClient, err := data.NewMinIO(&cfg.MinIO)
+	// 3. Init MinIO
+	minioClientWrapper, err := data.NewMinIO(&cfg.MinIO)
 	if err != nil {
-		log.Printf("Warning: Failed to init MinIO: %v", err)
+		log.Printf("Warning: MinIO init failed: %v", err)
 	} else {
 		log.Println("MinIO connected successfully")
 	}
 
-	// 3. Init Biz & Service
-	// If MinIO failed, minioClient is nil. In production we might fatal, but for dev we might allow partial start.
-	// However, TokenVendor needs a client.
-	var tv *sts.TokenVendor
-	if minioClient != nil {
-		tv = sts.NewTokenVendor(minioClient.Client)
+	// 4. Init TokenVendor
+	// NewTokenVendor expects *minio.Client, which is inside our wrapper
+	var tokenVendor *sts.TokenVendor
+	if minioClientWrapper != nil {
+		tokenVendor = sts.NewTokenVendor(minioClientWrapper.Client)
 	}
 
-	bucketName := cfg.MinIO.Bucket
-	if bucketName == "" {
-		bucketName = "simhub-raw"
-	}
+	// 5. Module Registration
+	registry := module.NewRegistry()
+	// NewModule expects *data.Data, *sts.TokenVendor, bucket string
+	registry.Register(resource.NewModule(dbConn, tokenVendor, cfg.MinIO.Bucket))
 
-	uc := biz.NewResourceUseCase(dbConn, tv, bucketName)
-	svc := service.NewResourceService(uc)
-
-	// 4. Setup Router
+	// 6. Setup Router
 	r := gin.Default()
 
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"message": "pong",
-			"db":      dbConn.DB != nil,
-			"minio":   minioClient != nil,
 		})
 	})
 
 	v1 := r.Group("/api/v1")
-	{
-		integration := v1.Group("/integration")
-		{
-			integration.POST("/upload/token", svc.ApplyUploadToken)
-			integration.POST("/upload/confirm", svc.ConfirmUpload)
-		}
-		resources := v1.Group("/resources")
-		{
-			resources.GET("", svc.ListResources)
-			resources.GET("/:id", svc.GetResource)
-		}
-	}
+	registry.MapRoutes(v1)
 
-	log.Println("Server starting on :8080")
-	if err := r.Run(":8080"); err != nil {
+	log.Println("Server starting on :30030")
+	if err := r.Run(":30030"); err != nil {
 		log.Fatal(err)
 	}
 }
