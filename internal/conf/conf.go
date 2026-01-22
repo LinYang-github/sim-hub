@@ -6,7 +6,6 @@ type Data struct {
 	ResourceTypes []ResourceType `mapstructure:"resource_types" json:"resource_types"`
 	Log           Log            `mapstructure:"log" json:"log"`
 	NATS          NATS           `mapstructure:"nats" json:"nats"`
-	NodeRole      string         `mapstructure:"node_role" json:"node_role"` // api, worker, combined
 	Worker        Worker         `mapstructure:"worker" json:"worker"`
 }
 

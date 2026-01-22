@@ -18,12 +18,12 @@ import (
 )
 
 func main() {
-	// 1. 加载配置信息
-	viper.SetConfigName("config")
+	// 1. 加载配置信息 (Master/API 专用)
+	viper.SetConfigName("config-api")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 	if err := viper.ReadInConfig(); err != nil {
-		slog.Error("读取配置文件出错", "error", err)
+		slog.Error("读取 API 配置文件出错 (config-api.yaml)", "error", err)
 		os.Exit(1)
 	}
 
@@ -73,7 +73,7 @@ func main() {
 
 	// 5. 业务模块注册
 	registry := module.NewRegistry()
-	registry.Register(resource.NewModule(dbConn, blobStore, stsProvider, cfg.MinIO.Bucket, natsClient, cfg.NodeRole, cfg.Worker.ApiBaseURL, cfg.Worker.Handlers))
+	registry.Register(resource.NewModule(dbConn, blobStore, stsProvider, cfg.MinIO.Bucket, natsClient, "api", "", nil))
 
 	// 6. 配置 HTTP 路由
 	r := gin.Default()

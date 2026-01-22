@@ -15,12 +15,12 @@ import (
 )
 
 func main() {
-	// 1. 加载配置
-	viper.SetConfigName("config")
+	// 1. 加载配置 (Worker 专用)
+	viper.SetConfigName("config-worker")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 	if err := viper.ReadInConfig(); err != nil {
-		slog.Error("读取配置文件出错", "error", err)
+		slog.Error("读取 Worker 配置文件出错 (config-worker.yaml)", "error", err)
 		os.Exit(1)
 	}
 
@@ -30,8 +30,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 强制设定 Role 为 worker
-	cfg.NodeRole = "worker"
 	if !cfg.NATS.Enabled {
 		slog.Error("Worker 节点必须开启 NATS 才能运行")
 		os.Exit(1)
@@ -40,15 +38,8 @@ func main() {
 	// 2. 初始化日志
 	logger.InitLogger(&cfg.Log)
 
-	// 3. 初始化数据层 (Worker 需要 DB 来读取配置，除非我们重构协议)
-	// 注意：在真正的分布式生产环境中，Worker 不应直连 DB。
-	// 此处为第一阶段实现，假设 Worker 和 API 共享同一后端存储/DB（如物理机或挂载卷）。
-	dbConn, cleanup, err := data.NewData(&cfg)
-	if err != nil {
-		slog.Error("数据库初始化失败", "error", err)
-		os.Exit(1)
-	}
-	defer cleanup()
+	// 3. Worker 现在不需要直接操作数据库
+	// 它通过 API Callback 上报结果
 
 	// 4. 初始化存储
 	minioClientWrapper, err := data.NewMinIO(&cfg.MinIO)
@@ -68,7 +59,7 @@ func main() {
 	defer natsClient.Close()
 
 	// 6. 启动 UseCase (Worker 模式)
-	_ = core.NewUseCase(dbConn, store, store, cfg.MinIO.Bucket, natsClient, cfg.NodeRole, cfg.Worker.ApiBaseURL, cfg.Worker.Handlers)
+	_ = core.NewUseCase(nil, store, store, cfg.MinIO.Bucket, natsClient, "worker", cfg.Worker.ApiBaseURL, cfg.Worker.Handlers)
 
 	slog.Info("SimHub 计算 Worker 已启动", "subject", cfg.NATS.Subject)
 
