@@ -54,6 +54,24 @@
 
       <el-table :data="scenarios" style="width: 100%" v-loading="loading">
       <el-table-column prop="name" label="想定名称" />
+      <el-table-column label="标签" width="180">
+        <template #default="scope">
+          <div class="tag-cell">
+            <el-tag 
+              v-for="tag in scope.row.tags" 
+              :key="tag" 
+              size="small" 
+              effect="plain"
+              class="mx-1"
+            >
+              {{ tag }}
+            </el-tag>
+            <el-button type="primary" link @click="openTagEditor(scope.row)">
+              <el-icon><PriceTag /></el-icon>
+            </el-button>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column prop="version" label="版本" width="80">
           <template #default="scope">
               v{{ scope.row.latest_version?.version_num || 1 }}
@@ -95,13 +113,37 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 标签编辑对话框 -->
+    <el-dialog v-model="tagDialogVisible" title="管理标签" width="400px">
+      <el-select
+        v-model="editingTags"
+        multiple
+        filterable
+        allow-create
+        default-first-option
+        placeholder="输入标签并按回车"
+        style="width: 100%"
+      >
+        <el-option
+          v-for="item in existingTags"
+          :key="item"
+          :label="item"
+          :value="item"
+        />
+      </el-select>
+      <template #footer>
+        <el-button @click="tagDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveTags" :loading="tagLoading">保存</el-button>
+      </template>
+    </el-dialog>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { Upload, Refresh, Plus, Folder, FolderOpened, Delete } from '@element-plus/icons-vue'
+import { Upload, Refresh, Plus, Folder, FolderOpened, Delete, PriceTag } from '@element-plus/icons-vue'
 import axios from 'axios'
 import JSZip from 'jszip'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -116,6 +158,7 @@ interface Category {
 interface Resource {
   id: string
   name: string
+  tags: string[]
   latest_version?: {
     version_num: number
     state: string
@@ -132,6 +175,37 @@ const progress = ref(0)
 const uploadPercent = ref(0)
 const currentFile = ref('')
 const selectedCategoryId = ref('all')
+const tagDialogVisible = ref(false)
+const tagLoading = ref(false)
+const editingTags = ref<string[]>([])
+const currentResourceId = ref('')
+const existingTags = computed(() => {
+    const tags = new Set<string>()
+    scenarios.value.forEach(s => {
+        if (s.tags) s.tags.forEach(t => tags.add(t))
+    })
+    return Array.from(tags)
+})
+
+const openTagEditor = (row: Resource) => {
+    currentResourceId.value = row.id
+    editingTags.value = [...(row.tags || [])]
+    tagDialogVisible.value = true
+}
+
+const saveTags = async () => {
+    tagLoading.value = true
+    try {
+        await axios.patch(`/api/v1/resources/${currentResourceId.value}/tags`, {
+            tags: editingTags.value
+        })
+        ElMessage.success('标签更新成功')
+        tagDialogVisible.value = false
+        fetchList()
+    } finally {
+        tagLoading.value = false
+    }
+}
 
 const defaultProps = {
   children: 'children',
@@ -387,6 +461,18 @@ onUnmounted(() => {
   align-items: center;
   margin-bottom: 20px;
 }
+
+.tag-cell {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.mx-1 {
+  margin: 2px;
+}
+
 .upload-status {
     margin: 10px 0;
     padding: 10px;

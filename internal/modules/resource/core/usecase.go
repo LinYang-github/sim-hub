@@ -42,8 +42,13 @@ type ConfirmUploadRequest struct {
 	CategoryID string         `json:"category_id"` // 新增：所属分类 ID
 	Name       string         `json:"name"`
 	OwnerID    string         `json:"owner_id"`
+	Tags       []string       `json:"tags"` // 新增：资源标签
 	Size       int64          `json:"size"`
 	ExtraMeta  map[string]any `json:"extra_meta"`
+}
+
+type UpdateResourceTagsRequest struct {
+	Tags []string `json:"tags"`
 }
 
 type CategoryDTO struct {
@@ -135,6 +140,7 @@ func (uc *UseCase) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) 
 			CategoryID: req.CategoryID,
 			Name:       req.Name,
 			OwnerID:    req.OwnerID,
+			Tags:       req.Tags,
 		}
 		if err := tx.Create(&res).Error; err != nil {
 			return err
@@ -358,4 +364,9 @@ func (uc *UseCase) ListCategories(ctx context.Context, typeKey string) ([]*Categ
 // DeleteCategory 删除分类
 func (uc *UseCase) DeleteCategory(ctx context.Context, id string) error {
 	return uc.data.DB.Delete(&model.Category{}, "id = ?", id).Error
+}
+
+// UpdateResourceTags 更新资源标签
+func (uc *UseCase) UpdateResourceTags(ctx context.Context, id string, tags []string) error {
+	return uc.data.DB.Model(&model.Resource{}).Where("id = ?", id).Update("tags", tags).Error
 }

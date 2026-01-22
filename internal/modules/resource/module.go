@@ -34,6 +34,7 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 	{
 		resources.GET("", m.ListResources)
 		resources.GET("/:id", m.GetResource)
+		resources.PATCH("/:id/tags", m.UpdateResourceTags) // 新增：更新标签
 	}
 
 	// /api/v1/categories 路径组
@@ -142,4 +143,20 @@ func (m *Module) DeleteCategory(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"msg": "Category deleted"})
+}
+
+// UpdateResourceTags 更新资源标签
+func (m *Module) UpdateResourceTags(c *gin.Context) {
+	id := c.Param("id")
+	var req core.UpdateResourceTagsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := m.uc.UpdateResourceTags(c.Request.Context(), id, req.Tags); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Tags updated"})
 }
