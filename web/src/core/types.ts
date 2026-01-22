@@ -15,6 +15,6 @@ export interface SimHubModule {
   // External Integration Props
   label?: string       // Menu label for external
   externalUrl?: string // Target URL
-  integrationMode?: 'iframe' | 'new-tab'
+  integrationMode?: 'iframe' | 'new-tab' | 'internal'
 }
 

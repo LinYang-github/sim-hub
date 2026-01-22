@@ -7,11 +7,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Workstation from './components/Workstation.vue'
 import { moduleManager } from './core/moduleManager'
 import resourceModule from './modules/resource'
-import bingModule from './modules/external_example'
 
-// Register Modules
-moduleManager.register(resourceModule)
-moduleManager.register(bingModule)
+// Register Built-in Modules Implementations
+moduleManager.registerImplementation(resourceModule)
 
 const routes = [
   { path: '/', component: Workstation },
@@ -29,7 +27,14 @@ app.use(ElementPlus, {
 })
 app.use(router)
 
-// Install Modules (after router is ready)
-moduleManager.install(app, router)
+const initApp = async () => {
+  // Load External Modules Config
+  await moduleManager.loadConfig('/modules.json')
+  
+  // Install Modules (after router is ready & config loaded)
+  moduleManager.install(app, router)
+  
+  app.mount('#app')
+}
 
-app.mount('#app')
+initApp()

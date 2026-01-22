@@ -1,0 +1,13 @@
+[
+  {
+    "key": "resource",
+    "label": "基础资源库",
+    "integrationMode": "internal"
+  },
+  {
+    "key": "test-repo",
+    "label": "测试资源库",
+    "externalUrl": "http://localhost:30031",
+    "integrationMode": "iframe"
+  }
+]
