@@ -87,6 +87,7 @@ func seedBasicTypes(db *gorm.DB, configTypes []conf.ResourceType) {
 				ViewerConf:   vc,
 				ProcessConf:  pc,
 				ProcessorCmd: ct.ProcessorCmd,
+				CategoryMode: ct.CategoryMode,
 			})
 		}
 		if len(types) > 0 {

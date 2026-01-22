@@ -105,6 +105,7 @@ import { Upload, Refresh, Plus, Folder, FolderOpened, Delete } from '@element-pl
 import axios from 'axios'
 import JSZip from 'jszip'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { buildTree } from '../../../core/utils/tree'
 
 interface Category {
   id: string
@@ -137,11 +138,12 @@ const defaultProps = {
   label: 'name',
 }
 
-// 格式化分类树
+// 格式化分类树 (支持多级嵌套)
 const categoryTree = computed(() => {
+  const tree = buildTree(categories.value)
   return [
     { id: 'all', name: '全部分类' },
-    ...categories.value
+    ...tree
   ]
 })
 

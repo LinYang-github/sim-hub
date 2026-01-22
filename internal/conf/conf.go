@@ -26,4 +26,5 @@ type ResourceType struct {
 	ViewerConf   map[string]any `mapstructure:"viewer_conf" json:"viewer_conf"`
 	ProcessConf  map[string]any `mapstructure:"process_conf" json:"process_conf"`
 	ProcessorCmd string         `mapstructure:"processor_cmd" json:"processor_cmd"`
+	CategoryMode string         `mapstructure:"category_mode" json:"category_mode"` // "flat" or "tree"
 }
