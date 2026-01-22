@@ -1,0 +1,10 @@
+database:
+  driver: "sqlite"
+  source: "simhub.db"
+
+minio:
+  endpoint: "localhost:9000"
+  access_key: "minio_admin"
+  secret_key: "minio_password"
+  use_ssl: false
+  bucket: "simhub-raw"
