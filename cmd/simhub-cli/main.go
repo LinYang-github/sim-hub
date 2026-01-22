@@ -6,7 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -21,7 +21,8 @@ func main() {
 	flag.Parse()
 
 	if *filePtr == "" {
-		log.Fatal("Please provide a file using -file")
+		slog.Error("Please provide a file using -file")
+		os.Exit(1)
 	}
 
 	filePath := *filePtr
@@ -32,7 +33,8 @@ func main() {
 	fmt.Println("\n[Step 1] Requesting Upload Token from SimHub...")
 	tokenResp, err := requestToken(filename, *typePtr)
 	if err != nil {
-		log.Fatalf("Request Token Failed: %v", err)
+		slog.Error("Request Token Failed", "error", err)
+		os.Exit(1)
 	}
 	fmt.Printf("   -> Ticket ID: %s\n", tokenResp.TicketID)
 	fmt.Printf("   -> Presigned URL: %s...\n", tokenResp.PresignedURL[:50])
@@ -40,7 +42,8 @@ func main() {
 	// Step 2: Upload to MinIO
 	fmt.Println("\n[Step 2] Uploading file to MinIO...")
 	if err := uploadFile(filePath, tokenResp.PresignedURL); err != nil {
-		log.Fatalf("Upload Failed: %v", err)
+		slog.Error("Upload Failed", "error", err)
+		os.Exit(1)
 	}
 	fmt.Println("   -> Upload Successful")
 
@@ -48,7 +51,8 @@ func main() {
 	fmt.Println("\n[Step 3] Confirming Upload to SimHub...")
 	fileInfo, _ := os.Stat(filePath)
 	if err := confirmUpload(tokenResp.TicketID, filename, *typePtr, fileInfo.Size()); err != nil {
-		log.Fatalf("Confirm Failed: %v", err)
+		slog.Error("Confirm Failed", "error", err)
+		os.Exit(1)
 	}
 	fmt.Println("   -> Confirmation Successful! Resource created.")
 }

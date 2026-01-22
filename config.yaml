@@ -46,3 +46,12 @@ resource_types:
           type: "string"
     processor_cmd: "./drivers/scenario-processor"
     category_mode: "flat"
+
+log:
+  level: "info"
+  filename: "simhub.log"
+  max_size: 100
+  max_backups: 3
+  max_age: 28
+  compress: true
+  format: "text"

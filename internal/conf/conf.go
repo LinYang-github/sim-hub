@@ -4,6 +4,17 @@ type Data struct {
 	Database      Database       `mapstructure:"database" json:"database"`
 	MinIO         MinIO          `mapstructure:"minio" json:"minio"`
 	ResourceTypes []ResourceType `mapstructure:"resource_types" json:"resource_types"`
+	Log           Log            `mapstructure:"log" json:"log"`
+}
+
+type Log struct {
+	Level      string `mapstructure:"level" json:"level"`             // debug, info, warn, error
+	Filename   string `mapstructure:"filename" json:"filename"`       // 日志文件路径
+	MaxSize    int    `mapstructure:"max_size" json:"max_size"`       // 每个日志文件最大尺寸 (MB)
+	MaxBackups int    `mapstructure:"max_backups" json:"max_backups"` // 保留旧文件最大个数
+	MaxAge     int    `mapstructure:"max_age" json:"max_age"`         // 保留旧文件最大天数
+	Compress   bool   `mapstructure:"compress" json:"compress"`       // 是否压缩/归档旧文件
+	Format     string `mapstructure:"format" json:"format"`           // json 或 text
 }
 
 type Database struct {

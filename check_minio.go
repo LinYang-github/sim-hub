@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -21,7 +21,8 @@ func main() {
 		Secure: useSSL,
 	})
 	if err != nil {
-		log.Fatalln(err)
+		slog.Error("MinIO 初始化失败", "error", err)
+		return
 	}
 
 	bucketName := "simhub-raw"
@@ -40,7 +41,7 @@ func main() {
 	count := 0
 	for object := range objectCh {
 		if object.Err != nil {
-			log.Println(object.Err)
+			slog.Error("ListObjects 错误", "error", object.Err)
 			return
 		}
 		fmt.Println("-", object.Key)

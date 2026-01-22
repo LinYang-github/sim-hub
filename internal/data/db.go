@@ -2,7 +2,7 @@ package data
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/liny/sim-hub/internal/conf"
 	"github.com/liny/sim-hub/internal/model"
@@ -58,7 +58,7 @@ func NewData(c *conf.Data) (*Data, func(), error) {
 	seedBasicTypes(db, c.ResourceTypes)
 
 	cleanup := func() {
-		log.Println("正在关闭数据资源连接")
+		slog.Info("正在关闭数据资源连接")
 		sqlDB, _ := db.DB()
 		if sqlDB != nil {
 			sqlDB.Close()
@@ -87,7 +87,7 @@ func seedBasicTypes(db *gorm.DB, configTypes []conf.ResourceType) {
 		}
 		if len(types) > 0 {
 			db.Create(&types)
-			log.Printf("已从配置注入 %d 条资源类型定义", len(types))
+			slog.Info("已从配置注入资源类型定义", "count", len(types))
 		}
 	}
 }

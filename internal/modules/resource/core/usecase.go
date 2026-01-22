@@ -3,11 +3,11 @@ package core
 import (
 	"context"
 	"fmt"
+	"log"
+	"log/slog"
+	"os"
 	"strings"
 	"time"
-
-	"log"
-	"os"
 
 	"github.com/google/uuid"
 	"github.com/liny/sim-hub/internal/data"
@@ -46,7 +46,7 @@ func NewUseCase(d *data.Data, tv *sts.TokenVendor, bucket string) *UseCase {
 }
 
 func (uc *UseCase) startWorker(id int) {
-	log.Printf("[Worker %d] 启动", id)
+	slog.Info("Worker 启动", "worker_id", id)
 	for job := range uc.jobChan {
 		uc.processResourceInternal(context.Background(), job.TypeKey, job.ObjectKey, job.VersionID)
 	}
@@ -162,7 +162,7 @@ func (uc *UseCase) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) 
 	// 0. 验证 MinIO 中对象是否存在
 	objInfo, err := uc.tokenVendor.StatObject(ctx, uc.minioConfig, objectKey)
 	if err != nil {
-		log.Printf("[Confirm] 无法获取对象信息 %s: %v", objectKey, err)
+		slog.Error("无法获取对象信息", "key", objectKey, "error", err)
 		return fmt.Errorf("uploaded file not found: %w", err)
 	}
 	actualSize := objInfo.Size
@@ -204,12 +204,12 @@ func (uc *UseCase) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) 
 
 // processResourceInternal 异步处理资源逻辑 (由 Worker 调用)
 func (uc *UseCase) processResourceInternal(ctx context.Context, typeKey, objectKey, versionID string) {
-	log.Printf("[Worker] 开始处理资源: %s (Type: %s)", objectKey, typeKey)
+	slog.Info("开始处理资源", "key", objectKey, "type", typeKey)
 
 	// 1. 获取资源类型配置，检查是否有处理器
 	var rt model.ResourceType
 	if err := uc.data.DB.First(&rt, "type_key = ?", typeKey).Error; err != nil {
-		log.Printf("[Worker] 无法获取资源类型配置: %v", typeKey)
+		slog.Warn("无法获取资源类型配置", "type", typeKey)
 		return
 	}
 
@@ -222,7 +222,7 @@ func (uc *UseCase) processResourceInternal(ctx context.Context, typeKey, objectK
 	if rt.ProcessorCmd != "" {
 		tempDir, err := os.MkdirTemp("", "simhub-proc-*")
 		if err != nil {
-			log.Printf("[Worker] 创建临时目录失败: %v", err)
+			slog.Error("创建临时目录失败", "error", err)
 			return
 		}
 		defer os.RemoveAll(tempDir)
@@ -230,7 +230,7 @@ func (uc *UseCase) processResourceInternal(ctx context.Context, typeKey, objectK
 		// 3. 执行外部处理器指令
 		// 需求变更：移除本地脚本执行，改为消息队列模式
 		// TODO: 后续集成消息队列 (如 Kafka/RabbitMQ) 发送处理事件
-		log.Printf("[Worker] 待发送处理消息至 MQ: Type=%s, Key=%s", rt.TypeKey, objectKey)
+		slog.Info("待发送处理消息至 MQ", "type", rt.TypeKey, "key", objectKey)
 
 		// 模拟异步处理耗时
 		time.Sleep(500 * time.Millisecond)
@@ -455,7 +455,7 @@ func (uc *UseCase) SyncFromStorage(ctx context.Context) (int, error) {
 		}
 
 		if err := uc.data.DB.Create(&ver).Error; err != nil {
-			log.Printf("[Sync] 无法创建版本记录: %v", err)
+			slog.Error("无法创建版本记录", "error", err)
 			continue
 		}
 
@@ -490,13 +490,13 @@ func (uc *UseCase) DeleteResource(ctx context.Context, id string) error {
 	for _, v := range versions {
 		// 删除主文件
 		if err := uc.tokenVendor.RemoveObject(ctx, uc.minioConfig, v.FilePath); err != nil {
-			log.Printf("[Delete] 无法删除 MinIO 文件 %s: %v", v.FilePath, err)
+			slog.Error("无法删除 MinIO 文件", "path", v.FilePath, "error", err)
 			continue
 		}
 		// 删除 Sidecar 元数据文件
 		sidecarKey := v.FilePath + ".meta.json"
 		if err := uc.tokenVendor.RemoveObject(ctx, uc.minioConfig, sidecarKey); err != nil {
-			log.Printf("[Delete] 无法删除 Sidecar %s: %v", sidecarKey, err)
+			slog.Error("无法删除 Sidecar", "path", sidecarKey, "error", err)
 			continue
 		}
 	}

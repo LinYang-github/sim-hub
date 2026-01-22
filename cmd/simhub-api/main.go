@@ -2,12 +2,14 @@ package main
 
 import (
 	"log"
+	"log/slog"
 
 	"github.com/gin-gonic/gin"
 	"github.com/liny/sim-hub/internal/conf"
 	"github.com/liny/sim-hub/internal/core/module"
 	"github.com/liny/sim-hub/internal/data"
 	"github.com/liny/sim-hub/internal/modules/resource"
+	"github.com/liny/sim-hub/pkg/logger"
 	"github.com/liny/sim-hub/pkg/sts"
 	"github.com/spf13/viper"
 )
@@ -25,6 +27,9 @@ func main() {
 	if err := viper.Unmarshal(&cfg); err != nil {
 		log.Fatalf("将配置解码为结构体时出错: %v", err)
 	}
+
+	// 1.5 初始化日志系统
+	logger.InitLogger(&cfg.Log)
 
 	// 2. 初始化核心数据组件 (数据库与 MinIO)
 	dbConn, cleanup, err := data.NewData(&cfg)
@@ -65,7 +70,7 @@ func main() {
 	v1 := r.Group("/api/v1")
 	registry.MapRoutes(v1)
 
-	log.Println("服务器正在启动，端口为 :30030")
+	slog.Info("服务器正在启动", "port", 30030)
 	if err := r.Run(":30030"); err != nil {
 		log.Fatal(err)
 	}
