@@ -18,7 +18,8 @@ const scenarioModule: SimHubModule = {
       props: { 
         typeKey: 'scenario', 
         typeName: '想定',
-        uploadMode: 'folder-zip'
+        uploadMode: 'folder-zip',
+        enableScope: true
       }
     }
   ]

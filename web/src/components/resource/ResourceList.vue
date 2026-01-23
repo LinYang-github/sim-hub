@@ -43,6 +43,14 @@
           <h2>{{ currentCategoryName }} <small>{{ typeName }}资源库</small></h2>
         </div>
         
+        <div v-if="enableScope" class="scope-tabs">
+          <el-radio-group v-model="activeScope" size="small">
+            <el-radio-button label="ALL">全部</el-radio-button>
+            <el-radio-button label="PUBLIC">公共库</el-radio-button>
+            <el-radio-button label="PRIVATE">我的</el-radio-button>
+          </el-radio-group>
+        </div>
+
         <div class="action-group">
           <el-button-group>
             <!-- Folder Upload -->
@@ -82,7 +90,10 @@
                   <el-icon v-else><Files /></el-icon>
                 </div>
                 <div class="resource-text">
-                  <div class="resource-name">{{ scope.row.name }}</div>
+                  <div class="name-row">
+                    <span class="resource-name">{{ scope.row.name }}</span>
+                    <el-tag v-if="scope.row.scope === 'PUBLIC'" size="small" type="success" effect="plain" class="scope-tag">公共</el-tag>
+                  </div>
                   <div class="resource-meta">
                     <span><el-icon><Clock /></el-icon> {{ formatDate(scope.row.created_at) }}</span>
                     <span><el-icon><DataLine /></el-icon> {{ formatSize(scope.row.latest_version?.file_size) }}</span>
@@ -126,11 +137,14 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="160" fixed="right">
+          <el-table-column label="操作" width="220" fixed="right">
             <template #default="scope">
               <div class="operation-buttons">
                 <el-button type="primary" link :disabled="scope.row.latest_version?.state !== 'ACTIVE'" @click="download(scope.row)">
                   <el-icon><Download /></el-icon> 下载
+                </el-button>
+                <el-button v-if="scope.row.scope === 'PRIVATE'" type="success" link @click="publishResource(scope.row)">
+                  <el-icon><Promotion /></el-icon> 发布
                 </el-button>
                 <el-button type="danger" link @click="confirmDelete(scope.row)">
                   <el-icon><Delete /></el-icon> 删除
@@ -207,6 +221,8 @@ interface Resource {
   id: string
   name: string
   tags: string[]
+  owner_id: string
+  scope: 'PRIVATE' | 'PUBLIC'
   created_at: string
   latest_version?: {
     version_num: number
@@ -221,6 +237,7 @@ const props = defineProps<{
   typeName: string
   uploadMode?: 'single' | 'folder-zip'
   accept?: string
+  enableScope?: boolean
 }>()
 
 const resources = ref<Resource[]>([])
@@ -233,6 +250,7 @@ const progress = ref(0)
 const uploadPercent = ref(0)
 const currentFile = ref('')
 const selectedCategoryId = ref('all')
+const activeScope = ref<'ALL' | 'PRIVATE' | 'PUBLIC'>(props.enableScope ? 'ALL' : 'PUBLIC')
 const tagDialogVisible = ref(false)
 const tagLoading = ref(false)
 const editingTags = ref<string[]>([])
@@ -316,6 +334,18 @@ const fetchList = async () => {
         if (selectedCategoryId.value !== 'all') {
             params.category_id = selectedCategoryId.value
         }
+        
+        const currentUserId = 'admin'
+        if (activeScope.value === 'PRIVATE') {
+          params.scope = 'PRIVATE'
+          params.owner_id = currentUserId
+        } else if (activeScope.value === 'PUBLIC') {
+          params.scope = 'PUBLIC'
+        } else {
+          // 全部：通过接口逻辑（后端已适配：如果不传 scope 且传了 owner_id，则显示公共 + 该用户的私有）
+          params.owner_id = currentUserId
+        }
+
         const res = await axios.get('/api/v1/resources', { params })
         resources.value = res.data.items || []
     } catch (err: any) {
@@ -324,6 +354,10 @@ const fetchList = async () => {
         loading.value = false
     }
 }
+
+watch([selectedCategoryId, activeScope], () => {
+    fetchList()
+})
 
 const syncFromStorage = async () => {
     syncing.value = true
@@ -478,6 +512,22 @@ const performUpload = async (displayName: string, blob: Blob, contentType: strin
         owner_id: 'admin',
         size: blob.size,
         extra_meta: {}
+    })
+}
+
+const publishResource = (row: Resource) => {
+    ElMessageBox.confirm(`确定要将资源 "${row.name}" 发布到公共库吗？发布后所有用户可见。`, '发布确认', {
+        type: 'success',
+        confirmButtonText: '确定发布',
+        cancelButtonText: '取消'
+    }).then(async () => {
+        try {
+            await axios.patch(`/api/v1/resources/${row.id}/scope`, { scope: 'PUBLIC' })
+            ElMessage.success('发布成功')
+            fetchList()
+        } catch (err: any) {
+            ElMessage.error('发布失败: ' + (err.response?.data?.error || err.message))
+        }
     })
 }
 
@@ -637,6 +687,17 @@ onUnmounted(() => {
   border: 1px solid var(--el-border-color-lighter);
   box-shadow: var(--el-box-shadow-lighter);
 
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .header-right-actions {
+    display: flex;
+    gap: 12px;
+  }
+  
   h2 {
     margin: 0;
     font-size: 18px;
@@ -705,6 +766,20 @@ onUnmounted(() => {
   font-weight: 600;
   color: var(--el-text-color-primary);
   font-size: 14px;
+}
+
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scope-tag {
+  font-family: var(--el-font-family);
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
 }
 
 .resource-meta {

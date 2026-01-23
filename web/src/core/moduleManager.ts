@@ -99,7 +99,8 @@ class ModuleManager {
                           typeKey: item.key,
                           typeName: item.typeName || item.label || '资源',
                           uploadMode: item.uploadMode || 'single',
-                          accept: item.accept
+                          accept: item.accept,
+                          enableScope: item.enableScope
                         }
                       }
                     ]

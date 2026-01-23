@@ -45,7 +45,8 @@ type Resource struct {
 	Category     *Category    `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 	Name         string       `gorm:"type:varchar(200);not null" json:"name"`
 	OwnerID      string       `gorm:"type:varchar(50);index" json:"owner_id"`
-	Tags         []string     `gorm:"serializer:json" json:"tags"` // SQLite/MySQL doesn't support array type natively, use JSON serializer
+	Scope        string       `gorm:"type:varchar(20);default:'PRIVATE';index" json:"scope"` // PRIVATE, PUBLIC
+	Tags         []string     `gorm:"serializer:json" json:"tags"`                           // SQLite/MySQL doesn't support array type natively, use JSON serializer
 	IsDeleted    bool         `gorm:"default:false" json:"is_deleted"`
 	CreatedAt    time.Time    `json:"created_at"`
 	UpdatedAt    time.Time    `json:"updated_at"`

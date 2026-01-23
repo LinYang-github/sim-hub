@@ -16,6 +16,7 @@ export interface SimHubModule {
   typeName?: string
   uploadMode?: 'single' | 'folder-zip'
   accept?: string
+  enableScope?: boolean // 是否开启作用域（我的/公共）管理
 
   // External Integration Props
   label?: string       // Menu label for external

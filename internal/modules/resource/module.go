@@ -40,8 +40,9 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 		resources.GET("", m.ListResources)
 		resources.POST("/sync", m.SyncFromStorage) // 新增：同步存储
 		resources.GET("/:id", m.GetResource)
-		resources.DELETE("/:id", m.DeleteResource)         // 新增：删除资源
-		resources.PATCH("/:id/tags", m.UpdateResourceTags) // 新增：更新标签
+		resources.DELETE("/:id", m.DeleteResource)
+		resources.PATCH("/:id/tags", m.UpdateResourceTags)
+		resources.PATCH("/:id/scope", m.UpdateResourceScope) // 新增：更新作用域
 		resources.PATCH("/:id/process-result", m.ReportProcessResult)
 	}
 
@@ -165,8 +166,10 @@ func (m *Module) ListResources(c *gin.Context) {
 	size := 20
 	typeKey := c.Query("type")
 	categoryID := c.Query("category_id")
+	ownerID := c.Query("owner_id")
+	scope := c.Query("scope")
 
-	list, total, err := m.uc.ListResources(c.Request.Context(), typeKey, categoryID, page, size)
+	list, total, err := m.uc.ListResources(c.Request.Context(), typeKey, categoryID, ownerID, scope, page, size)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -230,6 +233,22 @@ func (m *Module) UpdateResourceTags(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Tags updated"})
+}
+
+// UpdateResourceScope 更新资源作用域
+func (m *Module) UpdateResourceScope(c *gin.Context) {
+	id := c.Param("id")
+	var req core.UpdateResourceScopeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := m.uc.UpdateResourceScope(c.Request.Context(), id, req.Scope); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Scope updated"})
 }
 
 // SyncFromStorage 同步存储中的文件到数据库

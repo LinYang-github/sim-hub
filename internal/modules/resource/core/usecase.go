@@ -136,13 +136,18 @@ type ConfirmUploadRequest struct {
 	CategoryID string         `json:"category_id"` // 新增：所属分类 ID
 	Name       string         `json:"name"`
 	OwnerID    string         `json:"owner_id"`
-	Tags       []string       `json:"tags"` // 新增：资源标签
+	Scope      string         `json:"scope"` // 新增：作用域
+	Tags       []string       `json:"tags"`  // 新增：资源标签
 	Size       int64          `json:"size"`
 	ExtraMeta  map[string]any `json:"extra_meta"`
 }
 
 type UpdateResourceTagsRequest struct {
 	Tags []string `json:"tags"`
+}
+
+type UpdateResourceScopeRequest struct {
+	Scope string `json:"scope"`
 }
 
 // Multipart Upload DTOs
@@ -182,6 +187,7 @@ type CompleteMultipartUploadRequest struct {
 	CategoryID string         `json:"category_id"`
 	Name       string         `json:"name"`
 	OwnerID    string         `json:"owner_id"`
+	Scope      string         `json:"scope"` // 新增：作用域
 	Tags       []string       `json:"tags"`
 	ExtraMeta  map[string]any `json:"extra_meta"`
 }
@@ -212,6 +218,7 @@ type ResourceDTO struct {
 	CategoryID string              `json:"category_id,omitempty"`
 	Name       string              `json:"name"`
 	OwnerID    string              `json:"owner_id"`
+	Scope      string              `json:"scope"` // 新增：作用域
 	Tags       []string            `json:"tags"`
 	CreatedAt  time.Time           `json:"created_at"`
 	LatestVer  *ResourceVersionDTO `json:"latest_version,omitempty"`
@@ -319,7 +326,7 @@ func (uc *UseCase) CompleteMultipartUpload(ctx context.Context, req CompleteMult
 
 	// 3. 注册到数据库
 	return uc.data.DB.Transaction(func(tx *gorm.DB) error {
-		return uc.createResourceAndVersion(tx, req.TypeKey, req.CategoryID, req.Name, req.OwnerID, objectKey, objInfo.Size, req.Tags, req.ExtraMeta)
+		return uc.createResourceAndVersion(tx, req.TypeKey, req.CategoryID, req.Name, req.OwnerID, req.Scope, objectKey, objInfo.Size, req.Tags, req.ExtraMeta)
 	})
 }
 
@@ -338,17 +345,21 @@ func (uc *UseCase) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) 
 	}
 
 	return uc.data.DB.Transaction(func(tx *gorm.DB) error {
-		return uc.createResourceAndVersion(tx, req.TypeKey, req.CategoryID, req.Name, req.OwnerID, objectKey, objInfo.Size, req.Tags, req.ExtraMeta)
+		return uc.createResourceAndVersion(tx, req.TypeKey, req.CategoryID, req.Name, req.OwnerID, req.Scope, objectKey, objInfo.Size, req.Tags, req.ExtraMeta)
 	})
 }
 
 // createResourceAndVersion 内部统一资源注册逻辑
-func (uc *UseCase) createResourceAndVersion(tx *gorm.DB, typeKey, categoryID, name, ownerID, objectKey string, size int64, tags []string, meta map[string]any) error {
+func (uc *UseCase) createResourceAndVersion(tx *gorm.DB, typeKey, categoryID, name, ownerID, scope, objectKey string, size int64, tags []string, meta map[string]any) error {
+	if scope == "" {
+		scope = "PRIVATE"
+	}
 	res := model.Resource{
 		TypeKey:    typeKey,
 		CategoryID: categoryID,
 		Name:       name,
 		OwnerID:    ownerID,
+		Scope:      scope,
 		Tags:       tags,
 	}
 	if err := tx.Create(&res).Error; err != nil {
@@ -564,17 +575,28 @@ func (uc *UseCase) GetResource(ctx context.Context, id string) (*ResourceDTO, er
 }
 
 // ListResources 列出资源
-func (uc *UseCase) ListResources(ctx context.Context, typeKey string, categoryID string, page, size int) ([]*ResourceDTO, int64, error) {
+func (uc *UseCase) ListResources(ctx context.Context, typeKey string, categoryID string, ownerID string, scope string, page, size int) ([]*ResourceDTO, int64, error) {
 	var resources []model.Resource
 	var total int64
 	offset := (page - 1) * size
 
-	query := uc.data.DB.Model(&model.Resource{})
+	query := uc.data.DB.Model(&model.Resource{}).Where("is_deleted = ?", false)
 	if typeKey != "" {
 		query = query.Where("type_key = ?", typeKey)
 	}
 	if categoryID != "" {
 		query = query.Where("category_id = ?", categoryID)
+	}
+
+	// 作用域逻辑
+	if scope == "PUBLIC" {
+		query = query.Where("scope = ?", "PUBLIC")
+	} else if scope == "PRIVATE" {
+		query = query.Where("scope = ? AND owner_id = ?", "PRIVATE", ownerID)
+	} else if ownerID != "" {
+		// 如果未指定 scope 但指定了 ownerID，默认看该用户的私有 + 全体公有？
+		// 暂时简化：如果不传 scope，默认显示全部可见内容
+		query = query.Where("scope = ? OR (scope = ? AND owner_id = ?)", "PUBLIC", "PRIVATE", ownerID)
 	}
 
 	if err := query.Count(&total).Limit(size).Offset(offset).Order("created_at desc").Find(&resources).Error; err != nil {
@@ -604,6 +626,7 @@ func (uc *UseCase) ListResources(ctx context.Context, typeKey string, categoryID
 			CategoryID: r.CategoryID,
 			Name:       r.Name,
 			OwnerID:    r.OwnerID,
+			Scope:      r.Scope,
 			Tags:       r.Tags,
 			CreatedAt:  r.CreatedAt,
 			LatestVer:  dv,
@@ -652,6 +675,26 @@ func (uc *UseCase) UpdateResourceTags(ctx context.Context, id string, tags []str
 		}
 
 		// 触发异步刷新 Sidecar (获取最新版本)
+		var v model.ResourceVersion
+		if err := tx.Order("version_num desc").First(&v, "resource_id = ?", id).Error; err == nil {
+			uc.dispatchJob(processJob{
+				Action:    ActionRefresh,
+				ObjectKey: v.FilePath,
+				VersionID: v.ID,
+			})
+		}
+		return nil
+	})
+}
+
+// UpdateResourceScope 更新资源作用域 (公开/私有)
+func (uc *UseCase) UpdateResourceScope(ctx context.Context, id string, scope string) error {
+	return uc.data.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.Resource{}).Where("id = ?", id).Update("scope", scope).Error; err != nil {
+			return err
+		}
+
+		// 触发异步刷新 Sidecar，使云端存储的元数据也同步更新
 		var v model.ResourceVersion
 		if err := tx.Order("version_num desc").First(&v, "resource_id = ?", id).Error; err == nil {
 			uc.dispatchJob(processJob{

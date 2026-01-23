@@ -4,7 +4,8 @@
     "label": "想定资源库",
     "integrationMode": "internal",
     "typeName": "想定",
-    "uploadMode": "folder-zip"
+    "uploadMode": "folder-zip",
+    "enableScope": true
   },
   {
     "key": "model_glb",
@@ -12,19 +13,19 @@
     "integrationMode": "internal",
     "typeName": "模型",
     "uploadMode": "single",
-    "accept": ".glb"
+    "accept": ".glb",
+    "enableScope": false
   },
   {
     "key": "map_terrain",
     "label": "高程地形库",
-    "integrationMode": "internal",
-    "typeName": "地形",
-    "uploadMode": "single",
-    "accept": ".tif,.tiff"
+    "integrationMode": "iframe",
+    "externalUrl": "http://localhost:30032",
+    "typeName": "地形"
   },
   {
     "key": "test-repo",
-    "label": "测试资源库",
+    "label": "外部演示系统",
     "externalUrl": "http://localhost:30031",
     "integrationMode": "iframe"
   }
