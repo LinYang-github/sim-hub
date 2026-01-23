@@ -42,6 +42,9 @@ option(BUILD_EXAMPLES "Build SDK examples" ON)
 if(BUILD_EXAMPLES)
     add_executable(multipart_upload_example examples/multipart_upload.cpp)
     target_link_libraries(multipart_upload_example PRIVATE simhub_sdk ${CURL_LIBRARIES})
+
+    add_executable(query_and_download_example examples/query_and_download.cpp)
+    target_link_libraries(query_and_download_example PRIVATE simhub_sdk ${CURL_LIBRARIES})
 endif()
 
 # --- 单元测试 / Unit Tests ---

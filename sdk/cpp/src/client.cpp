@@ -84,6 +84,53 @@ public:
             };
         }
     }
+
+    json get(const std::string& endpoint) {
+        CURL* curl;
+        CURLcode res;
+        std::string readBuffer;
+
+        curl = curl_easy_init();
+        if(!curl) return {{"error", "Failed to init curl"}};
+
+        std::string url = baseUrl + endpoint;
+
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+
+        res = curl_easy_perform(curl);
+        
+        long http_code = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+        curl_easy_cleanup(curl);
+
+        if(res != CURLE_OK) {
+            return {
+                {"error", std::string("Network error: ") + curl_easy_strerror(res)},
+                {"error_code", (int)ErrorCode::NetworkError}
+            };
+        }
+
+        if (http_code >= 400) {
+            return {
+                {"error", "HTTP Server error: " + std::to_string(http_code)},
+                {"error_code", (int)ErrorCode::ServerError},
+                {"http_code", http_code},
+                {"body", readBuffer}
+            };
+        }
+
+        try {
+            return json::parse(readBuffer);
+        } catch (...) {
+            return {
+                {"error", "Failed to parse JSON response"},
+                {"error_code", (int)ErrorCode::ServerError}
+            };
+        }
+    }
 };
 
 static std::once_flag init_flag;
@@ -160,55 +207,105 @@ Status Client::confirmUpload(const ConfirmUploadRequest& req) {
     return success ? Status::Success(true) : Status::Fail(ErrorCode::ServerError, "Server returned failure code");
 }
 
-Result<ResourceDTO> Client::getResource(const std::string& id) {
-    CURL* curl = curl_easy_init();
-    std::string readBuffer;
-    
-    if(!curl) return Result<ResourceDTO>::Fail(ErrorCode::Unknown, "CURL init failed");
-
-    std::string url = impl_->baseUrl + "/api/v1/resources/" + id;
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ClientImpl::WriteCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-    
-    auto res = curl_easy_perform(curl);
-    
-    long http_code = 0;
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-    curl_easy_cleanup(curl);
-
-    if(res != CURLE_OK) {
-        return Result<ResourceDTO>::Fail(ErrorCode::NetworkError, curl_easy_strerror(res));
-    }
-
-    if (http_code == 404) {
-        return Result<ResourceDTO>::Fail(ErrorCode::InvalidParam, "Resource not found");
-    }
-
-    try {
-        auto j = json::parse(readBuffer);
-        ResourceDTO dto;
-        dto.id = j.value("id", "");
-        dto.name = j.value("name", "");
-        dto.type_key = j.value("type_key", "");
-        if (j.contains("latest_version")) {
-            auto v = j["latest_version"];
-            dto.latest_version.version_num = v.value("version_num", 0);
-            dto.latest_version.download_url = v.value("download_url", "");
+static ResourceDTO parseResourceDTO(const json& j) {
+    ResourceDTO dto;
+    dto.id = j.value("id", "");
+    dto.name = j.value("name", "");
+    dto.type_key = j.value("type_key", "");
+    dto.owner_id = j.value("owner_id", "");
+    if (j.contains("tags") && j["tags"].is_array()) {
+        for (auto& t : j["tags"]) {
+            if (t.is_string()) dto.tags.push_back(t.get<std::string>());
         }
-        return Result<ResourceDTO>::Success(dto);
-    } catch (...) {
-        return Result<ResourceDTO>::Fail(ErrorCode::ServerError, "JSON parse error");
     }
+    dto.created_at = j.value("created_at", "");
+    if (j.contains("latest_version") && !j["latest_version"].is_null()) {
+        auto v = j["latest_version"];
+        dto.latest_version.version_num = v.value("version_num", 0);
+        dto.latest_version.file_size = v.value("file_size", 0LL);
+        dto.latest_version.download_url = v.value("download_url", "");
+    }
+    return dto;
+}
+
+Result<ResourceDTO> Client::getResource(const std::string& id) {
+    auto res = impl_->get("/api/v1/resources/" + id);
+    if (res.contains("error")) {
+        auto code = static_cast<ErrorCode>(res.value("error_code", (int)ErrorCode::Unknown));
+        return Result<ResourceDTO>::Fail(code, res["error"]);
+    }
+    return Result<ResourceDTO>::Success(parseResourceDTO(res));
+}
+
+Result<std::vector<ResourceDTO>> Client::listResources(const std::string& typeKey, const std::string& categoryId) {
+    std::string endpoint = "/api/v1/resources?";
+    if (!typeKey.empty()) endpoint += "type=" + typeKey + "&";
+    if (!categoryId.empty()) endpoint += "category_id=" + categoryId + "&";
+    
+    auto res = impl_->get(endpoint);
+    if (res.contains("error")) {
+        auto code = static_cast<ErrorCode>(res.value("error_code", (int)ErrorCode::Unknown));
+        return Result<std::vector<ResourceDTO>>::Fail(code, res["error"]);
+    }
+
+    std::vector<ResourceDTO> list;
+    if (res.contains("items") && res["items"].is_array()) {
+        for (auto& item : res["items"]) {
+            list.push_back(parseResourceDTO(item));
+        }
+    }
+    return Result<std::vector<ResourceDTO>>::Success(list);
+}
+
+static size_t DownloadWriteCallback(void* ptr, size_t size, size_t nmemb, FILE* stream) {
+    return fwrite(ptr, size, nmemb, stream);
 }
 
 static size_t ProgressCallbackProxy(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow) {
     auto* cb = static_cast<std::function<void(double)>*>(clientp);
-    if (cb && *cb && ultotal > 0) {
-        (*cb)(static_cast<double>(ulnow) / static_cast<double>(ultotal));
+    if (cb && *cb) {
+        if (ultotal > 0) {
+            (*cb)(static_cast<double>(ulnow) / static_cast<double>(ultotal));
+        } else if (dltotal > 0) {
+            (*cb)(static_cast<double>(dlnow) / static_cast<double>(dltotal));
+        }
     }
     return 0;
 }
+
+Status Client::downloadFile(const std::string& url, const std::string& localPath, std::function<void(double)> progressCallback) {
+    CURL* curl = curl_easy_init();
+    if (!curl) return Status::Fail(ErrorCode::Unknown, "CURL init failed");
+
+    FILE* fp = fopen(localPath.c_str(), "wb");
+    if (!fp) {
+        curl_easy_cleanup(curl);
+        return Status::Fail(ErrorCode::FileSystemError, "Failed to open file for writing: " + localPath);
+    }
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, DownloadWriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+    if (progressCallback) {
+        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, ProgressCallbackProxy);
+        curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &progressCallback);
+        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    }
+
+    auto res = curl_easy_perform(curl);
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    fclose(fp);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) return Status::Fail(ErrorCode::NetworkError, curl_easy_strerror(res));
+    if (http_code >= 400) return Status::Fail(ErrorCode::StorageError, "HTTP " + std::to_string(http_code));
+
+    return Status::Success(true);
+}
+
 
 Status Client::uploadFileSimple(const std::string& url, const std::string& filePath, std::function<void(double)> progressCallback) {
     CURL* curl = curl_easy_init();

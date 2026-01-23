@@ -587,6 +587,16 @@ func (uc *UseCase) ListResources(ctx context.Context, typeKey string, categoryID
 		var v model.ResourceVersion
 		uc.data.DB.Order("version_num desc").First(&v, "resource_id = ?", r.ID)
 
+		dv := &ResourceVersionDTO{
+			VersionNum: v.VersionNum,
+			State:      v.State,
+			MetaData:   v.MetaData,
+		}
+		if v.State == "ACTIVE" {
+			url, _ := uc.store.PresignGet(ctx, uc.minioConfig, v.FilePath, time.Hour)
+			dv.DownloadURL = url
+		}
+
 		cw = append(cw, &ResourceDTO{
 			ID:         r.ID,
 			TypeKey:    r.TypeKey,
@@ -595,11 +605,7 @@ func (uc *UseCase) ListResources(ctx context.Context, typeKey string, categoryID
 			OwnerID:    r.OwnerID,
 			Tags:       r.Tags,
 			CreatedAt:  r.CreatedAt,
-			LatestVer: &ResourceVersionDTO{
-				VersionNum: v.VersionNum,
-				State:      v.State,
-				MetaData:   v.MetaData,
-			},
+			LatestVer:  dv,
 		})
 	}
 	return cw, total, nil

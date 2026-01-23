@@ -53,6 +53,24 @@ public:
     Result<ResourceDTO> getResource(const std::string& id);
 
     /**
+     * 查询资源列表
+     * @param typeKey 过滤资源类型 (可选)
+     * @param categoryId 过滤分类 ID (可选)
+     */
+    Result<std::vector<ResourceDTO>> listResources(const std::string& typeKey = "", 
+                                                 const std::string& categoryId = "");
+
+    /**
+     * 下载文件 (GET 方法)
+     * @param url 下载 URL (通常来自 ResourceDTO.latest_version.download_url)
+     * @param localPath 本地存储路径
+     * @param progressCallback 进度回调
+     */
+    Status downloadFile(const std::string& url, 
+                       const std::string& localPath,
+                       std::function<void(double)> progressCallback = nullptr);
+
+    /**
      * 基础 HTTP 上传 (PUT 方法，适用于 Presigned URL)
      * @param url 预签名 URL
      * @param filePath 本地文件路径
