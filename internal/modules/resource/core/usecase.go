@@ -488,9 +488,18 @@ func (uc *UseCase) processResourceInternal(ctx context.Context, typeKey, objectK
 		slog.Info("文件已下载至本地，准备处理", "path", tempFile.Name())
 
 		// 2. 执行外部命令
-		// 格式: <cmd> <filepath>
-		// 输出: JSON 格式的 metadata 到 stdout
-		cmd := exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf("%s '%s'", processorCmd, tempFile.Name()))
+		// 避免使用 sh -c 防止命令注入
+		parts := strings.Fields(processorCmd)
+		if len(parts) == 0 {
+			slog.Error("处理器命令为空", "type", typeKey)
+			return
+		}
+
+		head := parts[0]
+		args := parts[1:]
+		args = append(args, tempFile.Name())
+
+		cmd := exec.CommandContext(ctx, head, args...)
 		var stdout, stderr bytes.Buffer
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr

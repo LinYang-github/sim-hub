@@ -1,89 +1,160 @@
-import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
 import { useResourceList } from '../useResourceList'
-import axios from 'axios'
+import request from '../../../../core/utils/request'
+import { RESOURCE_SCOPE, ROOT_CATEGORY_ID, DEFAULT_ADMIN_ID } from '../../../../core/constants/resource'
 
-// Mock axios
-vi.mock('axios')
-const mockedAxios = axios as Mocked<typeof axios>
-
-// Mock ElMessage
-vi.mock('element-plus', () => ({
-  ElMessage: {
-    error: vi.fn(),
-    success: vi.fn()
+// Mock request module
+vi.mock('../../../../core/utils/request', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn()
   }
 }))
 
 describe('useResourceList', () => {
+  // Clear mocks before each test
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('fetchList should call API with correct params for PRIVATE scope', async () => {
-    const selectedCategoryId = ref('all')
-    const { fetchList, activeScope } = useResourceList('model', true, selectedCategoryId)
+  it('should initialize with default state', () => {
+    const typeKey = ref('model_glb')
+    const enableScope = ref(true)
+    const selectedCategoryId = ref(ROOT_CATEGORY_ID)
+
+    const { resources, loading, activeScope, searchQuery, syncing } = useResourceList(
+      typeKey,
+      enableScope,
+      selectedCategoryId
+    )
+
+    expect(resources.value).toEqual([])
+    expect(loading.value).toBe(true) // immediate watch triggers loading
+    expect(activeScope.value).toBe(RESOURCE_SCOPE.ALL)
+    expect(searchQuery.value).toBe('')
+    expect(syncing.value).toBe(false)
+  })
+
+  it('should fetch resources on initialization', async () => {
+    const mockData = { items: [{ id: '1', name: 'Res 1' }] }
+    ;(request.get as any).mockResolvedValue(mockData)
+
+    const typeKey = ref('model_glb')
+    const enableScope = ref(false)
+    const selectedCategoryId = ref(ROOT_CATEGORY_ID)
+
+    const { resources, loading } = useResourceList(
+      typeKey,
+      enableScope,
+      selectedCategoryId
+    )
+
+    // Wait for the async watcher
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(request.get).toHaveBeenCalledWith('/api/v1/resources', expect.any(Object))
+    expect(resources.value).toEqual(mockData.items)
+    expect(loading.value).toBe(false)
+  })
+
+  it('should construct correct parameters for filtering', async () => {
+    const typeKey = ref('map_terrain')
+    const enableScope = ref(true)
+    const selectedCategoryId = ref('cat-123')
     
-    // Set scope to PRIVATE
-    activeScope.value = 'PRIVATE'
+    ;(request.get as any).mockResolvedValue({ items: [] })
 
-    // Mock Response
-    mockedAxios.get.mockResolvedValue({ data: { items: [] } })
+    const { fetchList, activeScope, searchQuery } = useResourceList(
+      typeKey,
+      enableScope,
+      selectedCategoryId
+    )
 
+    // Set various filters
+    searchQuery.value = 'test-query'
+    activeScope.value = RESOURCE_SCOPE.PRIVATE
+    
     await fetchList()
 
-    expect(mockedAxios.get).toHaveBeenCalledWith('/api/v1/resources', {
-      params: { 
-        type: 'model', 
-        name: '',
-        scope: 'PRIVATE',
-        owner_id: 'admin'
+    expect(request.get).toHaveBeenCalledWith('/api/v1/resources', {
+      params: {
+        type: 'map_terrain',
+        name: 'test-query',
+        category_id: 'cat-123',
+        scope: RESOURCE_SCOPE.PRIVATE,
+        owner_id: DEFAULT_ADMIN_ID
       }
     })
   })
 
-  it('fetchList should include category_id if selected', async () => {
-    const selectedCategoryId = ref('cat-123')
-    const { fetchList } = useResourceList('model', true, selectedCategoryId)
+  it('should handle scope changes based on enableScope logic', async () => {
+    const typeKey = ref('model_glb')
+    const enableScope = ref(false)
+    const selectedCategoryId = ref(ROOT_CATEGORY_ID)
+
+    const { activeScope } = useResourceList(typeKey, enableScope, selectedCategoryId)
     
-    mockedAxios.get.mockResolvedValue({ data: { items: [] } })
+    // Initial state for enableScope = false
+    expect(activeScope.value).toBe(RESOURCE_SCOPE.PUBLIC)
 
-    await fetchList()
+    // Toggle enableScope to true
+    enableScope.value = true
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(activeScope.value).toBe(RESOURCE_SCOPE.ALL)
 
-    expect(mockedAxios.get).toHaveBeenCalledWith('/api/v1/resources', expect.objectContaining({
-      params: expect.objectContaining({
-        category_id: 'cat-123'
-      })
-    }))
+    // Toggle back
+    enableScope.value = false
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(activeScope.value).toBe(RESOURCE_SCOPE.PUBLIC)
   })
 
-  it('fetchList should include search query', async () => {
-    const selectedCategoryId = ref('all')
-    const { fetchList, searchQuery } = useResourceList('model', true, selectedCategoryId)
+  it('should handle race conditions properly', async () => {
+    const typeKey = ref('model_glb')
+    const enableScope = ref(true)
+    const selectedCategoryId = ref(ROOT_CATEGORY_ID)
     
-    searchQuery.value = 'tank'
-    mockedAxios.get.mockResolvedValue({ data: { items: [] } })
+    const { fetchList, resources } = useResourceList(typeKey, enableScope, selectedCategoryId)
 
-    await fetchList()
+    // Setup two promises, one slow and one fast
+    let resolveSlow: Function
+    const slowReq = new Promise(resolve => { resolveSlow = resolve })
+    
+    const fastData = { items: [{ id: 'fast', name: 'Fast' }] }
+    const slowData = { items: [{ id: 'slow', name: 'Slow' }] }
 
-    expect(mockedAxios.get).toHaveBeenCalledWith('/api/v1/resources', expect.objectContaining({
-      params: expect.objectContaining({
-        name: 'tank'
-      })
-    }))
+    // First call (Slow)
+    ;(request.get as any).mockReturnValue(slowReq)
+    const p1 = fetchList()
+
+    // Second call (Fast)
+    ;(request.get as any).mockResolvedValue(fastData)
+    const p2 = fetchList()
+
+    await p2
+    expect(resources.value).toEqual(fastData.items) // Should update to fast data
+
+    // Now resolve the slow one
+    resolveSlow!(slowData)
+    await p1
+
+    // Should NOT update to slow data, remain fast
+    expect(resources.value).toEqual(fastData.items)
   })
 
-  it('syncFromStorage should call sync API and refresh list', async () => {
-    const selectedCategoryId = ref('all')
-    const { syncFromStorage, fetchList } = useResourceList('model', true, selectedCategoryId)
+  it('should sync from storage and refresh list', async () => {
+    const typeKey = ref('model_glb')
+    const enableScope = ref(true)
+    const selectedCategoryId = ref(ROOT_CATEGORY_ID)
     
-    mockedAxios.post.mockResolvedValue({ data: { count: 5 } })
-    mockedAxios.get.mockResolvedValue({ data: { items: [] } })
+    const { syncFromStorage } = useResourceList(typeKey, enableScope, selectedCategoryId)
+
+    ;(request.post as any).mockResolvedValue({ count: 5 })
+    ;(request.get as any).mockResolvedValue({ items: [] })
 
     await syncFromStorage()
 
-    expect(mockedAxios.post).toHaveBeenCalledWith('/api/v1/resources/sync')
-    // Should call fetchList internally after sync
-    expect(mockedAxios.get).toHaveBeenCalled()
+    expect(request.post).toHaveBeenCalledWith('/api/v1/resources/sync')
+    expect(request.get).toHaveBeenCalled() // fetchList should be called after sync
   })
 })
