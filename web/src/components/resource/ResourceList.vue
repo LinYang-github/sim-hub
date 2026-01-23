@@ -234,6 +234,7 @@ import { useDependency } from './composables/useDependency'
 import { useResourceAction } from './composables/useResourceAction'
 
 import { formatDate, formatSize } from '../../core/utils/format'
+import { RESOURCE_STATUS_TEXT, SCOPE_OPTIONS, RESOURCE_STATE } from '../../core/constants/resource'
 
 const props = defineProps<{
   typeKey: string
@@ -243,23 +244,13 @@ const props = defineProps<{
   enableScope?: boolean
 }>()
 
-const statusMap: Record<string, string> = {
-  ACTIVE: '已就绪',
-  READY: '就绪',
-  PROCESSING: '处理中',
-  PENDING: '排队中',
-  FAILED: '处理失败',
-}
+const statusMap = RESOURCE_STATUS_TEXT
 
 const viewMode = ref('list')
 const searchFocused = ref(false)
 const detailDrawerVisible = ref(false)
 
-const scopeOptions = [
-  { label: '全部', val: 'ALL' },
-  { label: '公共', val: 'PUBLIC' },
-  { label: '我的', val: 'PRIVATE' }
-] as const
+const scopeOptions = SCOPE_OPTIONS
 
 // 1. Categories
 const { 
@@ -336,7 +327,7 @@ onMounted(() => {
     // Polling for processing status
     pollInterval = setInterval(() => {
         const hasProcessing = resources.value.some((s: Resource) => 
-            s.latest_version?.state === 'PROCESSING' || s.latest_version?.state === 'PENDING'
+            s.latest_version?.state === RESOURCE_STATE.PROCESSING || s.latest_version?.state === RESOURCE_STATE.PENDING
         )
         if (hasProcessing) {
             fetchList()

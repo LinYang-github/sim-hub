@@ -136,7 +136,7 @@
         <el-button 
           type="primary" 
           @click="resource && $emit('download', resource)" 
-          :disabled="resource?.latest_version?.state !== 'ACTIVE'"
+          :disabled="resource?.latest_version?.state !== RESOURCE_STATE.ACTIVE"
         >
           <el-icon><Download /></el-icon> 下载部署包
         </el-button>
@@ -150,6 +150,7 @@ import { ref, computed } from 'vue'
 import { InfoFilled, Edit, Download, Share } from '@element-plus/icons-vue'
 import { formatDate, formatSize } from '../../../core/utils/format'
 import type { Resource, ResourceVersion, ResourceDependency } from '../../../core/types/resource'
+import { RESOURCE_STATE } from '../../../core/constants/resource'
 
 const props = defineProps<{
   modelValue: boolean

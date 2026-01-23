@@ -3,10 +3,11 @@ import request from '../../../core/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { buildTree } from '../../../core/utils/tree'
 import type { Category, CategoryNode } from '../../../core/types/resource'
+import { ROOT_CATEGORY_ID } from '../../../core/constants/resource'
 
 export function useCategory(typeKey: Ref<string>) {
   const categories = ref<Category[]>([])
-  const selectedCategoryId = ref('all')
+  const selectedCategoryId = ref(ROOT_CATEGORY_ID)
 
   const fetchCategories = async () => {
     try {
@@ -18,20 +19,20 @@ export function useCategory(typeKey: Ref<string>) {
 
   // 监听资源类型变化：重置选中项并刷新分类树
   watch(typeKey, () => {
-    selectedCategoryId.value = 'all'
+    selectedCategoryId.value = ROOT_CATEGORY_ID
     fetchCategories()
   }, { immediate: true })
 
   const categoryTree = computed<CategoryNode[]>(() => {
     const tree = buildTree(categories.value) as CategoryNode[]
     return [
-      { id: 'all', name: '全部分类' } as CategoryNode,
+      { id: ROOT_CATEGORY_ID, name: '全部分类' } as CategoryNode,
       ...tree
     ]
   })
 
   const currentCategoryName = computed(() => {
-    if (selectedCategoryId.value === 'all') return '全部'
+    if (selectedCategoryId.value === ROOT_CATEGORY_ID) return '全部'
     const cat = categories.value.find(c => c.id === selectedCategoryId.value)
     return cat ? cat.name : ''
   })
@@ -62,7 +63,7 @@ export function useCategory(typeKey: Ref<string>) {
       await request.delete(`/api/v1/categories/${id}`)
       ElMessage.success('删除成功')
       if (selectedCategoryId.value === id) {
-        selectedCategoryId.value = 'all'
+        selectedCategoryId.value = ROOT_CATEGORY_ID
         onSuccess() // callback to refresh list
       }
       fetchCategories()

@@ -5,6 +5,7 @@ import JSZip from 'jszip'
 import { ElMessage } from 'element-plus'
 
 import type { Resource } from '../../../core/types/resource'
+import { ROOT_CATEGORY_ID, DEFAULT_ADMIN_ID } from '../../../core/constants/resource'
 
 export interface UploadFormState {
   semver: string
@@ -154,9 +155,9 @@ export function useUpload(
     await request.post('/api/v1/integration/upload/confirm', {
       ticket_id,
       type_key: typeKey.value,
-      category_id: categoryIdVal === 'all' ? '' : categoryIdVal,
+      category_id: categoryIdVal === ROOT_CATEGORY_ID ? '' : categoryIdVal,
       name: displayName,
-      owner_id: 'admin',
+      owner_id: DEFAULT_ADMIN_ID,
       size: blob.size,
       semver: uploadForm.value.semver,
       dependencies: uploadForm.value.dependencies.map(d => ({

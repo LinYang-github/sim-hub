@@ -56,7 +56,7 @@
                 type="primary" 
                 plain 
                 size="small"
-                :disabled="scope.row.latest_version?.state !== 'ACTIVE'" 
+                :disabled="scope.row.latest_version?.state !== RESOURCE_STATE.ACTIVE" 
                 @click="$emit('download', scope.row)"
               >
                 <el-icon><Download /></el-icon>
@@ -84,7 +84,7 @@
                     </div>
                   </el-dropdown-item>
                   
-                  <el-dropdown-item v-if="enableScope && scope.row.owner_id === 'admin'" class="nested-menu-parent">
+                  <el-dropdown-item v-if="enableScope && scope.row.owner_id === DEFAULT_ADMIN_ID" class="nested-menu-parent">
                     <el-dropdown trigger="hover" placement="left" popper-class="resource-popper" @command="(scopeCmd) => $emit('change-scope', scope.row, scopeCmd)">
                        <div class="menu-item-content">
                          <el-icon><Promotion /></el-icon>
@@ -92,13 +92,13 @@
                        </div>
                        <template #dropdown>
                          <el-dropdown-menu>
-                           <el-dropdown-item command="PRIVATE" :disabled="scope.row.scope === 'PRIVATE'">
+                           <el-dropdown-item :command="RESOURCE_SCOPE.PRIVATE" :disabled="scope.row.scope === RESOURCE_SCOPE.PRIVATE">
                               <div class="menu-item-content">
                                 <el-icon><Lock /></el-icon>
                                 <span>设为私有</span>
                               </div>
                            </el-dropdown-item>
-                           <el-dropdown-item command="PUBLIC" :disabled="scope.row.scope === 'PUBLIC'">
+                           <el-dropdown-item :command="RESOURCE_SCOPE.PUBLIC" :disabled="scope.row.scope === RESOURCE_SCOPE.PUBLIC">
                               <div class="menu-item-content">
                                 <el-icon><Promotion /></el-icon>
                                 <span>设为公开</span>
@@ -131,6 +131,7 @@ import {
 } from '@element-plus/icons-vue'
 import { formatDate, formatSize } from '../../../core/utils/format'
 import type { Resource, ResourceScope } from '../../../core/types/resource'
+import { RESOURCE_STATE, RESOURCE_SCOPE, DEFAULT_ADMIN_ID } from '../../../core/constants/resource'
 
 defineProps<{
   resources: Resource[]

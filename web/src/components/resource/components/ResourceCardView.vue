@@ -6,7 +6,7 @@
           <!-- 卡片封面区域 -->
           <div class="card-cover" @click="$emit('view-details', item)">
             <div class="card-status-badge">
-                <el-tag v-if="item.scope === 'PUBLIC'" size="small" type="success" effect="dark">公共</el-tag>
+                <el-tag v-if="item.scope === RESOURCE_SCOPE.PUBLIC" size="small" type="success" effect="dark">公共</el-tag>
             </div>
             <div class="card-icon-placeholder">
                 <el-icon v-if="typeKey === 'model_glb'" :size="48"><Box /></el-icon>
@@ -29,7 +29,7 @@
           </div>
 
           <div class="card-footer">
-              <el-button link type="primary" :disabled="item.latest_version?.state !== 'ACTIVE'" @click="$emit('download', item)">
+              <el-button link type="primary" :disabled="item.latest_version?.state !== RESOURCE_STATE.ACTIVE" @click="$emit('download', item)">
                 <el-icon><Download /></el-icon> 下载
               </el-button>
               
@@ -53,7 +53,7 @@
                       </div>
                     </el-dropdown-item>
                     
-                    <el-dropdown-item v-if="enableScope && item.owner_id === 'admin'" class="nested-menu-parent">
+                    <el-dropdown-item v-if="enableScope && item.owner_id === DEFAULT_ADMIN_ID" class="nested-menu-parent">
                       <el-dropdown trigger="hover" placement="right" popper-class="resource-popper" @command="(scopeCmd) => $emit('change-scope', item, scopeCmd)">
                          <div class="menu-item-content">
                            <el-icon><Promotion /></el-icon>
@@ -61,13 +61,13 @@
                          </div>
                          <template #dropdown>
                            <el-dropdown-menu>
-                             <el-dropdown-item command="PRIVATE" :disabled="item.scope === 'PRIVATE'">
+                             <el-dropdown-item :command="RESOURCE_SCOPE.PRIVATE" :disabled="item.scope === RESOURCE_SCOPE.PRIVATE">
                                 <div class="menu-item-content">
                                   <el-icon><Lock /></el-icon>
                                   <span>设为私有</span>
                                 </div>
                              </el-dropdown-item>
-                             <el-dropdown-item command="PUBLIC" :disabled="item.scope === 'PUBLIC'">
+                             <el-dropdown-item :command="RESOURCE_SCOPE.PUBLIC" :disabled="item.scope === RESOURCE_SCOPE.PUBLIC">
                                 <div class="menu-item-content">
                                   <el-icon><Promotion /></el-icon>
                                   <span>设为公开</span>
@@ -100,6 +100,7 @@ import {
 } from '@element-plus/icons-vue'
 import { formatSize } from '../../../core/utils/format'
 import type { Resource, ResourceScope } from '../../../core/types/resource'
+import { RESOURCE_STATE, RESOURCE_SCOPE, DEFAULT_ADMIN_ID } from '../../../core/constants/resource'
 
 defineProps<{
   resources: Resource[]

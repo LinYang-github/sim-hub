@@ -1,6 +1,7 @@
 import { ref, watch, Ref } from 'vue'
 import request from '../../../core/utils/request'
 import type { Resource } from '../../../core/types/resource'
+import { RESOURCE_SCOPE, ROOT_CATEGORY_ID, DEFAULT_ADMIN_ID } from '../../../core/constants/resource'
 
 export function useResourceList(
   typeKey: Ref<string>,
@@ -9,7 +10,7 @@ export function useResourceList(
 ) {
   const resources = ref<Resource[]>([])
   const loading = ref(false)
-  const activeScope = ref<'ALL' | 'PRIVATE' | 'PUBLIC'>(enableScope.value ? 'ALL' : 'PUBLIC')
+  const activeScope = ref<keyof typeof RESOURCE_SCOPE>(enableScope.value ? RESOURCE_SCOPE.ALL : RESOURCE_SCOPE.PUBLIC)
   const searchQuery = ref('')
   const syncing = ref(false)
 
@@ -26,16 +27,16 @@ export function useResourceList(
         name: searchQuery.value 
       }
       
-      if (selectedCategoryId.value !== 'all') {
+      if (selectedCategoryId.value !== ROOT_CATEGORY_ID) {
         params.category_id = selectedCategoryId.value
       }
 
-      const currentUserId = 'admin'
-      if (activeScope.value === 'PRIVATE') {
-        params.scope = 'PRIVATE'
+      const currentUserId = DEFAULT_ADMIN_ID
+      if (activeScope.value === RESOURCE_SCOPE.PRIVATE) {
+        params.scope = RESOURCE_SCOPE.PRIVATE
         params.owner_id = currentUserId
-      } else if (activeScope.value === 'PUBLIC') {
-        params.scope = 'PUBLIC'
+      } else if (activeScope.value === RESOURCE_SCOPE.PUBLIC) {
+        params.scope = RESOURCE_SCOPE.PUBLIC
       } else {
         params.owner_id = currentUserId
       }
@@ -75,7 +76,7 @@ export function useResourceList(
 
   // 当 enableScope 配置变化时同步 internal state
   watch(enableScope, (val) => {
-    activeScope.value = val ? 'ALL' : 'PUBLIC'
+    activeScope.value = val ? RESOURCE_SCOPE.ALL : RESOURCE_SCOPE.PUBLIC
   })
 
   return {

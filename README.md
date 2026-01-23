@@ -1,147 +1,166 @@
-# SimHub - 仿真资源中心
+# SimHub - 分布式仿真资源工厂 (Distributed Simulation Resource Factory)
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)
+![Go Version](https://img.shields.io/badge/go-1.25+-00ADD8.svg)
 ![Vue Version](https://img.shields.io/badge/vue-3.x-4FC08D.svg)
 ![MinIO](https://img.shields.io/badge/MinIO-Storage-C72C48.svg)
+![NATS](https://img.shields.io/badge/NATS-Messaging-27AAE1.svg)
 
-SimHub 是一个专为**仿真工程**设计的资源管理平台，提供高性能的仿真资源（想定、模型、地形）存储、版本控制、分类管理及自动化处理能力。它支持 **存算分离** 架构，可与 MinIO 对象存储和各类异构仿真处理器（Processor）无缝集成。
+**SimHub** 是一个面向仿真行业的**分布式资源中心与数据工厂**。它采用先进的**存算分离 (Storage-Compute Separation)** 架构，旨在解决海量异构仿真数据（如地形图、3D 模型、想定包）的存储、版本控制、自动化处理及分发难题。
+
+通过标准化协议，SimHub 能够无缝集成各类异构仿真处理器（Processor），将静态的文件资源转化为动态的、可被仿真引擎直接消费的高价值资产。
+
+## 🏗 系统架构 (Architecture)
+
+SimHub 采用 Master-Worker 分布式架构，通过 NATS 消息总线实现高并发的任务调度与解耦。
+
+```mermaid
+graph TD
+    User[用户/SDK] --> Master[Master API 节点]
+    Master --> DB[(元数据 DB)]
+    Master --> MinIO[(MinIO 对象存储)]
+    Master -- 发布任务 --> NATS{NATS 消息总线}
+    NATS -- 订阅任务 --> Worker1[Worker 计算节点 A]
+    NATS -- 订阅任务 --> Worker2[Worker 计算节点 B]
+    Worker1 -- 回调结果 --> Master
+    Worker2 -- 回调结果 --> Master
+    Worker1 -- 读写文件 --> MinIO
+    Worker2 -- 读写文件 --> MinIO
+```
 
 ## 🌟 核心特性 (Key Features)
 
-*   **📂 虚拟文件系统**: 支持多级资源分类（Tree/Flat 模式可配置），提供类似 Windows 文件管理器的操作体验。
-*   **🏷️ 智能标签系统**: 支持自由打标，兼容 SQLite/MySQL，提供多维度资源检索能力。
 *   **⚡️ 存算分离架构**:
-    *   **Worker Pool**: 内置异步任务队列，削峰填谷，防止高并发上传导致服务崩溃。
-    *   **STS 安全上传**: 支持 MinIO STS (Security Token Service) 临时凭证，前端直传存储桶，无需经由后端中转。
-*   **🛡️ 数据高可靠性**:
-    *   **Metadata Sidecar**: 核心元数据实时同步至 MinIO (`.meta.json`)，即使数据库丢失也能一键无损封禁。
-    *   **自愈能力**: 提供 `SyncFromStorage` 接口，可随时从对象存储反向重建数据库索引。
-*   **🔌 异构处理器集成**: 通过标准化 CLI 协议（JSON in/out）集成外部仿真工具（如 C++ 地形解析器、Python AI 模型分析器），自动提取资源元数据（文件数、时长、指纹等）。
+    *   **Master-Worker**: API 节点负责元数据与鉴权，Worker 节点负责繁重的资源解析与转换。
+    *   **NATS 驱动**: 内置异步任务队列，支持削峰填谷，轻松应对数千并发上传。
+*   **📂 虚拟文件系统**: 
+    *   支持 **Tree (树形)** 与 **Flat (扁平)** 两种视图模式，适应不同类型资源的管理需求。
+    *   提供类似 Windows 文件管理器的流畅 Web 体验。
+*   **🔌 异构处理器集成 (Processor)**:
+    *   支持通过标准 JSON 协议集成 C++、Python 等任意语言编写的外部工具。
+    *   自动化提取资源元数据（如模型面数、想定实体数、地形指纹）。
+*   **🛡️ 企业级数据安全**:
+    *   **STS 直传**: 采用 MinIO STS (Security Token Service) 签发临时凭证，前端直传存储桶，数据流不经过后端。
+    *   **Metadata Sidecar**: 核心元数据实时同步至对象存储 (`.meta.json`)，具备从存储层反向恢复数据库的灾难恢复能力。
+*   **🏷️ 智能检索**: 基于 SQLite/MySQL 的高性能标签系统，支持多维度组合搜索。
 
 ## 🛠 技术栈 (Tech Stack)
 
-*   **Backend**: Go (Gin, GORM, SQLite/MySQL), MinIO SDK
-*   **Frontend**: Vue 3 (TypeScript, Element Plus, Vite)
+*   **Backend**: 
+    *   **Core**: Go 1.25+
+    *   **Web Framework**: Gin
+    *   **ORM**: GORM (SQLite / MySQL / PostgreSQL)
+    *   **Messaging**: NATS
+*   **Frontend**: 
+    *   **Framework**: Vue 3 (Composition API)
+    *   **UI Library**: Element Plus
+    *   **Build Tool**: Vite
 *   **Storage**: MinIO (S3 Compatible)
-*   **SDK**: C++ SDK (libcurl, nlohmann/json) for native integration
+*   **SDK**: C++ SDK (libcurl, nlohmann/json) 用于仿真引擎原生集成。
 
 ## 🚀 快速开始 (Getting Started)
 
 ### 环境依赖
-*   Go 1.21+
-*   Node.js 18+
-*   MinIO Server (或使用 `minioadmin` 默认凭证的本地实例)
 
-### 1. 启动后端 (Backend)
+*   **Go** 1.25+
+*   **Node.js** 18+
+*   **MinIO** Server
+*   **NATS** Server
+
+### 1. 启动基础设施 (Infrastructure)
 
 ```bash
-# 1. 确保 MinIO 已启动且凭证正确 (默认: minioadmin/minioadmin)
-# 2. 运行服务 (自动迁移数据库结构 simhub.db)
-go run cmd/simhub-api/main.go
+# 启动 MinIO (示例)
+minio server /data --console-address ":9001"
+
+# 启动 NATS (示例)
+nats-server
 ```
 
-服务默认运行在 `http://localhost:30030`。
+### 2. 启动后端服务 (Backend Services)
 
-### 2. 启动前端 (Frontend)
+SimHub 包含两个核心组件：API 服务和 Worker 服务。
+
+#### 启动 API Server (Master)
+```bash
+# 自动迁移数据库结构 simhub.db
+go run cmd/simhub-api/main.go
+```
+*服务默认运行在 `http://localhost:30030`*
+
+#### 启动 Worker Server (Compute Node)
+```bash
+# Worker 负责处理资源解析任务
+go run cmd/simhub-worker/main.go
+```
+
+### 3. 启动前端 (Frontend)
 
 ```bash
 cd web
 npm install
 npm run dev
 ```
-
-访问管理界面: `http://localhost:5173`
-
-### 3. 运行 C++ SDK 示例 (可选)
-
-SimHub 提供了标准 C++ SDK，用于仿真引擎集成：
-
-```bash
-cd sdk/cpp/examples/02_sts_upload
-mkdir build && cd build
-cmake ..
-make
-./sts_example
-```
+*访问管理界面: `http://localhost:5173`*
 
 ## ⚙️ 核心配置 (Configuration)
 
-资源类型定义在 `config.yaml` 或数据库中管理。SimHub 启动时会根据配置自动注入基础类型：
+资源类型定义在 `config-api.yaml` (或数据库) 中。SimHub 启动时会根据配置自动注册处理逻辑：
 
 ```yaml
 resource_types:
   - type_key: "scenario"
     type_name: "仿真想定"
-    category_mode: "flat"      # 扁平模式，适合想定列表
-    processor_cmd: "./drivers/scenario-processor" # 外部处理器路径
+    category_mode: "flat"           # 扁平模式
+    process_conf:
+      pipeline: ["scenario-processor"] # 对应的 Worker 处理器链
   - type_key: "model_glb"
     type_name: "3D模型"
-    category_mode: "tree"      # 树形模式，适合模型库
+    category_mode: "tree"           # 树形模式
+    process_conf:
+      pipeline: ["model-optimizer"]
 ```
 
-## 📝 待办事项 (TODO)
-
-- [x] **资源分类**: 实现多级虚拟文件夹目录树。
-- [x] **标签系统**: 实现基于 SQLite JSON 的原子化标签管理。
-- [x] **STS 上传**: 实现前端直传 MinIO，通过后端签发临时 Token。
-- [x] **Worker Pool**: 实现异步资源处理任务队列。
-- [x] **灾难恢复**: 实现 `SyncFromStorage` 和 Metadata Sidecar 机制。
-- [x] **物理删除**: 实现数据库与 MinIO 文件的级联销毁。
-- [ ] **MQ 集成**: 将本地 Processor 调用重构为消息队列模式 (Kafka/RabbitMQ)，实现真正的分布式处理。(Current: TODO logged in logs)
-- [ ] **权限控制**: 集成 RBAC 角色权限管理。
-
-## 📂 项目结构
+## 📂 项目结构 (Project Structure)
 
 ```text
 /
-├── cmd/                # 应用程序入口 (API, CLI)
-├── internal/
-│   ├── conf/           # 配置定义
-│   ├── data/           # 数据层 (GORM, MinIO Client)
-│   ├── model/          # 领域模型 (Resource, Category, Version)
-│   └── modules/        # 业务模块 (Resource Core Logic, Handlers)
-├── pkg/
-│   ├── storage/        # 统一存储抽象接口与 MinIO 实现
-│   └── logger/         # 结构化日志组件
-├── sdk/
-│   └── cpp/            # C++ 客户端 SDK (支持分片上传、自动重试)
-├── tests/
-│   └── stress/         # 系统压力测试工具
-└── web/                # Vue 3 前端工程
+├── apps/               # 独立应用
+│   ├── terrain/        # 地形可视化/处理应用 (Vue Sub-app)
+│   └── demo-repo/      # 静态演示仓库
+├── cmd/                # 应用程序入口
+│   ├── simhub-api/     # Master API Server
+│   ├── simhub-worker/  # Worker Compute Node
+│   └── simhub-cli/     # 命令行工具
+├── internal/           # 核心业务代码
+│   ├── modules/        # 模块化业务逻辑 (Resource, Category等)
+│   ├── worker/         # Worker 任务消费逻辑
+│   └── data/           # 数据访问层
+├── pkg/                # 公共库
+│   ├── storage/        # MinIO 存储抽象
+│   └── mq/             # NATS 消息队列封装
+├── drivers/            # 外部处理器 (Processors)
+│   └── scenario-processor/ # 示例 C++ 处理器
+├── sdk/                # 客户端 SDK
+│   └── cpp/            # C++ 集成 SDK
+└── web/                # 主前端工程 (Vue 3)
 ```
 
-## 🧪 测试体系 (Testing)
+## 🧪 测试 (Testing)
 
-项目建立了三位一体的质量保障体系：
-
-### 1. 单元测试 (Unit Tests)
-*   **Go 端**: 使用 `testify` + `sqlmock` / `insmemory-sqlite` 实现 `UseCase` 逻辑验证。
+*   **单元测试**:
     ```bash
-    go test ./internal/modules/resource/core/...
+    go test ./internal/...
     ```
-*   **C++ 端**: 使用 `GoogleTest` 实现 SDK 核心逻辑验证。
+*   **压力测试**:
     ```bash
-    cd sdk/cpp/build && ./tests/sdk_tests
+    go run tests/stress/main.go -c 50
     ```
 
-### 2. 压力测试 (Stress Tests)
-*   **Go 实现**: 模拟高并发应用 Token 与列表查询。
-    ```bash
-    go run tests/stress/main.go -c 50 -d 30s
-    ```
-*   **C++ 实现**: 验证 SDK 在多线程下的稳定性。
-    ```bash
-    cd sdk/cpp/build && ./tests/sdk_stress_test
-    ```
+## 🤝 贡献 (Contributing)
 
-### 3. 集成测试 (Integration Tests - WIP)
-目前的集成测试通过 `examples` 目录下的示例程序手动完成。
+欢迎提交 Pull Request 或 Issue。对于重大架构变更，请先开启 Issue 讨论方案。
 
-## 🤝 贡献
-
-欢迎提交 Pull Request 或 Issue。对于重大变更，请先开启 Issue 讨论方案。
-
-## 📄 许可证
+## 📄 许可证 (License)
 
 MIT License

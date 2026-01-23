@@ -35,15 +35,15 @@
           class="custom-tree"
           @node-click="handleNodeClick"
           highlight-current
-          :default-expanded-keys="['all']"
+          :default-expanded-keys="[ROOT_CATEGORY_ID]"
           :filter-node-method="filterNode"
         >
           <template #default="{ node, data }">
             <div class="custom-tree-node">
-              <el-icon v-if="data.id === 'all'" class="node-icon root-icon"><Grid /></el-icon>
+              <el-icon v-if="data.id === ROOT_CATEGORY_ID" class="node-icon root-icon"><Grid /></el-icon>
               <el-icon v-else class="node-icon folder-icon"><Folder /></el-icon>
               <span class="node-label">{{ node.label }}</span>
-              <div class="node-actions" v-if="data.id !== 'all'">
+              <div class="node-actions" v-if="data.id !== ROOT_CATEGORY_ID">
                 <el-icon class="delete-icon" @click.stop="$emit('delete-category', data.id)"><Delete /></el-icon>
               </div>
             </div>
@@ -59,6 +59,7 @@ import { ref, watch } from 'vue'
 import { FolderOpened, Plus, Grid, Folder, Delete, Search } from '@element-plus/icons-vue'
 import type { ElTree } from 'element-plus'
 import type { CategoryNode } from '../../../core/types/resource'
+import { ROOT_CATEGORY_ID } from '../../../core/constants/resource'
 
 const props = defineProps<{
   categoryTree: CategoryNode[]
