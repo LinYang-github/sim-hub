@@ -4,7 +4,7 @@
     <el-aside width="210px" class="sidebar">
       <div class="logo-area">
         <el-icon class="logo-icon"><Platform /></el-icon>
-        <span class="logo-text">SimHub 平台</span>
+        <span class="logo-text">资源管理平台</span>
       </div>
       
       <el-scrollbar>

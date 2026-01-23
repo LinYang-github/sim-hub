@@ -221,7 +221,10 @@
       <template #header>
         <div class="drawer-header">
           <span>资源依赖全景图</span>
-          <el-button type="warning" size="small" @click="downloadBundle" :loading="bundleLoading">一键打包下载</el-button>
+          <div class="header-actions">
+            <el-button type="warning" size="small" @click="downloadBundle" :loading="bundleLoading">清单下载</el-button>
+            <el-button type="success" size="small" @click="downloadSimPack" :loading="packLoading">离线打包 (.simpack)</el-button>
+          </div>
         </div>
       </template>
       <div v-loading="depLoading" class="dep-content">
@@ -402,6 +405,7 @@ const versionHistory = ref<any[]>([])
 
 // 打包下载相关
 const bundleLoading = ref(false)
+const packLoading = ref(false)
 
 // 上传表单相关
 const uploadConfirmVisible = ref(false)
@@ -847,6 +851,15 @@ const downloadBundle = async () => {
     }
 }
 
+const downloadSimPack = async () => {
+    if (!currentResource.value?.latest_version?.id) return
+    const vid = currentResource.value.latest_version.id
+    // 直接调用后端流式下载接口
+    const downloadUrl = `/api/v1/resources/versions/${vid}/download-pack`
+    window.open(downloadUrl, '_blank')
+    ElMessage.success('已开始生成离线包并下载')
+}
+
 let pollInterval: any = null
 
 const initData = () => {
@@ -1132,6 +1145,11 @@ onUnmounted(() => {
   align-items: center;
   width: 100%;
   padding-right: 20px;
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
+  }
 }
 
 .history-content {

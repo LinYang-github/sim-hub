@@ -1,6 +1,7 @@
 package core
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -35,6 +36,7 @@ type UseCase struct {
 const (
 	ActionProcess = "PROCESS" // 全流程处理 (执行 Processor + 写 Sidecar)
 	ActionRefresh = "REFRESH" // 仅刷新元数据 (重新生成 Sidecar)
+	ActionExport  = "EXPORT"  // 异步打包导出
 )
 
 type processJob struct {
@@ -1014,14 +1016,14 @@ func (uc *UseCase) ListResourceVersions(ctx context.Context, resourceID string) 
 	for _, v := range versions {
 		url, _ := uc.store.PresignGet(ctx, uc.minioConfig, v.FilePath, time.Hour)
 		res = append(res, ResourceVersionDTO{
-ID:          v.ID,
-VersionNum:  v.VersionNum,
-SemVer:      v.SemVer,
-FileSize:    v.FileSize,
-MetaData:    v.MetaData,
-State:       v.State,
-DownloadURL: url,
-})
+			ID:          v.ID,
+			VersionNum:  v.VersionNum,
+			SemVer:      v.SemVer,
+			FileSize:    v.FileSize,
+			MetaData:    v.MetaData,
+			State:       v.State,
+			DownloadURL: url,
+		})
 	}
 	return res, nil
 }
@@ -1074,7 +1076,7 @@ func (uc *UseCase) recursiveCollectBundle(ctx context.Context, versionID string,
 
 	// 生成下载链接
 	url, _ := uc.store.PresignGet(ctx, uc.minioConfig, ver.FilePath, time.Hour*24)
-	
+
 	flatList[ver.ID] = map[string]any{
 		"name":         ver.Resource.Name,
 		"type":         ver.Resource.TypeKey,
@@ -1095,5 +1097,51 @@ func (uc *UseCase) recursiveCollectBundle(ctx context.Context, versionID string,
 			uc.recursiveCollectBundle(ctx, targetVer.ID, flatList, visited)
 		}
 	}
+	return nil
+}
+
+// DownloadBundleZip 实时流式生成并下载打包文件
+func (uc *UseCase) DownloadBundleZip(ctx context.Context, versionID string, w io.Writer) error {
+	// 1. 获取完整清单
+	bundle, err := uc.GetResourceBundle(ctx, versionID)
+	if err != nil {
+		return err
+	}
+
+	zipW := zip.NewWriter(w)
+	defer zipW.Close()
+
+	// 2. 写入清单文件
+	manifestVer, _ := json.MarshalIndent(bundle, "", "  ")
+	f, _ := zipW.Create("manifest.json")
+	f.Write(manifestVer)
+
+	// 3. 递归写入文件流
+	files := bundle["files"].(map[string]any)
+	for _, info := range files {
+		m := info.(map[string]any)
+		// 创建 Zip 内的路径
+		filePath := fmt.Sprintf("resources/%s/%s-%s.%s",
+			m["type"], m["name"], m["semver"],
+			strings.Split(m["file_path"].(string), ".")[len(strings.Split(m["file_path"].(string), "."))-1])
+
+		zf, err := zipW.Create(filePath)
+		if err != nil {
+			return err
+		}
+
+		// 从存储直接拉取并写入目标流 (串联 Pipeline)
+		rc, err := uc.store.Get(ctx, uc.minioConfig, m["file_path"].(string))
+		if err != nil {
+			slog.Warn("跳过文件下载失败", "key", m["file_path"], "error", err)
+			continue
+		}
+		_, err = io.Copy(zf, rc)
+		rc.Close()
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

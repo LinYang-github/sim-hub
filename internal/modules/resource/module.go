@@ -1,6 +1,8 @@
 package resource
 
 import (
+	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -51,6 +53,9 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 		resources.GET("/versions/:vid/dependencies", m.GetDependencies)
 		resources.GET("/versions/:vid/dependency-tree", m.GetDependencyTree)
 		resources.GET("/versions/:vid/bundle", m.GetBundle)
+
+		// 新增：实时同步打包下载
+		resources.GET("/versions/:vid/download-pack", m.DownloadBundle)
 	}
 
 	// /api/v1/categories 路径组
@@ -338,4 +343,24 @@ func (m *Module) GetBundle(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, bundle)
+}
+
+// DownloadBundle 实时流式下载 Zip 包
+func (m *Module) DownloadBundle(c *gin.Context) {
+	vid := c.Param("vid")
+
+	// 1. 设置响应头，告诉浏览器这是一个文件下载
+	// 这里可以先查一下资源名称来给文件命名
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Transfer-Encoding", "binary")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"bundle-%s.simpack\"", vid))
+	c.Header("Content-Type", "application/octet-stream")
+
+	// 2. 调用 UseCase 直接将 Zip 数据流向 ResponseWriter
+	err := m.uc.DownloadBundleZip(c.Request.Context(), vid, c.Writer)
+	if err != nil {
+		slog.Error("打包下载失败", "error", err)
+		// 注意：如果已经开始写入数据，这里再写 JSON 错误可能会破坏响应
+		return
+	}
 }
