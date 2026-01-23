@@ -17,11 +17,6 @@
       <div class="premium-header">
         <!-- 1. Left: Context & Filter -->
         <div class="header-left">
-          <div class="title-block">
-            <h2>{{ currentCategoryName }}</h2>
-            <span class="subtitle">{{ typeName }}库</span>
-          </div>
-          
           <div v-if="enableScope" class="scope-segment">
             <div 
               v-for="opt in [{label:'全部', val:'ALL'}, {label:'公共', val:'PUBLIC'}, {label:'我的', val:'PRIVATE'}]"
