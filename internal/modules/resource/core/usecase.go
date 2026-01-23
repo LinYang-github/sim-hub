@@ -5,8 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -73,9 +76,17 @@ func NewUseCase(d *data.Data, store storage.MultipartBlobStore, stsProvider stor
 }
 
 func (uc *UseCase) dispatchJob(job processJob) {
+	// ActionRefresh 需要数据库访问，强制在本地执行 (API 节点有 DB)
+	if job.Action == ActionRefresh {
+		go uc.handleJob(context.Background(), job)
+		return
+	}
+
 	if uc.nats != nil && uc.nats.Config.Enabled {
 		if err := uc.nats.Encoded.Publish(uc.nats.Config.Subject, &job); err != nil {
 			slog.Error("发送 NATS 消息失败，回退到本地队列", "error", err)
+			// 如果是 API 模式且未启动 Worker，这里写入 jobChan 可能会阻塞或死锁
+			// 但一般 fallback 意味着 NATS 挂了，系统降级
 			uc.jobChan <- job
 		}
 		return
@@ -375,13 +386,73 @@ func (uc *UseCase) processResourceInternal(ctx context.Context, typeKey, objectK
 
 	finalMeta := make(map[string]any)
 	if processorCmd != "" {
-		// 模拟异步处理耗时
-		slog.Debug("执行外部处理器", "cmd", processorCmd)
-		time.Sleep(500 * time.Millisecond)
-		finalMeta = map[string]any{
-			"processed_by": "distributed-worker",
-			"processed_at": time.Now().Format(time.RFC3339),
+		// --- 真实执行逻辑 ---
+		// 1. 下载文件到本地临时目录
+		ext := ""
+		if parts := strings.Split(objectKey, "."); len(parts) > 1 {
+			ext = "." + parts[len(parts)-1]
 		}
+
+		tempFile, err := os.CreateTemp("", "simhub-resource-*"+ext)
+		if err != nil {
+			slog.Error("创建临时文件失败", "error", err)
+			return // 应该上报 ERROR 状态
+		}
+		defer os.Remove(tempFile.Name())
+		defer tempFile.Close()
+
+		// 从 MinIO 下载
+		obj, err := uc.store.Get(ctx, uc.minioConfig, objectKey)
+		if err != nil {
+			slog.Error("下载资源文件失败", "key", objectKey, "error", err)
+			return
+		}
+
+		if _, err := io.Copy(tempFile, obj); err != nil {
+			obj.Close()
+			slog.Error("保存临时文件失败", "error", err)
+			return
+		}
+		obj.Close()
+
+		slog.Info("文件已下载至本地，准备处理", "path", tempFile.Name())
+
+		// 2. 执行外部命令
+		// 格式: <cmd> <filepath>
+		// 输出: JSON 格式的 metadata 到 stdout
+		cmd := exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf("%s '%s'", processorCmd, tempFile.Name()))
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+
+		slog.Debug("执行外部处理器", "cmd", cmd.String())
+		startTime := time.Now()
+		if err := cmd.Run(); err != nil {
+			slog.Error("外部处理器执行失败", "error", err, "stderr", stderr.String())
+			// 上报错误状态
+			uc.notifyResult(ctx, versionID, ProcessResultRequest{
+				State:   "ERROR",
+				Message: fmt.Sprintf("Processor failed: %v, stderr: %s", err, stderr.String()),
+			})
+			return
+		}
+
+		duration := time.Since(startTime)
+		slog.Info("外部处理器执行完成", "duration", duration)
+
+		// 3. 解析结果
+		if err := json.Unmarshal(stdout.Bytes(), &finalMeta); err != nil {
+			slog.Warn("处理器输出非 JSON 格式，忽略元数据", "output", stdout.String())
+			finalMeta["raw_output"] = stdout.String()
+		} else {
+			// 追加系统级元数据
+			finalMeta["processed_by"] = "simhub-worker"
+			finalMeta["processed_at"] = time.Now().Format(time.RFC3339)
+			finalMeta["processor_duration_ms"] = duration.Milliseconds()
+		}
+	} else {
+		slog.Debug("未配置该类型的处理器，跳过计算", "type", typeKey)
+		finalMeta["status"] = "skipped"
 	}
 
 	// 2. 上报结果

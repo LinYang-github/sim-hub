@@ -54,6 +54,6 @@ log:
   format: "text"
 
 nats:
-  enabled: false
+  enabled: true
   url: "nats://localhost:4222"
   subject: "simhub.jobs"
