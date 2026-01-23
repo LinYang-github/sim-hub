@@ -5,81 +5,223 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>外部测试资源库</title>
     <style>
+        :root {
+            --bg-color: #f5f7fa;
+            --card-bg: #fff;
+            --text-primary: #303133;
+            --text-secondary: #909399;
+            --border-color: #ebeef5;
+        }
+
+        /* 极简深色模式支持 */
+        html.dark {
+            --bg-color: #0a0a0a;
+            --card-bg: #1d1d1d;
+            --text-primary: #e5eaf3;
+            --text-secondary: #a8abb2;
+            --border-color: #363637;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             margin: 0;
             padding: 20px;
-            background-color: #f5f7fa;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            transition: all 0.3s;
         }
         .header {
-            background-color: #fff;
+            background-color: var(--card-bg);
             padding: 20px;
-            border-bottom: 1px solid #ebeef5;
+            border-bottom: 3px solid #409eff;
             margin-bottom: 20px;
-            border-radius: 4px;
-            box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
-        .header h2 { margin: 0; color: #303133; }
-        .header p { color: #909399; margin-top: 10px; }
+        .header h2 { margin: 0; }
+        .header p { color: var(--text-secondary); margin-top: 10px; }
         
+        .bridge-actions {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        button {
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: 1px solid #dcdfe6;
+            background: #fff;
+            cursor: pointer;
+            font-size: 13px;
+            transition: .2s;
+        }
+        button:hover {
+            color: #409eff;
+            border-color: #c6e2ff;
+            background-color: #ecf5ff;
+        }
+        button.primary {
+            background: #409eff;
+            color: white;
+            border: none;
+        }
+        button.primary:hover {
+            background: #66b1ff;
+        }
+
+        #token-display {
+            font-family: monospace;
+            background: #eee;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: none;
+            color: #444;
+        }
+
         .resource-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
             gap: 20px;
         }
         
         .card {
-            background: #fff;
-            border-radius: 4px;
-            border: 1px solid #ebeef5;
+            background: var(--card-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
             padding: 20px;
-            transition: .3s;
         }
-        .card:hover {
-            box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
-        }
-        .card-title { font-weight: bold; color: #303133; margin-bottom: 10px; }
+        .card-title { font-weight: bold; margin-bottom: 10px; }
         .card-tag { 
             display: inline-block; 
             padding: 2px 10px; 
-            background: #ecf5ff; 
+            background: #409eff22; 
             color: #409eff; 
             border-radius: 4px; 
             font-size: 12px;
         }
         .badge-external {
-            background-color: #f0f9eb;
+            background-color: #67c23a22;
             color: #67c23a;
             padding: 5px 10px;
             border-radius: 4px;
             font-size: 12px;
             float: right;
+            border: 1px solid #67c23a44;
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <span class="badge-external">External System</span>
-        <h2>测试资源库 (External)</h2>
-        <p>这是一个完全独立的外部系统，通过 Iframe 集成到了 SimHub 中。</p>
+        <span class="badge-external">微前端演示应用</span>
+        <h2>外部演示系统 (Legacy Repo)</h2>
+        <p>这是一个模拟的独立老旧系统，现已通过 <b>SimHubBridge</b> 实现与主平台的实时通信。</p>
+        
+        <div class="bridge-actions">
+            <button class="primary" onclick="syncToken()">同步主应用令牌</button>
+            <button onclick="sendNotify()">发送跨应用通知</button>
+            <span id="token-display"></span>
+        </div>
     </div>
 
     <div class="resource-grid">
         <div class="card">
             <div class="card-title">F-22 气动数据模型</div>
             <span class="card-tag">AeroModel</span>
-            <p style="font-size: 13px; color: #666; margin-top: 10px;">来源: 外部联合实验室</p>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 10px;">来源: 外部联合实验室</p>
         </div>
         <div class="card">
             <div class="card-title">红海行动想定包</div>
             <span class="card-tag">Scenario</span>
-            <p style="font-size: 13px; color: #666; margin-top: 10px;">来源: 演训中心</p>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 10px;">来源: 演训中心</p>
         </div>
         <div class="card">
             <div class="card-title">全局地形数据 (Level 10)</div>
             <span class="card-tag">Terrain</span>
-            <p style="font-size: 13px; color: #666; margin-top: 10px;">来源: 测绘局 API</p>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 10px;">来源: 测绘局 API</p>
         </div>
     </div>
+
+    <script>
+        /**
+         * 极简版 SimHubBridge Guest 实现
+         * 适用于无编译环境的遗留系统
+         */
+        const SimHubBridge = {
+            pendingRequests: new Map(),
+            handlers: new Map(),
+
+            init() {
+                window.addEventListener('message', (e) => this._handleMessage(e));
+                console.log('%c[SimHubBridge] Guest Init Success', 'color: #67c23a; font-weight: bold');
+            },
+
+            _handleMessage(event) {
+                const data = event.data;
+                // RPC Response
+                if (data.id && this.pendingRequests.has(data.id)) {
+                    const { resolve } = this.pendingRequests.get(data.id);
+                    this.pendingRequests.delete(data.id);
+                    resolve(data.data);
+                }
+                // Broadcast Event
+                if (data.type && this.handlers.has(data.type)) {
+                    this.handlers.get(data.type)(data.payload);
+                }
+            },
+
+            callHost(type, payload) {
+                const id = Math.random().toString(36).substring(2);
+                return new Promise(resolve => {
+                    this.pendingRequests.set(id, { resolve });
+                    window.parent.postMessage({ id, type, payload, timestamp: Date.now() }, '*');
+                });
+            },
+
+            on(type, handler) {
+                this.handlers.set(type, handler);
+            }
+        };
+
+        // 初始化
+        SimHubBridge.init();
+
+        // 监听主题切换
+        SimHubBridge.on('THEME_UPDATE', (payload) => {
+            console.log('Theme changed to:', payload.theme);
+            if (payload.theme === 'dark') {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        // 业务函数
+        async function syncToken() {
+            const result = await SimHubBridge.callHost('AUTH_TOKEN_GET');
+            const display = document.getElementById('token-display');
+            display.innerText = 'Token: ' + result.token.substring(0, 12) + '...';
+            display.style.display = 'inline-block';
+            
+            // 发个通知显摆一下
+            SimHubBridge.callHost('NOTIFY', {
+                type: 'success',
+                title: '同步成功',
+                message: '已从父窗口安全获取 JWT 令牌'
+            });
+        }
+
+        function sendNotify() {
+            SimHubBridge.callHost('NOTIFY', {
+                type: 'info',
+                title: '遗留系统提示',
+                message: '这是一条来自原汁原味 HTML 页面的通知消息'
+            });
+        }
+    </script>
 </body>
 </html>

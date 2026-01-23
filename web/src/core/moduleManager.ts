@@ -1,11 +1,11 @@
-import { App } from 'vue'
+import { App, shallowRef } from 'vue'
 import { Router } from 'vue-router'
 import { SimHubModule } from './types'
 import IframeContainer from './views/IframeContainer.vue'
 
 class ModuleManager {
-  // 已配置（活跃）的模块列表
-  private activeModules: SimHubModule[] = []
+  // 已配置（活跃）的模块列表 (使用 shallowRef 确保 UI 响应式同步)
+  private activeModules = shallowRef<SimHubModule[]>([])
   
   // 可用的代码实现（内部模块映射表）
   private implementations: Map<string, SimHubModule> = new Map()
@@ -19,7 +19,7 @@ class ModuleManager {
   }
 
   install(_app: App, router: Router) {
-    this.activeModules.forEach(m => {
+    this.activeModules.value.forEach(m => {
       // 1. 内部路由注册
       if (m.routes) {
         m.routes.forEach(r => router.addRoute(r))
@@ -40,14 +40,14 @@ class ModuleManager {
   }
 
   getMenus() {
-    return this.activeModules.flatMap(m => {
-      // 情况 1: 显式菜单（内部模块）- 若配置中有 label 则进行覆盖
+    return this.activeModules.value.flatMap(m => {
+      // 情况 1: 显式菜单（内部模块）- 若配置中有 label 或 icon 则进行覆盖
       if (m.menu) {
-          // 若配置文件提供了 label，则覆盖菜单项的显示文本（简易覆盖逻辑）
-          if (m.label && m.menu.length > 0) {
-              return m.menu.map(item => ({ ...item, label: m.label }))
-          }
-          return m.menu
+          return m.menu.map(item => ({ 
+              ...item, 
+              label: m.label || item.label,
+              icon: m.icon || item.icon 
+          }))
       }
 
       // 情况 2: 生成的菜单（外部模块）
@@ -58,6 +58,7 @@ class ModuleManager {
         return [{
           label: m.label,
           path: path || '#',
+          icon: m.icon
         }]
       }
       return []
@@ -73,7 +74,7 @@ class ModuleManager {
       }
       const configItems: SimHubModule[] = await response.json()
       
-      this.activeModules = [] // 重置活跃模块列表
+      const newActiveModules: SimHubModule[] = []
 
       configItems.forEach(item => {
         if (item.integrationMode === 'internal') {
@@ -83,7 +84,7 @@ class ModuleManager {
                 // 将配置项（如 label）合并到代码实现中
                 const merged = { ...impl, ...item } 
                 // 注意：保留实现中的 routes/menu，但覆盖 label 等顶层属性
-                this.activeModules.push(merged)
+                newActiveModules.push(merged)
             } else {
                 // 兜底逻辑：如果没有特定实现，自动使用通用的 ResourceList
                 console.log(`未找到内容模块 '${item.key}' 的特定实现，使用通用 ResourceList 兜底。`)
@@ -110,14 +111,15 @@ class ModuleManager {
                       }
                     ]
                 }
-                this.activeModules.push(fallback)
+                newActiveModules.push(fallback)
             }
         } else {
             // 激活外部模块
-            this.activeModules.push(item)
+            newActiveModules.push(item)
         }
       })
-      console.log(`已成功加载 ${this.activeModules.length} 个活跃模块`)
+      this.activeModules.value = newActiveModules
+      console.log(`已成功加载 ${this.activeModules.value.length} 个活跃模块`)
     } catch (e) {
       console.error("加载模块配置时发生异常", e)
     }

@@ -3,6 +3,7 @@
     "key": "scenario",
     "label": "想定资源库",
     "integrationMode": "internal",
+    "icon": "FolderOpened",
     "typeName": "想定",
     "uploadMode": "folder-zip",
     "enableScope": true
@@ -11,6 +12,7 @@
     "key": "model_glb",
     "label": "3D 模型库",
     "integrationMode": "internal",
+    "icon": "Box",
     "typeName": "模型",
     "uploadMode": "single",
     "accept": ".glb",
@@ -20,15 +22,17 @@
     "key": "map_terrain",
     "label": "高程地形库",
     "integrationMode": "iframe",
+    "icon": "Location",
     "externalUrl": "/terrain/",
-    "devUrl": "http://127.0.0.1:30032",
+    "devUrl": "http://localhost:30032",
     "typeName": "地形"
   },
   {
     "key": "test-repo",
     "label": "外部演示系统",
     "integrationMode": "iframe",
+    "icon": "Monitor",
     "externalUrl": "/demo/",
-    "devUrl": "http://127.0.0.1:30031"
+    "devUrl": "http://localhost:30031"
   }
 ]

@@ -14,8 +14,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useDark } from '@vueuse/core'
+import { hostBridge } from '../bridge/host'
 
 const props = defineProps<{
   url: string
@@ -27,18 +28,27 @@ const iframeRef = ref<HTMLIFrameElement | null>(null)
 
 // 同步主题给子页面
 const syncTheme = () => {
-  if (iframeRef.value && iframeRef.value.contentWindow) {
-    iframeRef.value.contentWindow.postMessage({
-      type: 'SIMHUB_THEME_CHANGE',
-      theme: isDark.value ? 'dark' : 'light'
-    }, '*')
-  }
+  hostBridge.broadcast('THEME_UPDATE', {
+    theme: isDark.value ? 'dark' : 'light'
+  })
 }
 
 const onLoad = () => {
   loading.value = false
   syncTheme() // 加载完成后立刻同步一次
 }
+
+onMounted(() => {
+  if (iframeRef.value) {
+    hostBridge.register(iframeRef.value)
+  }
+})
+
+onUnmounted(() => {
+  if (iframeRef.value) {
+    hostBridge.unregister(iframeRef.value)
+  }
+})
 
 // 监听主题变化并实时同步
 watch(isDark, () => {

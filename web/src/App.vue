@@ -77,8 +77,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { 
-  Platform, Odometer, Files, Bell, Sunny, Moon, 
-  UserFilled, ArrowDown 
+  Platform, Odometer, Files, Sunny, Moon, ArrowDown 
 } from '@element-plus/icons-vue'
 import { moduleManager } from './core/moduleManager'
 import { useDark, useToggle } from '@vueuse/core'
@@ -86,11 +85,11 @@ import { useDark, useToggle } from '@vueuse/core'
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
 const route = useRoute()
-const menus = moduleManager.getMenus()
+const menus = computed(() => moduleManager.getMenus())
 
 const currentPageTitle = computed(() => {
   if (route.path === '/') return '工作台概览'
-  const activeMenu = menus.find(m => m.path === route.path)
+  const activeMenu = menus.value.find(m => m.path === route.path)
   return activeMenu ? activeMenu.label : '仿真资源'
 })
 </script>

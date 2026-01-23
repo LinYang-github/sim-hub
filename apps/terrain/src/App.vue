@@ -103,29 +103,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Upload, MapLocation, Search, DataAnalysis, Files, Connection } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDark } from '@vueuse/core'
+import { bridge } from './bridge/guest'
 
 const isDark = useDark()
 const viewMode = ref('list')
 
-// 监听来自父窗体的主题切换消息
-const handleMessage = (event: MessageEvent) => {
-  if (event.data && event.data.type === 'SIMHUB_THEME_CHANGE') {
-    const theme = event.data.theme
-    isDark.value = theme === 'dark'
-  }
-}
-
 onMounted(() => {
-  window.addEventListener('message', handleMessage)
+  // 仅保留主题同步
+  bridge.on('THEME_UPDATE', (payload) => {
+    isDark.value = payload.theme === 'dark'
+  })
 })
 
-onUnmounted(() => {
-  window.removeEventListener('message', handleMessage)
-})
 const searchQuery = ref('')
 const uploadVisible = ref(false)
 
@@ -186,6 +179,11 @@ const handleDelete = (row: any) => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
 }
 
 .dashboard-header h2 {
