@@ -1002,3 +1002,98 @@ func (uc *UseCase) resolveDependencies(ctx context.Context, versionID string, vi
 
 	return result, nil
 }
+
+// ListResourceVersions 获取资源的所有版本历史
+func (uc *UseCase) ListResourceVersions(ctx context.Context, resourceID string) ([]ResourceVersionDTO, error) {
+	var versions []model.ResourceVersion
+	if err := uc.data.DB.Where("resource_id = ?", resourceID).Order("version_num desc").Find(&versions).Error; err != nil {
+		return nil, err
+	}
+
+	res := make([]ResourceVersionDTO, 0, len(versions))
+	for _, v := range versions {
+		url, _ := uc.store.PresignGet(ctx, uc.minioConfig, v.FilePath, time.Hour)
+		res = append(res, ResourceVersionDTO{
+ID:          v.ID,
+VersionNum:  v.VersionNum,
+SemVer:      v.SemVer,
+FileSize:    v.FileSize,
+MetaData:    v.MetaData,
+State:       v.State,
+DownloadURL: url,
+})
+	}
+	return res, nil
+}
+
+// SetResourceLatestVersion 设置当前资源的“主版本”（版本回溯）
+func (uc *UseCase) SetResourceLatestVersion(ctx context.Context, resourceID string, versionID string) error {
+	// 验证版本确实属于该资源
+	var v model.ResourceVersion
+	if err := uc.data.DB.Where("id = ? AND resource_id = ?", versionID, resourceID).First(&v).Error; err != nil {
+		return fmt.Errorf("version not found or not belong to this resource: %w", err)
+	}
+
+	return uc.data.DB.Model(&model.Resource{}).Where("id = ?", resourceID).Update("latest_version_id", versionID).Error
+}
+
+// GetResourceBundle 获取“一键打包”所需的完整清单
+func (uc *UseCase) GetResourceBundle(ctx context.Context, versionID string) (map[string]any, error) {
+	// 1. 获取主版本信息
+	var mainVer model.ResourceVersion
+	if err := uc.data.DB.Preload("Resource").First(&mainVer, "id = ?", versionID).Error; err != nil {
+		return nil, err
+	}
+
+	// 2. 递归解析依赖记录
+	flatList := make(map[string]any)
+	visited := make(map[string]bool)
+	err := uc.recursiveCollectBundle(ctx, versionID, flatList, visited)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"root_resource": mainVer.Resource.Name,
+		"root_version":  mainVer.SemVer,
+		"bundle_size":   0, // 可选：累加计算总大小
+		"files":         flatList,
+	}, nil
+}
+
+func (uc *UseCase) recursiveCollectBundle(ctx context.Context, versionID string, flatList map[string]any, visited map[string]bool) error {
+	if visited[versionID] {
+		return nil
+	}
+	visited[versionID] = true
+
+	var ver model.ResourceVersion
+	if err := uc.data.DB.Preload("Resource").First(&ver, "id = ?", versionID).Error; err != nil {
+		return err
+	}
+
+	// 生成下载链接
+	url, _ := uc.store.PresignGet(ctx, uc.minioConfig, ver.FilePath, time.Hour*24)
+	
+	flatList[ver.ID] = map[string]any{
+		"name":         ver.Resource.Name,
+		"type":         ver.Resource.TypeKey,
+		"semver":       ver.SemVer,
+		"size":         ver.FileSize,
+		"download_url": url,
+		"file_path":    ver.FilePath,
+	}
+
+	// 查找并递归子依赖
+	var deps []model.ResourceDependency
+	uc.data.DB.Where("source_version_id = ?", versionID).Find(&deps)
+	for _, d := range deps {
+		var targetVer model.ResourceVersion
+		// 简单逻辑：取目标资源的符合约束的最佳版本
+		uc.data.DB.Order("version_num desc").First(&targetVer, "resource_id = ?", d.TargetResourceID)
+		if targetVer.ID != "" {
+			uc.recursiveCollectBundle(ctx, targetVer.ID, flatList, visited)
+		}
+	}
+	return nil
+}

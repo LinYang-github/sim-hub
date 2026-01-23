@@ -124,8 +124,8 @@
 
           <el-table-column label="版本" width="120">
             <template #default="scope">
-              <el-tooltip :content="'流水版本: ' + (scope.row.latest_version?.version_num || 1)" placement="top">
-                <span class="version-badge">
+              <el-tooltip :content="'点击查看历史版本 - 当前流水: ' + (scope.row.latest_version?.version_num || 1)" placement="top">
+                <span class="version-badge clickable" @click="viewHistory(scope.row)">
                   {{ scope.row.latest_version?.semver || 'v' + (scope.row.latest_version?.version_num || 1) }}
                 </span>
               </el-tooltip>
@@ -218,6 +218,12 @@
 
     <!-- 依赖树展示对话框 -->
     <el-drawer v-model="depDrawerVisible" title="资源依赖全景图" size="450px" class="dep-drawer">
+      <template #header>
+        <div class="drawer-header">
+          <span>资源依赖全景图</span>
+          <el-button type="warning" size="small" @click="downloadBundle" :loading="bundleLoading">一键打包下载</el-button>
+        </div>
+      </template>
       <div v-loading="depLoading" class="dep-content">
         <template v-if="depTree.length > 0">
           <el-tree
@@ -241,6 +247,41 @@
           </el-tree>
         </template>
         <el-empty v-else description="该资源暂无任何依赖" />
+      </div>
+    </el-drawer>
+
+    <!-- 版本历史对话框 -->
+    <el-drawer v-model="historyDrawerVisible" title="版本历史与回溯" size="500px">
+      <div v-loading="historyLoading" class="history-content">
+        <el-timeline>
+          <el-timeline-item
+            v-for="v in versionHistory"
+            :key="v.id"
+            :timestamp="formatDate(v.created_at)"
+            placement="top"
+          >
+            <el-card class="history-card">
+              <div class="history-info">
+                <div class="history-main">
+                  <span class="history-ver">{{ v.semver || 'v' + v.version_num }}</span>
+                  <el-tag size="small" :type="v.state === 'ACTIVE' ? 'success' : 'info'">{{ statusMap[v.state] }}</el-tag>
+                  <el-tag v-if="v.id === currentResource?.latest_version?.id" size="small" effect="dark">当前</el-tag>
+                </div>
+                <div class="history-actions">
+                  <el-button link type="primary" @click="handleDownload(v.download_url)">下载</el-button>
+                  <el-button 
+                    v-if="v.id !== currentResource?.latest_version?.id" 
+                    link 
+                    type="warning" 
+                    @click="rollback(v)"
+                  >
+                    设为主版本
+                  </el-button>
+                </div>
+              </div>
+            </el-card>
+          </el-timeline-item>
+        </el-timeline>
       </div>
     </el-drawer>
 
@@ -352,6 +393,15 @@ const currentResourceId = ref('')
 const depDrawerVisible = ref(false)
 const depLoading = ref(false)
 const depTree = ref<any[]>([])
+const currentResource = ref<Resource | null>(null)
+
+// 版本历史相关
+const historyDrawerVisible = ref(false)
+const historyLoading = ref(false)
+const versionHistory = ref<any[]>([])
+
+// 打包下载相关
+const bundleLoading = ref(false)
 
 // 上传表单相关
 const uploadConfirmVisible = ref(false)
@@ -714,11 +764,20 @@ const download = async (row: any) => {
     }
 }
 
+const handleDownload = (url?: string) => {
+  if (url) {
+    window.open(url, '_blank')
+  } else {
+    ElMessage.warning('下载链接无效')
+  }
+}
+
 const viewDependencies = async (row: Resource) => {
     if (!row.latest_version?.id) {
         ElMessage.warning('未能获取该资源的版本信息')
         return
     }
+    currentResource.value = row
     depDrawerVisible.value = true
     depLoading.value = true
     try {
@@ -728,6 +787,63 @@ const viewDependencies = async (row: Resource) => {
         ElMessage.error('获取依赖树失败: ' + (err.response?.data?.error || err.message))
     } finally {
         depLoading.value = false
+    }
+}
+
+const viewHistory = async (row: Resource) => {
+    currentResource.value = row
+    historyDrawerVisible.value = true
+    historyLoading.value = true
+    try {
+        const res = await axios.get(`/api/v1/resources/${row.id}/versions`)
+        versionHistory.value = res.data || []
+    } catch (err: any) {
+        ElMessage.error('获取历史失败: ' + (err.response?.data?.error || err.message))
+    } finally {
+        historyLoading.value = false
+    }
+}
+
+const rollback = async (ver: any) => {
+    if (!currentResource.value) return
+    ElMessageBox.confirm(`确定要将版本切换回 ${ver.semver || 'v' + ver.version_num} 吗？此操作会影响所有下游依赖。`, '版本回溯确认', {
+        type: 'warning'
+    }).then(async () => {
+        try {
+            await axios.post(`/api/v1/resources/${currentResource.value?.id}/latest`, {
+                version_id: ver.id
+            })
+            ElMessage.success('版本切换成功')
+            // 更新当前列表和状态
+            fetchList()
+            viewHistory(currentResource.value!)
+        } catch (err: any) {
+            ElMessage.error('切换失败: ' + (err.response?.data?.error || err.message))
+        }
+    })
+}
+
+const downloadBundle = async () => {
+    if (!currentResource.value?.latest_version?.id) return
+    bundleLoading.value = true
+    try {
+        const res = await axios.get(`/api/v1/resources/versions/${currentResource.value.latest_version.id}/bundle`)
+        const data = res.data
+        
+        // 将清单作为 JSON 下载
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `bundle-${currentResource.value.name}-${data.root_version}.json`
+        a.click()
+        URL.revokeObjectURL(url)
+        
+        ElMessage.success('依赖包清单已生成并下载')
+    } catch (err: any) {
+        ElMessage.error('生成打包清单失败: ' + (err.response?.data?.error || err.message))
+    } finally {
+        bundleLoading.value = false
     }
 }
 
@@ -999,6 +1115,56 @@ onUnmounted(() => {
   font-size: 12px;
   color: var(--el-text-color-regular);
   font-weight: 500;
+  
+  &.clickable {
+    cursor: pointer;
+    transition: all 0.2s;
+    &:hover {
+      background: var(--el-color-primary-light-8);
+      color: var(--el-color-primary);
+    }
+  }
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding-right: 20px;
+}
+
+.history-content {
+  padding: 0 20px;
+}
+
+.history-card {
+  margin-bottom: 4px;
+  :deep(.el-card__body) {
+    padding: 12px;
+  }
+}
+
+.history-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-ver {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.history-actions {
+  display: flex;
+  gap: 4px;
 }
 
 .status-cell {

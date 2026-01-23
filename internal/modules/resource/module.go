@@ -45,9 +45,12 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 		resources.PATCH("/:id/scope", m.UpdateResourceScope) // 新增：更新作用域
 		resources.PATCH("/:id/process-result", m.ReportProcessResult)
 
-		// 新增：依赖管理
+		// 新增：版本历史与依赖管理
+		resources.GET("/:id/versions", m.ListVersions)
+		resources.POST("/:id/latest", m.SetLatestVersion)
 		resources.GET("/versions/:vid/dependencies", m.GetDependencies)
 		resources.GET("/versions/:vid/dependency-tree", m.GetDependencyTree)
+		resources.GET("/versions/:vid/bundle", m.GetBundle)
 	}
 
 	// /api/v1/categories 路径组
@@ -295,4 +298,44 @@ func (m *Module) GetDependencyTree(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, tree)
+}
+
+// ListVersions 获取版本历史
+func (m *Module) ListVersions(c *gin.Context) {
+	id := c.Param("id")
+	versions, err := m.uc.ListResourceVersions(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, versions)
+}
+
+// SetLatestVersion 设置主版本（回溯）
+func (m *Module) SetLatestVersion(c *gin.Context) {
+	id := c.Param("id")
+	var req struct {
+		VersionID string `json:"version_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := m.uc.SetResourceLatestVersion(c.Request.Context(), id, req.VersionID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Latest version updated"})
+}
+
+// GetBundle 获取一键打包清单
+func (m *Module) GetBundle(c *gin.Context) {
+	vid := c.Param("vid")
+	bundle, err := m.uc.GetResourceBundle(c.Request.Context(), vid)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, bundle)
 }
