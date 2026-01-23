@@ -1,0 +1,63 @@
+import axios from 'axios'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import type { Resource } from './useResourceList'
+
+export function useResourceAction(fetchList: () => void) {
+  
+  const confirmDelete = (row: any) => {
+    ElMessageBox.confirm(`确定要删除资源 "${row.name}" 吗？`, '警告', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消'
+    }).then(async () => {
+      try {
+        await axios.delete(`/api/v1/resources/${row.id}`)
+        ElMessage.success('删除成功')
+        fetchList()
+      } catch (err: any) {
+        ElMessage.error('删除失败: ' + (err.response?.data?.error || err.message))
+      }
+    })
+  }
+
+  const download = async (row: any) => {
+    const res = await axios.get(`/api/v1/resources/${row.id}`)
+    const url = res.data.latest_version?.download_url
+    if (url) {
+      window.open(url, '_blank')
+    } else {
+      ElMessage.warning('下载链接无效')
+    }
+  }
+
+  const handleDownloadUrl = (url?: string) => {
+    if (url) {
+      window.open(url, '_blank')
+    } else {
+      ElMessage.warning('下载链接无效')
+    }
+  }
+
+  const publishResource = (row: Resource) => {
+    ElMessageBox.confirm(`确定要将资源 "${row.name}" 发布到公共库吗？发布后所有用户可见。`, '发布确认', {
+      type: 'success',
+      confirmButtonText: '确定发布',
+      cancelButtonText: '取消'
+    }).then(async () => {
+      try {
+        await axios.patch(`/api/v1/resources/${row.id}/scope`, { scope: 'PUBLIC' })
+        ElMessage.success('发布成功')
+        fetchList()
+      } catch (err: any) {
+        ElMessage.error('发布失败: ' + (err.response?.data?.error || err.message))
+      }
+    })
+  }
+
+  return {
+    confirmDelete,
+    download,
+    handleDownloadUrl,
+    publishResource
+  }
+}
