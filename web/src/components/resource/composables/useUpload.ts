@@ -128,9 +128,13 @@ export function useUpload(
     }
   }
 
-  const performUpload = async (displayName: string, blob: Blob, contentType: string, filename: string, categoryIdVal: string) => {
+  /* 
+   * Update performUpload to accept overrideTypeKey for closure fix 
+   */
+  const performUpload = async (displayName: string, blob: Blob, contentType: string, filename: string, categoryIdVal: string, overrideTypeKey?: string) => {
+    const currentKey = overrideTypeKey || typeKey
     const res = await axios.post('/api/v1/integration/upload/token', {
-      resource_type: typeKey,
+      resource_type: currentKey,
       checksum: 'skip-for-now',
       size: blob.size,
       filename: filename
@@ -149,7 +153,7 @@ export function useUpload(
 
     await axios.post('/api/v1/integration/upload/confirm', {
       ticket_id,
-      type_key: typeKey,
+      type_key: currentKey,
       category_id: categoryIdVal === 'all' ? '' : categoryIdVal,
       name: displayName,
       owner_id: 'admin',
@@ -163,13 +167,13 @@ export function useUpload(
     })
   }
 
-  const confirmAndDoUpload = async (categoryIdVal: string) => {
+  const confirmAndDoUpload = async (categoryIdVal: string, overrideTypeKey?: string) => {
     if (!pendingUploadData.value) return
     const { displayName, blob, contentType, filename } = pendingUploadData.value
     
     uploading.value = true
     try {
-      await performUpload(displayName, blob, contentType, filename, categoryIdVal)
+      await performUpload(displayName, blob, contentType, filename, categoryIdVal, overrideTypeKey)
       ElMessage.success('任务已提交并自动关联依赖')
       uploadConfirmVisible.value = false
       pendingUploadData.value = null

@@ -12,9 +12,10 @@
       <el-tree
         :data="categoryTree"
         :props="defaultProps"
-        node-key="id"
+        :node-key="'id'"
+        :current-node-key="modelValue"
         class="custom-tree"
-        @node-click="(data) => $emit('select-category', data)"
+        @node-click="(data) => { $emit('select-category', data); $emit('update:modelValue', data.id) }"
         highlight-current
         :default-expanded-keys="['all']"
       >
@@ -39,9 +40,10 @@ import { FolderOpened, Plus, Grid, Folder, Delete } from '@element-plus/icons-vu
 defineProps<{
   categoryTree: any[]
   defaultProps: any
+  modelValue?: string
 }>()
 
-defineEmits(['add-category', 'select-category', 'delete-category'])
+defineEmits(['add-category', 'select-category', 'delete-category', 'update:modelValue'])
 </script>
 
 <style scoped lang="scss">

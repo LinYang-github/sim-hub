@@ -6,6 +6,7 @@
     <CategorySidebar
       :category-tree="categoryTree"
       :default-props="{ children: 'children', label: 'name' }"
+      v-model="selectedCategoryId"
       @add-category="promptAddCategory"
       @select-category="handleCategorySelect"
       @delete-category="(id) => confirmDeleteCategory(id, fetchList)"
@@ -34,23 +35,7 @@
           </div>
         </div>
 
-        <!-- 2. Center: Global Search -->
-        <div class="header-center">
-          <div class="search-capsule" :class="{ focused: searchFocused }">
-            <el-icon class="search-icon"><Search /></el-icon>
-            <input 
-              v-model="searchQuery"
-              class="search-input"
-              type="text" 
-              placeholder="搜索资源名称..." 
-              @focus="searchFocused = true"
-              @blur="searchFocused = false"
-              @keyup.enter="fetchList"
-            />
-            <div class="shortcut-hint" v-if="!searchQuery && !searchFocused">/</div>
-            <el-icon v-if="searchQuery" class="clear-icon" @click="searchQuery = ''; fetchList()"><CircleCloseFilled /></el-icon>
-          </div>
-        </div>
+
 
         <!-- 3. Right: Actions Cluster -->
         <div class="header-right">
@@ -77,7 +62,7 @@
             </el-tooltip>
 
             <el-tooltip content="刷新列表" placement="bottom">
-              <el-button class="icon-btn" @click="fetchList" circle>
+              <el-button class="icon-btn" @click="fetchList()" circle>
                 <el-icon><Refresh /></el-icon>
               </el-button>
             </el-tooltip>
@@ -165,7 +150,7 @@
       :search-results="searchResults"
       :search-loading="searchLoading"
       @search-dependency="searchTargetResources"
-      @confirm="() => confirmAndDoUpload(selectedCategoryId)"
+      @confirm="() => confirmAndDoUpload(selectedCategoryId, props.typeKey)"
     />
 
     <DependencyDrawer
@@ -299,8 +284,8 @@ const handleCategorySelect = (data: any) => {
 let pollInterval: any = null
 
 const initData = () => {
-    fetchList()
-    fetchCategories()
+    fetchList(props.typeKey)
+    fetchCategories(props.typeKey)
 }
 
 watch(() => props.typeKey, () => {
@@ -349,21 +334,17 @@ onUnmounted(() => {
 
 .premium-header {
   background: var(--sidebar-bg);
-  height: 72px;
-  padding: 0 24px;
-  border-radius: 16px;
+  height: 60px;
+  padding: 0 20px;
+  border-radius: 8px; /* Tighter radius */
   display: flex;
   justify-content: space-between;
   align-items: center;
   border: 1px solid var(--el-border-color-lighter);
-  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.04);
   backdrop-filter: blur(10px);
   margin-bottom: 2px;
   transition: all 0.3s ease;
-
-  &:hover {
-    box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.08);
-  }
 }
 
 /* 1. Header Left */
@@ -380,14 +361,14 @@ onUnmounted(() => {
 
   h2 {
     margin: 0;
-    font-size: 20px;
+    font-size: 18px; /* Slightly smaller */
     font-weight: 700;
     color: var(--el-text-color-primary);
     letter-spacing: -0.5px;
   }
 
   .subtitle {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--el-text-color-secondary);
     font-weight: 500;
   }
@@ -396,14 +377,14 @@ onUnmounted(() => {
 .scope-segment {
   display: flex;
   background: var(--el-fill-color);
-  padding: 4px;
-  border-radius: 10px;
+  padding: 3px;
+  border-radius: 6px; /* Sharper */
   gap: 2px;
 
   .segment-item {
-    padding: 6px 16px;
-    font-size: 13px;
-    border-radius: 8px;
+    padding: 4px 12px;
+    font-size: 12px;
+    border-radius: 4px;
     cursor: pointer;
     color: var(--el-text-color-regular);
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -417,76 +398,13 @@ onUnmounted(() => {
     &.active {
       background: var(--el-bg-color);
       color: var(--el-color-primary);
-      box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 1px 4px -1px rgba(0, 0, 0, 0.1);
       font-weight: 600;
     }
   }
 }
 
-/* 2. Header Center (Search) */
-.header-center {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  max-width: 480px;
-  margin: 0 24px;
-}
-
-.search-capsule {
-  width: 100%;
-  height: 42px;
-  background: var(--el-fill-color);
-  border-radius: 20px;
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  transition: all 0.3s ease;
-  border: 1px solid transparent;
-
-  &.focused {
-    background: var(--el-bg-color);
-    border-color: var(--el-color-primary);
-    box-shadow: 0 0 0 3px var(--el-color-primary-light-9);
-    width: 105%; /* Slight expansion effect */
-  }
-
-  .search-icon {
-    font-size: 16px;
-    color: var(--el-text-color-placeholder);
-    margin-right: 8px;
-  }
-
-  .search-input {
-    flex: 1;
-    border: none;
-    background: transparent;
-    font-size: 14px;
-    color: var(--el-text-color-primary);
-    outline: none;
-
-    &::placeholder {
-      color: var(--el-text-color-placeholder);
-    }
-  }
-
-  .shortcut-hint {
-    font-size: 12px;
-    color: var(--el-text-color-disabled);
-    border: 1px solid var(--el-border-color);
-    border-radius: 4px;
-    padding: 0 6px;
-    line-height: 18px;
-    margin-left: 8px;
-  }
-  
-  .clear-icon {
-    cursor: pointer;
-    color: var(--el-text-color-placeholder);
-    &:hover { color: var(--el-text-color-regular); }
-  }
-}
-
-/* 3. Header Right */
+/* 2. Header Right */
 .header-right {
   display: flex;
   align-items: center;
@@ -495,7 +413,7 @@ onUnmounted(() => {
 
 .divider-vertical {
   width: 1px;
-  height: 24px;
+  height: 20px;
   background: var(--el-border-color-lighter);
 }
 
@@ -504,15 +422,20 @@ onUnmounted(() => {
   gap: 12px;
 
   .upload-btn {
-    height: 36px;
-    border-radius: 10px;
-    padding: 0 20px;
+    height: 32px; /* More compact */
+    border-radius: 4px; /* Standard sharp corners */
+    padding: 0 16px;
     font-weight: 600;
-    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
-    transition: transform 0.1s;
+    font-size: 13px;
+    box-shadow: none; /* Removed heavy shadow */
+    transition: all 0.1s;
 
+    &:hover {
+      opacity: 0.9;
+    }
+    
     &:active {
-      transform: scale(0.98);
+      transform: translateY(1px);
     }
   }
 }
@@ -525,11 +448,12 @@ onUnmounted(() => {
   .icon-btn {
     border: none;
     background: transparent;
-    font-size: 18px;
+    font-size: 16px;
     color: var(--el-text-color-regular);
     transition: all 0.2s;
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
 
     &:hover {
       background: var(--el-fill-color-light);
@@ -541,18 +465,18 @@ onUnmounted(() => {
 .view-toggle-group {
   display: flex;
   background: var(--el-fill-color);
-  border-radius: 8px;
-  padding: 3px;
+  border-radius: 4px;
+  padding: 2px;
   gap: 2px;
   margin-left: 8px;
 
   .toggle-item {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 6px;
+    border-radius: 3px;
     cursor: pointer;
     color: var(--el-text-color-placeholder);
     transition: all 0.2s;
@@ -564,7 +488,7 @@ onUnmounted(() => {
     &.active {
       background: var(--el-bg-color);
       color: var(--el-color-primary);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
   }
 }

@@ -31,11 +31,12 @@ export function useResourceList(
   const searchQuery = ref('')
   const syncing = ref(false)
 
-  const fetchList = async () => {
+  const fetchList = async (overrideTypeKey?: string) => {
     loading.value = true
     try {
+      const currentKey = overrideTypeKey || typeKey
       const params: any = { 
-        type: typeKey,
+        type: currentKey,
         name: searchQuery.value 
       }
       if (selectedCategoryId.value !== 'all') {
