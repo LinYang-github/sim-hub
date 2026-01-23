@@ -37,10 +37,11 @@ install(TARGETS simhub_sdk DESTINATION lib)
 install(DIRECTORY include/simhub DESTINATION include)
 
 # 示例程序 (可选开关)
+# 示例程序 (可选开关)
 option(BUILD_EXAMPLES "Build SDK examples" ON)
 if(BUILD_EXAMPLES)
-    add_subdirectory(examples/01_simple_upload)
-    add_subdirectory(examples/02_sts_upload)
+    add_executable(multipart_upload_example examples/multipart_upload.cpp)
+    target_link_libraries(multipart_upload_example PRIVATE simhub_sdk ${CURL_LIBRARIES})
 endif()
 
 # --- 单元测试 / Unit Tests ---

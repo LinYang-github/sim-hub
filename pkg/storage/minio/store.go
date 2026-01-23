@@ -130,7 +130,7 @@ func (s *MinIOStore) PresignPart(ctx context.Context, bucket, key, uploadID stri
 	// MinIO SDK 的 PresignedPutObject 不直接支持 passing query params for uploadId.
 	// 我们需要使用 client.Presign (Generic) 或者构建自定义请求。
 
-	// 更稳妥的方式是使用 Presign 方法
+	// 统一使用 127.0.0.1 以避免 localhost/IP 混用导致的签名问题
 	u, err := s.client.Presign(ctx, "PUT", bucket, key, expiry, reqParams)
 	if err != nil {
 		return "", err

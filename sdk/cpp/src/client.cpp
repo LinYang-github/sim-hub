@@ -252,6 +252,27 @@ Status Client::uploadFileSimple(const std::string& url, const std::string& fileP
     return Status::Success(true);
 }
 
+// Helper struct for memory reading
+struct MemoryReader {
+    const char* data;
+    size_t size;
+    size_t pos;
+};
+
+static size_t ReadMemoryCallback(char* dest, size_t size, size_t nmemb, void* userp) {
+    MemoryReader* reader = static_cast<MemoryReader*>(userp);
+    size_t buffer_size = size * nmemb;
+    size_t left = reader->size - reader->pos;
+    size_t to_copy = std::min(buffer_size, left);
+    
+    if (to_copy > 0) {
+        memcpy(dest, reader->data + reader->pos, to_copy);
+        reader->pos += to_copy;
+        return to_copy;
+    }
+    return 0;
+}
+
 // Helper for capturing ETag from headers
 static size_t HeaderCallback(char* buffer, size_t size, size_t nitems, void* userdata) {
     std::string* headers = static_cast<std::string*>(userdata);
@@ -360,14 +381,27 @@ Status Client::uploadFileMultipart(const std::string& typeKey, const std::string
             std::string headerBuffer;
             curl_easy_setopt(curl, CURLOPT_URL, urlRes.value.c_str());
             curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
-            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, buffer.data());
-            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)toRead);
+            
+            MemoryReader reader = { buffer.data(), (size_t)toRead, 0 };
+            curl_easy_setopt(curl, CURLOPT_READFUNCTION, ReadMemoryCallback);
+            curl_easy_setopt(curl, CURLOPT_READDATA, &reader);
+            curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, (curl_off_t)toRead);
+
             curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, HeaderCallback);
             curl_easy_setopt(curl, CURLOPT_HEADERDATA, &headerBuffer);
+
+            struct curl_slist* headers = NULL;
+            // Explicitly remove Content-Type and Expect headers as they are usually not 
+            // part of the signature in minio-go's Presign() for simple PUTs.
+            headers = curl_slist_append(headers, "Content-Type:");
+            headers = curl_slist_append(headers, "Expect:");
+            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
             
             auto res = curl_easy_perform(curl);
             long http_code = 0;
             curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+            
+            curl_slist_free_all(headers);
             curl_easy_cleanup(curl);
 
             if (res == CURLE_OK && http_code < 400) {
