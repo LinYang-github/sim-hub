@@ -589,6 +589,7 @@ func (uc *UseCase) ListResources(ctx context.Context, typeKey string, categoryID
 
 		dv := &ResourceVersionDTO{
 			VersionNum: v.VersionNum,
+			FileSize:   v.FileSize,
 			State:      v.State,
 			MetaData:   v.MetaData,
 		}

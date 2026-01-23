@@ -34,7 +34,10 @@ watch(() => props.url, () => {
 <style scoped>
 .iframe-container {
   width: 100%;
-  height: calc(100vh - 80px); /* Adjust based on header height */
+  height: calc(100vh - var(--header-height) - 40px); 
   overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  background: var(--sidebar-bg);
 }
 </style>

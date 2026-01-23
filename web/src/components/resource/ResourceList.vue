@@ -126,14 +126,16 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="120" fixed="right">
+          <el-table-column label="操作" width="160" fixed="right">
             <template #default="scope">
-              <el-button type="primary" link :disabled="scope.row.latest_version?.state !== 'ACTIVE'" @click="download(scope.row)">
-                <el-icon><Download /></el-icon> 下载
-              </el-button>
-              <el-button type="danger" link @click="confirmDelete(scope.row)">
-                <el-icon><Delete /></el-icon> 删除
-              </el-button>
+              <div class="operation-buttons">
+                <el-button type="primary" link :disabled="scope.row.latest_version?.state !== 'ACTIVE'" @click="download(scope.row)">
+                  <el-icon><Download /></el-icon> 下载
+                </el-button>
+                <el-button type="danger" link @click="confirmDelete(scope.row)">
+                  <el-icon><Delete /></el-icon> 删除
+                </el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -294,7 +296,8 @@ const statusMap: Record<string, string> = {
 const formatDate = (dateString: string) => {
   if (!dateString) return ''
   const date = new Date(dateString)
-  return date.toLocaleString()
+  const pad = (num: number) => num.toString().padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
 const formatSize = (bytes?: number) => {
@@ -535,77 +538,85 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .resource-layout {
   display: flex;
-  height: calc(100vh - 140px); 
-  padding: 0;
-  background-color: transparent;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  gap: 16px;
+  height: calc(100vh - var(--header-height) - 40px);
+  gap: 12px;
+  animation: fadeIn 0.4s ease-out;
 }
 
-/* 侧边栏：Glassmorphism */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 侧边栏：更精致的分类树 */
 .category-sidebar {
-  width: 240px;
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
+  width: 220px;
+  background: var(--sidebar-bg);
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--el-border-color-lighter);
   display: flex;
   flex-direction: column;
+  box-shadow: var(--el-box-shadow-lighter);
 }
 
 .sidebar-header {
-  padding: 20px;
+  padding: 16px 20px;
   display: flex;
   align-items: center;
   gap: 8px;
   font-weight: 600;
-  color: #1e293b;
-  border-bottom: 1px solid #f1f5f9;
-}
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+  border-bottom: 1px solid var(--el-border-color-lighter);
 
-.sidebar-header span {
-  flex: 1;
+  span { flex: 1; }
 }
 
 .custom-tree {
   background: transparent;
-  padding: 8px;
+  padding: 12px 8px;
+  
+  :deep(.el-tree-node__content) {
+    height: 36px;
+    border-radius: 6px;
+    margin-bottom: 2px;
+    
+    &:hover {
+      background-color: var(--el-fill-color-light);
+    }
+  }
+  
+  :deep(.is-current > .el-tree-node__content) {
+    background-color: var(--el-color-primary-light-9);
+    color: var(--el-color-primary);
+  }
 }
 
 .custom-tree-node {
   display: flex;
   align-items: center;
   width: 100%;
-  padding-right: 8px;
+  font-size: 13px;
+  padding-right: 12px;
+  
+  .node-label {
+    margin-left: 8px;
+    flex: 1;
+  }
+  
+  .node-actions {
+    opacity: 0;
+    transition: opacity 0.2s;
+    color: var(--el-text-color-placeholder);
+    
+    &:hover { color: var(--el-color-danger); }
+  }
 }
 
-.node-label {
-  margin-left: 8px;
-  flex: 1;
-  font-size: 13.5px;
-}
-
-.node-actions {
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.custom-tree-node:hover .node-actions {
-  opacity: 1;
-}
-
-.delete-icon {
-  color: #94a3b8;
-  cursor: pointer;
-}
-
-.delete-icon:hover {
-  color: #f43f5e;
-}
+.custom-tree-node:hover .node-actions { opacity: 1; }
 
 /* 主内容区 */
 .resource-main {
@@ -613,30 +624,32 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  overflow: hidden;
+  min-width: 0;
 }
 
 .premium-header {
-  background: #ffffff;
-  padding: 12px 20px;
+  background: var(--sidebar-bg);
+  padding: 16px 24px;
   border-radius: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
+  border: 1px solid var(--el-border-color-lighter);
+  box-shadow: var(--el-box-shadow-lighter);
 
-.premium-header h2 {
-  margin: 0;
-  color: #0f172a;
-  font-size: 18px;
-}
-
-.premium-header h2 small {
-  font-weight: 400;
-  color: #64748b;
-  font-size: 13px;
-  margin-left: 8px;
+  h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+    
+    small {
+      font-weight: 400;
+      color: var(--el-text-color-secondary);
+      font-size: 13px;
+      margin-left: 8px;
+    }
+  }
 }
 
 .action-group {
@@ -646,53 +659,66 @@ onUnmounted(() => {
 
 .content-container {
   flex: 1;
-  background: #ffffff;
+  background: var(--sidebar-bg);
   border-radius: 12px;
+  border: 1px solid var(--el-border-color-lighter);
   overflow: hidden;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--el-box-shadow-lighter);
 }
 
-/* 表格定制 */
+/* 表格样式定制 */
 .premium-table {
-  --el-table-header-bg-color: #f8fafc;
+  --el-table-header-bg-color: var(--el-fill-color-lighter);
+  
+  :deep(th.el-table__cell) {
+    font-weight: 600;
+    color: var(--el-text-color-regular);
+    font-size: 13px;
+    padding: 12px 0;
+  }
+  
+  :deep(td.el-table__cell) {
+    padding: 14px 0;
+  }
 }
 
 .resource-info-cell {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .resource-icon {
-  width: 36px;
-  height: 36px;
-  background: #eff6ff;
-  color: #3b82f6;
-  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 20px;
+  flex-shrink: 0;
 }
 
 .resource-name {
   font-weight: 600;
-  color: #1e293b;
+  color: var(--el-text-color-primary);
   font-size: 14px;
 }
 
 .resource-meta {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--el-text-color-placeholder);
   display: flex;
   gap: 12px;
   margin-top: 4px;
-}
-
-.resource-meta span {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  
+  span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
 }
 
 .tag-wrap {
@@ -704,66 +730,86 @@ onUnmounted(() => {
 
 .premium-tag {
   border: none;
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--el-fill-color);
+  color: var(--el-text-color-regular);
 }
 
 .add-tag-btn {
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
-  color: #64748b;
+  background: transparent;
+  border: 1px dashed var(--el-border-color);
+  color: var(--el-text-color-placeholder);
+  
+  &:hover {
+    border-color: var(--el-color-primary);
+    color: var(--el-color-primary);
+  }
 }
 
 .version-badge {
-  background: #f1f5f9;
+  background: var(--el-fill-color-light);
   padding: 2px 8px;
-  border-radius: 12px;
+  border-radius: 6px;
   font-size: 12px;
-  color: #475569;
+  color: var(--el-text-color-regular);
+  font-weight: 500;
 }
 
 .status-cell {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #cbd5e1;
+  background: var(--el-text-color-placeholder);
+  
+  &.active {
+    background: var(--el-color-success);
+    box-shadow: 0 0 8px var(--el-color-success-light-5);
+  }
+  
+  &.processing {
+    background: var(--el-color-primary);
+    animation: statusPulse 2s infinite;
+  }
+  
+  &.failed {
+    background: var(--el-color-danger);
+  }
 }
 
-.status-dot.active {
-  background: #10b981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-}
-
-.status-dot.processing {
-  background: #3b82f6;
-  animation: pulse 1.5s infinite;
-}
-
-.status-dot.failed {
-  background: #f43f5e;
-}
-
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+@keyframes statusPulse {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  50% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.6; }
 }
 
 .status-text {
   font-size: 13px;
-  color: #475569;
+  color: var(--el-text-color-regular);
 }
 
 .upload-status {
-  padding: 12px;
-  background: #f8fafc;
-  border-radius: 8px;
-  margin: 0;
+  padding: 16px 24px;
+  background: var(--sidebar-bg);
+  border-radius: 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  margin-bottom: 12px;
+  
+  p {
+    margin: 0 0 10px 0;
+    font-size: 13px;
+    color: var(--el-text-color-regular);
+  }
+}
+
+.operation-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
 }
 </style>
