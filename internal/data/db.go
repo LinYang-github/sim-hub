@@ -50,6 +50,7 @@ func NewData(c *conf.Data) (*Data, func(), error) {
 		&model.Category{},
 		&model.Resource{},
 		&model.ResourceVersion{},
+		&model.ResourceDependency{},
 	); err != nil {
 		return nil, nil, fmt.Errorf("数据库迁移失败: %w", err)
 	}

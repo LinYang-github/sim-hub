@@ -73,8 +73,16 @@ func main() {
 	}
 
 	// 5. 业务模块注册
+	handlers := make(map[string]string)
+	for _, rt := range cfg.ResourceTypes {
+		if rt.ProcessConf != nil {
+			// 如果配置了 pipeline，则视为有处理器（目前简单以 typeKey 为索引）
+			handlers[rt.TypeKey] = "placeholder"
+		}
+	}
+
 	registry := module.NewRegistry()
-	registry.Register(resource.NewModule(dbConn, blobStore, stsProvider, cfg.MinIO.Bucket, natsClient, "api", "", nil))
+	registry.Register(resource.NewModule(dbConn, blobStore, stsProvider, cfg.MinIO.Bucket, natsClient, "api", "", handlers))
 
 	// 6. 配置 HTTP 路由
 	r := gin.Default()

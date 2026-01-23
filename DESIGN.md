@@ -29,7 +29,8 @@ graph TD
 ### 2.1 实体模型 (Entities)
 
 *   **Resource (资源主表)**：代表一个逻辑资源实体（如“城市三维模型”）。
-*   **ResourceVersion (资源版本)**：资源的版本化记录，每个版本对应存储中的一个物理路径。
+*   **ResourceVersion (资源版本)**：资源的版本化记录。引入了 **语义化版本 (SemVer)** (如 v1.0.2) 与 **流水号版本 (VersionNum)** (如 5) 双重标识。
+*   **ResourceDependency (资源依赖)**：描述资源版本间的有向无环图 (DAG) 关系。例如“想定 A”依赖于“模型 B”和“地形 C”。
 *   **ResourceType (资源类型)**：定义资源的属性结构（JSON Schema）、预览配置及处理逻辑。
 *   **Sidecar (元数据辅助文件)**：持久化在存储层的 `.meta.json` 文件，用于在数据库丢失时恢复系统状态。
 
@@ -39,20 +40,22 @@ graph TD
 | :--- | :--- | :--- |
 | `resource_types` | 类型定义 | 定义资源 Schema、前端预览组件及分类模式 |
 | `resources` | 资源元数据 | 记录名称、分类、标签及所属权 |
-| `resource_versions` | 版本追踪 | 记录物理路径、大小、状态（PENDING/ACTIVE）及处理后的动态元数据 |
+| `resource_versions` | 版本追踪 | 记录语义化版本 (SemVer)、物理路径、大小、状态（PENDING/ACTIVE） |
+| `resource_dependencies` | 依赖关系 | 记录版本间的父子引用关系，支持版本约束条件 |
 | `categories` | 层级分类 | 维护资源的虚拟文件夹目录结构 |
 
 ## 3. 核心流程设计 (Core Flow Design)
 
-### 3.1 异步处理流水线 (Processing Pipeline)
+### 3.1 异步处理与智能感知反馈 (Processing Pipeline)
 
-SimHub 采用了“上传即处理”的策略：
+SimHub 采用了“智能感知式”处理策略：
 
-1.  **上传确认**：客户端完成分片上传并调用 `/confirm`，Master 在 DB 记录版本并发布 NATS 消息。
-2.  **任务分发**：NATS 将 `ActionProcess` 消息投递给空闲的 Worker。
-3.  **计算执行**：Worker 根据本地 `handlers` 配置执行对应的处理工具（如 GDAL, FFmpeg）。
-4.  **结果反馈**：Worker 通过 HTTP PATCH 接口将分析出的元数据上报给 Master。
-5.  **落盘完成**：Master 更新 DB 状态，并强制刷新存储层的 Sidecar 文件。
+1.  **上传决策**：Master 接收上传确认请求时，会识别资源类型的 **Handler 配置**：
+    *   **无 Handler 类型**：判定为即插即用资源（如想定包、文档），直接标记为 `ACTIVE` 并跳过 NATS 队列。
+    *   **有 Handler 类型**：标记为 `PENDING` 并发布 NATS 任务。
+2.  **依赖解析**：在版本创建时，同步持久化解析出的依赖树（Dependency Tree）。
+3.  **计算执行 (如有)**：NATS 将任务投递给 Worker，执行本地映射的处理工具。
+4.  **结果反馈**：Worker 通过 HTTP PATCH 接口回传元数据，Master 更新状态并刷新存储层的 Sidecar。
 
 ## 4. 组件详解 (Component Breakdown)
 

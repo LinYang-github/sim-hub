@@ -131,15 +131,22 @@ type ApplyUploadTokenRequest struct {
 }
 
 type ConfirmUploadRequest struct {
-	TicketID   string         `json:"ticket_id"`
-	TypeKey    string         `json:"type_key"`
-	CategoryID string         `json:"category_id"` // 新增：所属分类 ID
-	Name       string         `json:"name"`
-	OwnerID    string         `json:"owner_id"`
-	Scope      string         `json:"scope"` // 新增：作用域
-	Tags       []string       `json:"tags"`  // 新增：资源标签
-	Size       int64          `json:"size"`
-	ExtraMeta  map[string]any `json:"extra_meta"`
+	TicketID     string          `json:"ticket_id"`
+	TypeKey      string          `json:"type_key"`
+	CategoryID   string          `json:"category_id"`
+	Name         string          `json:"name"`
+	OwnerID      string          `json:"owner_id"`
+	Scope        string          `json:"scope"`
+	Tags         []string        `json:"tags"`
+	Size         int64           `json:"size"`
+	SemVer       string          `json:"semver"`       // 新增：版本号
+	Dependencies []DependencyDTO `json:"dependencies"` // 新增：依赖列表
+	ExtraMeta    map[string]any  `json:"extra_meta"`
+}
+
+type DependencyDTO struct {
+	TargetResourceID string `json:"target_resource_id"`
+	Constraint       string `json:"constraint"`
 }
 
 type UpdateResourceTagsRequest struct {
@@ -180,16 +187,18 @@ type ProcessResultRequest struct {
 }
 
 type CompleteMultipartUploadRequest struct {
-	TicketID   string         `json:"ticket_id"`
-	UploadID   string         `json:"upload_id"`
-	Parts      []storage.Part `json:"parts"`
-	TypeKey    string         `json:"type_key"`
-	CategoryID string         `json:"category_id"`
-	Name       string         `json:"name"`
-	OwnerID    string         `json:"owner_id"`
-	Scope      string         `json:"scope"` // 新增：作用域
-	Tags       []string       `json:"tags"`
-	ExtraMeta  map[string]any `json:"extra_meta"`
+	TicketID     string          `json:"ticket_id"`
+	UploadID     string          `json:"upload_id"`
+	Parts        []storage.Part  `json:"parts"`
+	TypeKey      string          `json:"type_key"`
+	CategoryID   string          `json:"category_id"`
+	Name         string          `json:"name"`
+	OwnerID      string          `json:"owner_id"`
+	Scope        string          `json:"scope"`
+	Tags         []string        `json:"tags"`
+	SemVer       string          `json:"semver"`       // 新增：版本号
+	Dependencies []DependencyDTO `json:"dependencies"` // 新增：依赖列表
+	ExtraMeta    map[string]any  `json:"extra_meta"`
 }
 
 type CategoryDTO struct {
@@ -225,7 +234,9 @@ type ResourceDTO struct {
 }
 
 type ResourceVersionDTO struct {
+	ID          string         `json:"id"`
 	VersionNum  int            `json:"version_num"`
+	SemVer      string         `json:"semver"`
 	FileSize    int64          `json:"file_size"`
 	MetaData    map[string]any `json:"meta_data"`
 	State       string         `json:"state"`
@@ -326,7 +337,7 @@ func (uc *UseCase) CompleteMultipartUpload(ctx context.Context, req CompleteMult
 
 	// 3. 注册到数据库
 	return uc.data.DB.Transaction(func(tx *gorm.DB) error {
-		return uc.createResourceAndVersion(tx, req.TypeKey, req.CategoryID, req.Name, req.OwnerID, req.Scope, objectKey, objInfo.Size, req.Tags, req.ExtraMeta)
+		return uc.createResourceAndVersion(tx, req.TypeKey, req.CategoryID, req.Name, req.OwnerID, req.Scope, objectKey, objInfo.Size, req.Tags, req.SemVer, req.Dependencies, req.ExtraMeta)
 	})
 }
 
@@ -345,46 +356,92 @@ func (uc *UseCase) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) 
 	}
 
 	return uc.data.DB.Transaction(func(tx *gorm.DB) error {
-		return uc.createResourceAndVersion(tx, req.TypeKey, req.CategoryID, req.Name, req.OwnerID, req.Scope, objectKey, objInfo.Size, req.Tags, req.ExtraMeta)
+		return uc.createResourceAndVersion(tx, req.TypeKey, req.CategoryID, req.Name, req.OwnerID, req.Scope, objectKey, objInfo.Size, req.Tags, req.SemVer, req.Dependencies, req.ExtraMeta)
 	})
 }
 
 // createResourceAndVersion 内部统一资源注册逻辑
-func (uc *UseCase) createResourceAndVersion(tx *gorm.DB, typeKey, categoryID, name, ownerID, scope, objectKey string, size int64, tags []string, meta map[string]any) error {
+func (uc *UseCase) createResourceAndVersion(tx *gorm.DB, typeKey, categoryID, name, ownerID, scope, objectKey string, size int64, tags []string, semver string, deps []DependencyDTO, meta map[string]any) error {
 	if scope == "" {
 		scope = "PRIVATE"
 	}
-	res := model.Resource{
-		TypeKey:    typeKey,
-		CategoryID: categoryID,
-		Name:       name,
-		OwnerID:    ownerID,
-		Scope:      scope,
-		Tags:       tags,
-	}
-	if err := tx.Create(&res).Error; err != nil {
+
+	// 1. 查找或创建资源主体
+	var res model.Resource
+	err := tx.Where("type_key = ? AND name = ? AND owner_id = ? AND is_deleted = ?", typeKey, name, ownerID, false).First(&res).Error
+
+	if err == gorm.ErrRecordNotFound {
+		res = model.Resource{
+			TypeKey:    typeKey,
+			CategoryID: categoryID,
+			Name:       name,
+			OwnerID:    ownerID,
+			Scope:      scope,
+			Tags:       tags,
+		}
+		if err := tx.Create(&res).Error; err != nil {
+			return err
+		}
+	} else if err != nil {
 		return err
+	} else {
+		// 如果资源已存在，更新其标签和分类（可选）
+		tx.Model(&res).Updates(map[string]any{
+			"category_id": categoryID,
+			"tags":        tags,
+			"scope":       scope,
+		})
 	}
 
+	// 2. 确定版本号
+	var lastVer int
+	tx.Model(&model.ResourceVersion{}).Where("resource_id = ?", res.ID).Select("max(version_num)").Scan(&lastVer)
+	currentVer := lastVer + 1
+
+	// 3. 决定初始状态
+	// 如果该资源类型没有配置处理器，说明不需要异步处理，直接设为 ACTIVE
+	initialState := "PENDING"
+	hasHandler := uc.handlers[typeKey] != ""
+	if !hasHandler {
+		initialState = "ACTIVE"
+	}
+
+	// 4. 创建版本
 	ver := model.ResourceVersion{
 		ResourceID: res.ID,
-		VersionNum: 1,
+		VersionNum: currentVer,
+		SemVer:     semver,
 		FilePath:   objectKey,
 		FileSize:   size,
 		MetaData:   meta,
-		State:      "PENDING",
+		State:      initialState,
 	}
 	if err := tx.Create(&ver).Error; err != nil {
 		return err
 	}
 
-	// 触发异步处理
-	uc.dispatchJob(processJob{
-		Action:    ActionProcess,
-		TypeKey:   typeKey,
-		ObjectKey: objectKey,
-		VersionID: ver.ID,
-	})
+	// 5. 处理依赖关系
+	// ... (同之前逻辑)
+	for _, d := range deps {
+		dependency := model.ResourceDependency{
+			SourceVersionID:  ver.ID,
+			TargetResourceID: d.TargetResourceID,
+			Constraint:       d.Constraint,
+		}
+		tx.Create(&dependency)
+	}
+
+	// 6. 只有在有处理器的情况下才触发异步处理
+	if hasHandler {
+		uc.dispatchJob(processJob{
+			Action:    ActionProcess,
+			TypeKey:   typeKey,
+			ObjectKey: objectKey,
+			VersionID: ver.ID,
+		})
+	} else {
+		slog.Info("资源类型无需后端处理，跳过 NATS 任务分发", "type", typeKey, "name", name)
+	}
 	return nil
 }
 
@@ -562,10 +619,13 @@ func (uc *UseCase) GetResource(ctx context.Context, id string) (*ResourceDTO, er
 		CategoryID: r.CategoryID,
 		Name:       r.Name,
 		OwnerID:    r.OwnerID,
+		Scope:      r.Scope,
 		Tags:       r.Tags,
 		CreatedAt:  r.CreatedAt,
 		LatestVer: &ResourceVersionDTO{
+			ID:          v.ID,
 			VersionNum:  v.VersionNum,
+			SemVer:      v.SemVer,
 			FileSize:    v.FileSize,
 			MetaData:    v.MetaData,
 			State:       v.State,
@@ -610,7 +670,9 @@ func (uc *UseCase) ListResources(ctx context.Context, typeKey string, categoryID
 		uc.data.DB.Order("version_num desc").First(&v, "resource_id = ?", r.ID)
 
 		dv := &ResourceVersionDTO{
+			ID:         v.ID,
 			VersionNum: v.VersionNum,
+			SemVer:     v.SemVer,
 			FileSize:   v.FileSize,
 			State:      v.State,
 			MetaData:   v.MetaData,
@@ -875,4 +937,68 @@ func (uc *UseCase) ReportProcessResult(ctx context.Context, versionID string, re
 		slog.Info("接收到处理结果回调", "version_id", versionID, "state", ver.State)
 		return nil
 	})
+}
+
+// GetResourceDependencies 获取指定版本的直接依赖
+func (uc *UseCase) GetResourceDependencies(ctx context.Context, versionID string) ([]DependencyDTO, error) {
+	var deps []model.ResourceDependency
+	if err := uc.data.DB.Where("source_version_id = ?", versionID).Find(&deps).Error; err != nil {
+		return nil, err
+	}
+
+	res := make([]DependencyDTO, 0, len(deps))
+	for _, d := range deps {
+		res = append(res, DependencyDTO{
+			TargetResourceID: d.TargetResourceID,
+			Constraint:       d.Constraint,
+		})
+	}
+	return res, nil
+}
+
+// GetDependencyTree 递归获取依赖树
+func (uc *UseCase) GetDependencyTree(ctx context.Context, versionID string) ([]map[string]any, error) {
+	return uc.resolveDependencies(ctx, versionID, make(map[string]bool))
+}
+
+func (uc *UseCase) resolveDependencies(ctx context.Context, versionID string, visited map[string]bool) ([]map[string]any, error) {
+	if visited[versionID] {
+		return nil, nil // 发现循环依赖或重复处理，停止
+	}
+	visited[versionID] = true
+
+	var deps []model.ResourceDependency
+	uc.data.DB.Where("source_version_id = ?", versionID).Find(&deps)
+
+	result := make([]map[string]any, 0)
+	for _, d := range deps {
+		// 查询目标资源基本信息
+		var targetRes model.Resource
+		uc.data.DB.First(&targetRes, "id = ?", d.TargetResourceID)
+
+		// 查找目标资源的符合约束的最新版本（目前简单处理为查找最新版本）
+		var targetVer model.ResourceVersion
+		uc.data.DB.Order("version_num desc").First(&targetVer, "resource_id = ?", d.TargetResourceID)
+
+		node := map[string]any{
+			"resource_id":   targetRes.ID,
+			"resource_name": targetRes.Name,
+			"type_key":      targetRes.TypeKey,
+			"version_id":    targetVer.ID,
+			"semver":        targetVer.SemVer,
+			"constraint":    d.Constraint,
+		}
+
+		// 递归解析子依赖
+		if targetVer.ID != "" {
+			children, _ := uc.resolveDependencies(ctx, targetVer.ID, visited)
+			if len(children) > 0 {
+				node["dependencies"] = children
+			}
+		}
+
+		result = append(result, node)
+	}
+
+	return result, nil
 }

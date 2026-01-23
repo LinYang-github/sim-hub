@@ -122,18 +122,37 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="版本" width="100">
+          <el-table-column label="版本" width="120">
             <template #default="scope">
-              <span class="version-badge">v{{ scope.row.latest_version?.version_num || 1 }}</span>
+              <el-tooltip :content="'流水版本: ' + (scope.row.latest_version?.version_num || 1)" placement="top">
+                <span class="version-badge">
+                  {{ scope.row.latest_version?.semver || 'v' + (scope.row.latest_version?.version_num || 1) }}
+                </span>
+              </el-tooltip>
             </template>
           </el-table-column>
 
-          <el-table-column label="状态" width="140">
+          <el-table-column label="状态" width="120">
             <template #default="scope">
               <div class="status-cell">
-                <div :class="['status-dot', scope.row.latest_version?.state.toLowerCase()]"></div>
+                <el-tooltip 
+                  v-if="scope.row.latest_version?.state === 'ACTIVE' && !(scope.row.latest_version?.meta_data?.processed)"
+                  content="该资源类型无需后端处理，已直接可用"
+                  placement="top"
+                >
+                  <el-icon class="skip-icon"><CircleCheckFilled /></el-icon>
+                </el-tooltip>
+                <div v-else :class="['status-dot', scope.row.latest_version?.state.toLowerCase()]"></div>
                 <span class="status-text">{{ statusMap[scope.row.latest_version?.state] || scope.row.latest_version?.state }}</span>
               </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="依赖" width="100">
+            <template #default="scope">
+              <el-button link type="primary" @click="viewDependencies(scope.row)">
+                <el-icon><Connection /></el-icon> 依赖关系
+              </el-button>
             </template>
           </el-table-column>
 
@@ -196,6 +215,78 @@
         <el-button type="primary" @click="saveTags" :loading="tagLoading">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 依赖树展示对话框 -->
+    <el-drawer v-model="depDrawerVisible" title="资源依赖全景图" size="450px" class="dep-drawer">
+      <div v-loading="depLoading" class="dep-content">
+        <template v-if="depTree.length > 0">
+          <el-tree
+            :data="depTree"
+            :props="{ label: 'resource_name', children: 'dependencies' }"
+            default-expand-all
+            class="dep-tree"
+          >
+            <template #default="{ node, data }">
+              <div class="dep-node">
+                <el-icon class="dep-icon"><Share /></el-icon>
+                <div class="dep-info">
+                  <span class="dep-name">{{ data.resource_name }}</span>
+                  <div class="dep-meta">
+                    <el-tag size="small" type="info" class="dep-ver">{{ data.semver || 'latest' }}</el-tag>
+                    <span class="dep-constraint" v-if="data.constraint">约束: {{ data.constraint }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </el-tree>
+        </template>
+        <el-empty v-else description="该资源暂无任何依赖" />
+      </div>
+    </el-drawer>
+
+    <!-- 上传确认与依赖选择对话框 -->
+    <el-dialog v-model="uploadConfirmVisible" title="确认上传信息" width="550px" class="premium-dialog">
+      <el-form :model="uploadForm" label-position="top">
+        <el-form-item label="语义化版本 (SemVer)" required>
+          <el-input v-model="uploadForm.semver" placeholder="例如: v1.0.0" />
+          <div class="input-tip">建议遵循语义化版本规范，方便后续依赖追踪。</div>
+        </el-form-item>
+        
+        <el-form-item label="资源依赖">
+          <el-select
+            v-model="uploadForm.dependencies"
+            multiple
+            filterable
+            remote
+            reserve-keyword
+            placeholder="搜索并选择关联资源"
+            :remote-method="searchTargetResources"
+            :loading="searchLoading"
+            style="width: 100%"
+            value-key="id"
+          >
+            <el-option
+              v-for="item in searchResults"
+              :key="item.id"
+              :label="item.name"
+              :value="item"
+            >
+              <div class="search-option">
+                <span class="option-name">{{ item.name }}</span>
+                <span class="option-type">{{ item.type_key }}</span>
+              </div>
+            </el-option>
+          </el-select>
+          <div class="input-tip">你可以搜索并关联目前系统中已有的其他资源。</div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="uploadConfirmVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmAndDoUpload" :loading="uploading">
+           开始上传
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -204,7 +295,7 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { 
   Upload, Refresh, Plus, Folder, FolderOpened, Delete, 
   PriceTag, Connection, Grid, Clock, Files, DataLine, 
-  Download, Search, Box, Location, Promotion
+  Download, Search, Box, Location, Promotion, Share, CircleCheckFilled
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 import JSZip from 'jszip'
@@ -225,10 +316,13 @@ interface Resource {
   scope: 'PRIVATE' | 'PUBLIC'
   created_at: string
   latest_version?: {
+    id: string
     version_num: number
+    semver?: string
     state: string
     meta_data?: any
     file_size?: number
+    download_url?: string
   }
 }
 
@@ -255,6 +349,19 @@ const tagDialogVisible = ref(false)
 const tagLoading = ref(false)
 const editingTags = ref<string[]>([])
 const currentResourceId = ref('')
+const depDrawerVisible = ref(false)
+const depLoading = ref(false)
+const depTree = ref<any[]>([])
+
+// 上传表单相关
+const uploadConfirmVisible = ref(false)
+const uploadForm = ref({
+    semver: 'v1.0.0',
+    dependencies: [] as any[]
+})
+const searchLoading = ref(false)
+const searchResults = ref<any[]>([])
+const pendingUploadData = ref<{displayName: string, blob: Blob, contentType: string, filename: string} | null>(null)
 
 const existingTags = computed(() => {
     const tags = new Set<string>()
@@ -304,11 +411,11 @@ const currentCategoryName = computed(() => {
 })
 
 const statusMap: Record<string, string> = {
-  ACTIVE: '已激活',
+  ACTIVE: '已就绪',
+  READY: '就绪',
   PROCESSING: '处理中',
-  PENDING: '待处理',
-  FAILED: '失败',
-  UNKNOWN: '未知'
+  PENDING: '排队中',
+  FAILED: '处理失败',
 }
 
 const formatDate = (dateString: string) => {
@@ -452,9 +559,14 @@ const handleFolderSelect = async (event: Event) => {
         })
 
         compressing.value = false
-        await performUpload(rootFolderName, content, 'application/zip', rootFolderName + '.zip')
         
-        ElMessage.success('上传成功')
+        pendingUploadData.value = {
+            displayName: rootFolderName,
+            blob: content,
+            contentType: 'application/zip',
+            filename: rootFolderName + '.zip'
+        }
+        uploadConfirmVisible.value = true
         fetchList()
     } catch (e: any) {
         console.error(e)
@@ -473,8 +585,13 @@ const handleFileSelect = async (event: Event) => {
     uploading.value = true
     try {
         const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name
-        await performUpload(nameWithoutExt, file, file.type || 'application/octet-stream', file.name)
-        ElMessage.success('上传成功')
+        pendingUploadData.value = {
+            displayName: nameWithoutExt,
+            blob: file,
+            contentType: file.type || 'application/octet-stream',
+            filename: file.name
+        }
+        uploadConfirmVisible.value = true
         fetchList()
     } catch (e: any) {
         console.error(e)
@@ -482,6 +599,39 @@ const handleFileSelect = async (event: Event) => {
     } finally {
         uploading.value = false
         input.value = ''
+    }
+}
+
+const searchTargetResources = async (query: string) => {
+    if (query) {
+        searchLoading.value = true
+        try {
+            // 目前简单搜索全部资源，生产环境应根据 typeKey 进行相关性筛选
+            const res = await axios.get('/api/v1/resources', { params: { name: query } })
+            searchResults.value = res.data.items || []
+        } finally {
+            searchLoading.value = false
+        }
+    } else {
+        searchResults.value = []
+    }
+}
+
+const confirmAndDoUpload = async () => {
+    if (!pendingUploadData.value) return
+    const { displayName, blob, contentType, filename } = pendingUploadData.value
+    
+    uploading.value = true
+    try {
+        await performUpload(displayName, blob, contentType, filename)
+        ElMessage.success('任务已提交并自动关联依赖')
+        uploadConfirmVisible.value = false
+        pendingUploadData.value = null
+        fetchList()
+    } catch (e: any) {
+        ElMessage.error('上传失败: ' + e.message)
+    } finally {
+        uploading.value = false
     }
 }
 
@@ -511,6 +661,11 @@ const performUpload = async (displayName: string, blob: Blob, contentType: strin
         name: displayName,
         owner_id: 'admin',
         size: blob.size,
+        semver: uploadForm.value.semver,
+        dependencies: uploadForm.value.dependencies.map(d => ({
+            target_resource_id: d.id,
+            constraint: 'latest' // 目前默认锁定到最新版
+        })),
         extra_meta: {}
     })
 }
@@ -556,6 +711,23 @@ const download = async (row: any) => {
         window.open(url, '_blank')
     } else {
         ElMessage.warning('下载链接无效')
+    }
+}
+
+const viewDependencies = async (row: Resource) => {
+    if (!row.latest_version?.id) {
+        ElMessage.warning('未能获取该资源的版本信息')
+        return
+    }
+    depDrawerVisible.value = true
+    depLoading.value = true
+    try {
+        const res = await axios.get(`/api/v1/resources/versions/${row.latest_version.id}/dependency-tree`)
+        depTree.value = Array.isArray(res.data) ? res.data : []
+    } catch (err: any) {
+        ElMessage.error('获取依赖树失败: ' + (err.response?.data?.error || err.message))
+    } finally {
+        depLoading.value = false
     }
 }
 
@@ -832,7 +1004,12 @@ onUnmounted(() => {
 .status-cell {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+}
+
+.skip-icon {
+  color: var(--el-color-success);
+  font-size: 16px;
 }
 
 .status-dot {
@@ -886,5 +1063,99 @@ onUnmounted(() => {
   gap: 8px;
   justify-content: flex-start;
   flex-wrap: nowrap;
+}
+
+/* 依赖树样式 */
+.dep-drawer {
+  :deep(.el-drawer__body) {
+    padding: 0;
+  }
+}
+
+.dep-content {
+  padding: 20px;
+  height: 100%;
+}
+
+.dep-tree {
+  background: transparent;
+  
+  :deep(.el-tree-node__content) {
+    height: auto;
+    padding: 8px 0;
+    
+    &:hover {
+      background-color: var(--el-fill-color-light);
+    }
+  }
+}
+
+.dep-node {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+}
+
+.dep-icon {
+  margin-top: 4px;
+  font-size: 18px;
+  color: var(--el-color-primary);
+}
+
+.dep-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dep-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.dep-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dep-ver {
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+
+.dep-constraint {
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+}
+
+/* 搜索与表单样式 */
+.input-tip {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.6;
+  margin-top: 4px;
+}
+
+.search-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  
+  .option-name {
+    font-weight: 500;
+  }
+  
+  .option-type {
+    font-size: 11px;
+    color: var(--el-text-color-placeholder);
+    background: var(--el-fill-color-light);
+    padding: 0 4px;
+    border-radius: 4px;
+  }
 }
 </style>

@@ -44,6 +44,10 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 		resources.PATCH("/:id/tags", m.UpdateResourceTags)
 		resources.PATCH("/:id/scope", m.UpdateResourceScope) // 新增：更新作用域
 		resources.PATCH("/:id/process-result", m.ReportProcessResult)
+
+		// 新增：依赖管理
+		resources.GET("/versions/:vid/dependencies", m.GetDependencies)
+		resources.GET("/versions/:vid/dependency-tree", m.GetDependencyTree)
 	}
 
 	// /api/v1/categories 路径组
@@ -269,4 +273,26 @@ func (m *Module) DeleteResource(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Resource deleted"})
+}
+
+// GetDependencies 获取版本依赖
+func (m *Module) GetDependencies(c *gin.Context) {
+	vid := c.Param("vid")
+	deps, err := m.uc.GetResourceDependencies(c.Request.Context(), vid)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, deps)
+}
+
+// GetDependencyTree 获取依赖树
+func (m *Module) GetDependencyTree(c *gin.Context) {
+	vid := c.Param("vid")
+	tree, err := m.uc.GetDependencyTree(c.Request.Context(), vid)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, tree)
 }
