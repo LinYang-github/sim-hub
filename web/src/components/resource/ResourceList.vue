@@ -45,9 +45,9 @@
         
         <div v-if="enableScope" class="scope-tabs">
           <el-radio-group v-model="activeScope" size="small">
-            <el-radio-button label="ALL">全部</el-radio-button>
-            <el-radio-button label="PUBLIC">公共库</el-radio-button>
-            <el-radio-button label="PRIVATE">我的</el-radio-button>
+            <el-radio-button value="ALL">全部</el-radio-button>
+            <el-radio-button value="PUBLIC">公共库</el-radio-button>
+            <el-radio-button value="PRIVATE">我的</el-radio-button>
           </el-radio-group>
         </div>
 
@@ -204,7 +204,7 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { 
   Upload, Refresh, Plus, Folder, FolderOpened, Delete, 
   PriceTag, Connection, Grid, Clock, Files, DataLine, 
-  Download, Search, Box, Location 
+  Download, Search, Box, Location, Promotion
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 import JSZip from 'jszip'

@@ -3,6 +3,7 @@
     <iframe 
       v-if="url" 
       :src="url" 
+      ref="iframeRef"
       frameborder="0" 
       width="100%" 
       height="100%"
@@ -14,16 +15,35 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useDark } from '@vueuse/core'
 
 const props = defineProps<{
   url: string
 }>()
 
+const isDark = useDark()
 const loading = ref(true)
+const iframeRef = ref<HTMLIFrameElement | null>(null)
+
+// 同步主题给子页面
+const syncTheme = () => {
+  if (iframeRef.value && iframeRef.value.contentWindow) {
+    iframeRef.value.contentWindow.postMessage({
+      type: 'SIMHUB_THEME_CHANGE',
+      theme: isDark.value ? 'dark' : 'light'
+    }, '*')
+  }
+}
 
 const onLoad = () => {
   loading.value = false
+  syncTheme() // 加载完成后立刻同步一次
 }
+
+// 监听主题变化并实时同步
+watch(isDark, () => {
+  syncTheme()
+})
 
 // Reset loading when URL changes (if component is reused)
 watch(() => props.url, () => {
