@@ -20,13 +20,13 @@
     "key": "map_terrain",
     "label": "高程地形库",
     "integrationMode": "iframe",
-    "externalUrl": "http://localhost:30032",
+    "externalUrl": "http://127.0.0.1:30032",
     "typeName": "地形"
   },
   {
     "key": "test-repo",
     "label": "外部演示系统",
-    "externalUrl": "http://localhost:30031",
+    "externalUrl": "http://127.0.0.1:30031",
     "integrationMode": "iframe"
   }
 ]

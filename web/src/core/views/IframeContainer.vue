@@ -1,5 +1,5 @@
 <template>
-  <div class="iframe-container" v-loading="loading">
+  <div class="iframe-container" v-loading="false">
     <iframe 
       v-if="url" 
       :src="url" 
