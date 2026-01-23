@@ -128,7 +128,7 @@
               </div>
             </template>
             <div class="empty-actions">
-               <el-button type="primary" plain @click="fetchList(typeKey)">刷新列表</el-button>
+                <el-button type="primary" plain @click="fetchList()">刷新列表</el-button>
                <el-button @click="syncFromStorage">同步存储</el-button>
             </div>
           </el-empty>
@@ -184,14 +184,14 @@
       :search-results="searchResults"
       :search-loading="searchLoading"
       @search-dependency="searchTargetResources"
-      @confirm="() => confirmAndDoUpload(selectedCategoryId, props.typeKey)"
+      @confirm="confirmAndDoUpload"
     />
 
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, toRef, computed } from 'vue'
 import { 
   Upload as UploadIcon, Connection, DataLine, Grid, Refresh,
   Search, CircleCloseFilled, FolderDelete
@@ -243,13 +243,17 @@ const detailDrawerVisible = ref(false)
 const { 
   categories, selectedCategoryId, categoryTree, currentCategoryName, 
   fetchCategories, promptAddCategory, confirmDeleteCategory 
-} = useCategory(props.typeKey)
+} = useCategory(toRef(props, 'typeKey'))
 
 // 2. Resource List
 const { 
   resources, loading, activeScope, searchQuery, syncing, 
   fetchList, syncFromStorage 
-} = useResourceList(props.typeKey, !!props.enableScope, selectedCategoryId)
+} = useResourceList(
+  toRef(props, 'typeKey'), 
+  computed(() => !!props.enableScope), 
+  selectedCategoryId
+)
 
 // 3. Upload
 const {
@@ -257,7 +261,7 @@ const {
   pendingUploadData, uploadConfirmVisible, uploadForm, searchLoading, searchResults,
   triggerFolderUpload, triggerFileUpload, handleFolderSelect, handleFileSelect,
   searchTargetResources, confirmAndDoUpload
-} = useUpload(props.typeKey, selectedCategoryId, fetchList)
+} = useUpload(toRef(props, 'typeKey'), selectedCategoryId, fetchList)
 
 // 4. History & Rollback
 const {
@@ -307,18 +311,7 @@ const handleCategorySelect = (data: any) => {
 // Lifecycle
 let pollInterval: any = null
 
-const initData = () => {
-    fetchList(props.typeKey)
-    fetchCategories(props.typeKey)
-}
-
-watch(() => props.typeKey, () => {
-    selectedCategoryId.value = 'all'
-    initData()
-})
-
 onMounted(() => {
-    initData()
     // Polling for processing status
     pollInterval = setInterval(() => {
         const hasProcessing = resources.value.some((s: any) => 

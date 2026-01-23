@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, Ref } from 'vue'
 import axios from 'axios'
 import JSZip from 'jszip'
 import { ElMessage } from 'element-plus'
@@ -16,8 +16,8 @@ export interface PendingUploadData {
 }
 
 export function useUpload(
-  typeKey: string, 
-  selectedCategoryId: string | any, // can be a ref or string logic passed in
+  typeKey: Ref<string>, 
+  selectedCategoryId: Ref<string>,
   onSuccess: () => void
 ) {
   const uploading = ref(false)
@@ -128,20 +128,16 @@ export function useUpload(
     }
   }
 
-  /* 
-   * Update performUpload to accept overrideTypeKey for closure fix 
-   */
-  const performUpload = async (displayName: string, blob: Blob, contentType: string, filename: string, categoryIdVal: string, overrideTypeKey?: string) => {
-    const currentKey = overrideTypeKey || typeKey
+  const performUpload = async (displayName: string, blob: Blob, contentType: string, filename: string, categoryIdVal: string) => {
     const res = await axios.post('/api/v1/integration/upload/token', {
-      resource_type: currentKey,
+      resource_type: typeKey.value,
       checksum: 'skip-for-now',
       size: blob.size,
       filename: filename
     })
     
     const { ticket_id, presigned_url } = res.data
-
+    
     await axios.put(presigned_url, blob, {
       headers: { 'Content-Type': contentType },
       onUploadProgress: (p) => {
@@ -153,7 +149,7 @@ export function useUpload(
 
     await axios.post('/api/v1/integration/upload/confirm', {
       ticket_id,
-      type_key: currentKey,
+      type_key: typeKey.value,
       category_id: categoryIdVal === 'all' ? '' : categoryIdVal,
       name: displayName,
       owner_id: 'admin',
@@ -167,13 +163,14 @@ export function useUpload(
     })
   }
 
-  const confirmAndDoUpload = async (categoryIdVal: string, overrideTypeKey?: string) => {
+  const confirmAndDoUpload = async () => {
     if (!pendingUploadData.value) return
     const { displayName, blob, contentType, filename } = pendingUploadData.value
+    const categoryIdVal = selectedCategoryId.value
     
     uploading.value = true
     try {
-      await performUpload(displayName, blob, contentType, filename, categoryIdVal, overrideTypeKey)
+      await performUpload(displayName, blob, contentType, filename, categoryIdVal)
       ElMessage.success('任务已提交并自动关联依赖')
       uploadConfirmVisible.value = false
       pendingUploadData.value = null

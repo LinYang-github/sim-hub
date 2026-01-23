@@ -21,24 +21,29 @@ export interface Resource {
 }
 
 export function useResourceList(
-  typeKey: string,
-  enableScope: boolean,
+  typeKey: Ref<string>,
+  enableScope: Ref<boolean>,
   selectedCategoryId: Ref<string>
 ) {
   const resources = ref<Resource[]>([])
   const loading = ref(false)
-  const activeScope = ref<'ALL' | 'PRIVATE' | 'PUBLIC'>(enableScope ? 'ALL' : 'PUBLIC')
+  const activeScope = ref<'ALL' | 'PRIVATE' | 'PUBLIC'>(enableScope.value ? 'ALL' : 'PUBLIC')
   const searchQuery = ref('')
   const syncing = ref(false)
 
-  const fetchList = async (overrideTypeKey?: string) => {
+  // 用于解决竞态问题：记录最后一次发起的请求标识
+  let lastRequestId = 0
+
+  const fetchList = async () => {
+    const requestId = ++lastRequestId
     loading.value = true
+    
     try {
-      const currentKey = overrideTypeKey || typeKey
       const params: any = { 
-        type: currentKey,
+        type: typeKey.value,
         name: searchQuery.value 
       }
+      
       if (selectedCategoryId.value !== 'all') {
         params.category_id = selectedCategoryId.value
       }
@@ -50,16 +55,23 @@ export function useResourceList(
       } else if (activeScope.value === 'PUBLIC') {
         params.scope = 'PUBLIC'
       } else {
-        // Backend logic: if scope missing and owner_id present -> public + private for that user
         params.owner_id = currentUserId
       }
 
       const res = await axios.get('/api/v1/resources', { params })
-      resources.value = res.data.items || []
+      
+      // 只有最后一次发起的请求才有效，避免旧请求残留数据覆盖新数据
+      if (requestId === lastRequestId) {
+        resources.value = res.data.items || []
+      }
     } catch (err: any) {
-      ElMessage.error('获取列表失败: ' + (err.response?.data?.error || err.message))
+      if (requestId === lastRequestId) {
+        ElMessage.error('获取列表失败: ' + (err.response?.data?.error || err.message))
+      }
     } finally {
-      loading.value = false
+      if (requestId === lastRequestId) {
+        loading.value = false
+      }
     }
   }
 
@@ -76,8 +88,14 @@ export function useResourceList(
     }
   }
 
-  watch([selectedCategoryId, activeScope], () => {
+  // 监听所有可能触发列表刷新的响应式变量，并立即执行一次首屏加载
+  watch([typeKey, selectedCategoryId, activeScope], () => {
     fetchList()
+  }, { immediate: true })
+
+  // 当 enableScope 配置变化时同步 internal state
+  watch(enableScope, (val) => {
+    activeScope.value = val ? 'ALL' : 'PUBLIC'
   })
 
   return {
