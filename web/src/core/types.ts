@@ -12,7 +12,11 @@ export interface SimHubModule {
   // Internal Module Props
   routes?: RouteRecordRaw[]
   menu?: MenuOption[]
-  
+  // Generic Resource Props (used if no custom routes provided)
+  typeName?: string
+  uploadMode?: 'single' | 'folder-zip'
+  accept?: string
+
   // External Integration Props
   label?: string       // Menu label for external
   externalUrl?: string // Target URL

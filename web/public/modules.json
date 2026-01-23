@@ -2,7 +2,25 @@
   {
     "key": "scenario",
     "label": "想定资源库",
-    "integrationMode": "internal"
+    "integrationMode": "internal",
+    "typeName": "想定",
+    "uploadMode": "folder-zip"
+  },
+  {
+    "key": "model_glb",
+    "label": "3D 模型库",
+    "integrationMode": "internal",
+    "typeName": "模型",
+    "uploadMode": "single",
+    "accept": ".glb"
+  },
+  {
+    "key": "map_terrain",
+    "label": "高程地形库",
+    "integrationMode": "internal",
+    "typeName": "地形",
+    "uploadMode": "single",
+    "accept": ".tif,.tiff"
   },
   {
     "key": "test-repo",

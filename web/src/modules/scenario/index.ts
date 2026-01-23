@@ -14,7 +14,12 @@ const scenarioModule: SimHubModule = {
   routes: [
     {
       path: '/scenarios',
-      component: () => import('./views/ScenarioList.vue')
+      component: () => import('../../components/resource/ResourceList.vue'),
+      props: { 
+        typeKey: 'scenario', 
+        typeName: '想定',
+        uploadMode: 'folder-zip'
+      }
     }
   ]
 }

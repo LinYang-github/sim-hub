@@ -1,5 +1,7 @@
 <template>
-  <div class="scenario-layout">
+  <div class="resource-layout">
+    <!-- Breadcrumb or Header for context -->
+    
     <!-- 侧边栏：Glassmorphism 设计 -->
     <div class="category-sidebar">
       <div class="sidebar-header">
@@ -35,17 +37,23 @@
     </div>
 
     <!-- 主内容区 -->
-    <div class="scenario-main">
+    <div class="resource-main">
       <div class="premium-header">
         <div class="title-group">
-          <h2>{{ currentCategoryName }} <small>想定资源库</small></h2>
+          <h2>{{ currentCategoryName }} <small>{{ typeName }}资源库</small></h2>
         </div>
         
         <div class="action-group">
           <el-button-group>
-            <el-button type="primary" class="upload-btn" @click="triggerFolderUpload">
-              <el-icon><Upload /></el-icon> 导入想定包
+            <!-- Folder Upload -->
+            <el-button v-if="uploadMode === 'folder-zip'" type="primary" class="upload-btn" @click="triggerFolderUpload">
+              <el-icon><Upload /></el-icon> 导入{{ typeName }}包
             </el-button>
+            <!-- Single File Upload -->
+            <el-button v-else type="primary" class="upload-btn" @click="triggerFileUpload">
+              <el-icon><Upload /></el-icon> 上传{{ typeName }}
+            </el-button>
+
             <el-button class="sync-btn" @click="syncFromStorage" :loading="syncing">
               <el-icon><Connection /></el-icon> 同步存储
             </el-button>
@@ -64,16 +72,18 @@
 
       <!-- 列表区 -->
       <div class="content-container">
-        <el-table :data="scenarios" style="width: 100%" v-loading="loading" class="premium-table">
-          <el-table-column label="想定详情" min-width="250">
+        <el-table :data="resources" style="width: 100%" v-loading="loading" class="premium-table">
+          <el-table-column label="资源详情" min-width="250">
             <template #default="scope">
-              <div class="scenario-info-cell">
-                <div class="scenario-icon">
-                  <el-icon><Files /></el-icon>
+              <div class="resource-info-cell">
+                <div class="resource-icon">
+                  <el-icon v-if="typeKey === 'model_glb'"><Box /></el-icon>
+                  <el-icon v-else-if="typeKey === 'map_terrain'"><Location /></el-icon>
+                  <el-icon v-else><Files /></el-icon>
                 </div>
-                <div class="scenario-text">
-                  <div class="scenario-name">{{ scope.row.name }}</div>
-                  <div class="scenario-meta">
+                <div class="resource-text">
+                  <div class="resource-name">{{ scope.row.name }}</div>
+                  <div class="resource-meta">
                     <span><el-icon><Clock /></el-icon> {{ formatDate(scope.row.created_at) }}</span>
                     <span><el-icon><DataLine /></el-icon> {{ formatSize(scope.row.latest_version?.file_size) }}</span>
                   </div>
@@ -130,6 +140,23 @@
       </div>
     </div>
 
+    <!-- 隐藏的输入框 -->
+    <input 
+      id="folderInput" 
+      type="file" 
+      webkitdirectory 
+      directory 
+      style="display: none" 
+      @change="handleFolderSelect"
+    />
+    <input 
+      id="fileInput" 
+      type="file" 
+      :accept="accept"
+      style="display: none" 
+      @change="handleFileSelect"
+    />
+
     <!-- 标签编辑对话框 -->
     <el-dialog v-model="tagDialogVisible" title="管理标签" width="400px">
       <el-select
@@ -157,16 +184,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { 
   Upload, Refresh, Plus, Folder, FolderOpened, Delete, 
   PriceTag, Connection, Grid, Clock, Files, DataLine, 
-  Download, Search 
+  Download, Search, Box, Location 
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 import JSZip from 'jszip'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { buildTree } from '../../../core/utils/tree'
+import { buildTree } from '../../core/utils/tree'
 
 interface Category {
   id: string
@@ -187,7 +214,14 @@ interface Resource {
   }
 }
 
-const scenarios = ref<Resource[]>([])
+const props = defineProps<{
+  typeKey: string
+  typeName: string
+  uploadMode?: 'single' | 'folder-zip'
+  accept?: string
+}>()
+
+const resources = ref<Resource[]>([])
 const categories = ref<Category[]>([])
 const loading = ref(false)
 const syncing = ref(false)
@@ -201,9 +235,10 @@ const tagDialogVisible = ref(false)
 const tagLoading = ref(false)
 const editingTags = ref<string[]>([])
 const currentResourceId = ref('')
+
 const existingTags = computed(() => {
     const tags = new Set<string>()
-    scenarios.value.forEach(s => {
+    resources.value.forEach(s => {
         if (s.tags) s.tags.forEach(t => tags.add(t))
     })
     return Array.from(tags)
@@ -234,7 +269,6 @@ const defaultProps = {
   label: 'name',
 }
 
-// 格式化分类树 (支持多级嵌套)
 const categoryTree = computed(() => {
   const tree = buildTree(categories.value)
   return [
@@ -272,16 +306,15 @@ const formatSize = (bytes?: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-// 获取资源列表
 const fetchList = async () => {
     loading.value = true
     try {
-        const params: any = { type: 'scenario' }
+        const params: any = { type: props.typeKey }
         if (selectedCategoryId.value !== 'all') {
             params.category_id = selectedCategoryId.value
         }
         const res = await axios.get('/api/v1/resources', { params })
-        scenarios.value = res.data.items || []
+        resources.value = res.data.items || []
     } catch (err: any) {
         ElMessage.error('获取列表失败: ' + (err.response?.data?.error || err.message))
     } finally {
@@ -289,7 +322,6 @@ const fetchList = async () => {
     }
 }
 
-// 同步存储
 const syncFromStorage = async () => {
     syncing.value = true
     try {
@@ -303,9 +335,8 @@ const syncFromStorage = async () => {
     }
 }
 
-// 获取分类列表
 const fetchCategories = async () => {
-    const res = await axios.get('/api/v1/categories', { params: { type: 'scenario' } })
+    const res = await axios.get('/api/v1/categories', { params: { type: props.typeKey } })
     categories.value = res.data || []
 }
 
@@ -321,7 +352,7 @@ const promptAddCategory = () => {
     }).then(async ({ value }) => {
         if (!value) return
         await axios.post('/api/v1/categories', {
-            type_key: 'scenario',
+            type_key: props.typeKey,
             name: value,
             parent_id: ''
         })
@@ -347,12 +378,16 @@ const confirmDeleteCategory = (id: string) => {
     })
 }
 
-// 触发隐藏的文件夹输入框
+// ---------------- 上传逻辑 ----------------
+
 const triggerFolderUpload = () => {
     document.getElementById('folderInput')?.click()
 }
 
-// 处理文件夹选择
+const triggerFileUpload = () => {
+    document.getElementById('fileInput')?.click()
+}
+
 const handleFolderSelect = async (event: Event) => {
     const input = event.target as HTMLInputElement
     if (!input.files || input.files.length === 0) return
@@ -360,12 +395,6 @@ const handleFolderSelect = async (event: Event) => {
     const files = Array.from(input.files)
     const rootFolderName = files[0].webkitRelativePath.split('/')[0]
     
-    await uploadFolderAsZip(rootFolderName, files)
-    input.value = ''
-}
-
-// 将文件夹打包为 ZIP 并上传
-const uploadFolderAsZip = async (name: string, files: File[]) => {
     uploading.value = true
     compressing.value = true
     progress.value = 0
@@ -386,7 +415,7 @@ const uploadFolderAsZip = async (name: string, files: File[]) => {
         })
 
         compressing.value = false
-        await uploadZip(name, content)
+        await performUpload(rootFolderName, content, 'application/zip', rootFolderName + '.zip')
         
         ElMessage.success('上传成功')
         fetchList()
@@ -395,22 +424,42 @@ const uploadFolderAsZip = async (name: string, files: File[]) => {
         ElMessage.error('处理失败: ' + (e.message || '未知错误'))
     } finally {
         uploading.value = false
+        input.value = ''
     }
 }
 
-// 执行 ZIP 文件上传
-const uploadZip = async (name: string, blob: Blob) => {
+const handleFileSelect = async (event: Event) => {
+    const input = event.target as HTMLInputElement
+    if (!input.files || input.files.length === 0) return
+    const file = input.files[0]
+    
+    uploading.value = true
+    try {
+        const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name
+        await performUpload(nameWithoutExt, file, file.type || 'application/octet-stream', file.name)
+        ElMessage.success('上传成功')
+        fetchList()
+    } catch (e: any) {
+        console.error(e)
+        ElMessage.error('上传失败: ' + (e.message || '未知错误'))
+    } finally {
+        uploading.value = false
+        input.value = ''
+    }
+}
+
+const performUpload = async (displayName: string, blob: Blob, contentType: string, filename: string) => {
     const res = await axios.post('/api/v1/integration/upload/token', {
-        resource_type: 'scenario',
+        resource_type: props.typeKey,
         checksum: 'skip-for-now',
         size: blob.size,
-        filename: name + '.zip'
+        filename: filename
     })
     
     const { ticket_id, presigned_url } = res.data
 
     await axios.put(presigned_url, blob, {
-        headers: { 'Content-Type': 'application/zip' },
+        headers: { 'Content-Type': contentType },
         onUploadProgress: (p) => {
             if (p.total) {
                 uploadPercent.value = Math.round((p.loaded * 100) / p.total)
@@ -420,14 +469,16 @@ const uploadZip = async (name: string, blob: Blob) => {
 
     await axios.post('/api/v1/integration/upload/confirm', {
         ticket_id,
-        type_key: 'scenario',
+        type_key: props.typeKey,
         category_id: selectedCategoryId.value === 'all' ? '' : selectedCategoryId.value,
-        name: name,
+        name: displayName,
         owner_id: 'admin',
         size: blob.size,
         extra_meta: {}
     })
 }
+
+// -----------------------------------------
 
 const confirmDelete = (row: any) => {
     ElMessageBox.confirm(`确定要删除资源 "${row.name}" 吗？`, '警告', {
@@ -445,7 +496,6 @@ const confirmDelete = (row: any) => {
     })
 }
 
-// 处理下载请求
 const download = async (row: any) => {
     const res = await axios.get(`/api/v1/resources/${row.id}`)
     const url = res.data.latest_version?.download_url
@@ -458,11 +508,20 @@ const download = async (row: any) => {
 
 let pollInterval: any = null
 
-onMounted(() => {
+const initData = () => {
     fetchList()
     fetchCategories()
+}
+
+watch(() => props.typeKey, () => {
+    selectedCategoryId.value = 'all'
+    initData()
+})
+
+onMounted(() => {
+    initData()
     pollInterval = setInterval(() => {
-        const hasProcessing = scenarios.value.some((s: any) => 
+        const hasProcessing = resources.value.some((s: any) => 
             s.latest_version?.state === 'PROCESSING' || s.latest_version?.state === 'PENDING'
         )
         if (hasProcessing) {
@@ -477,11 +536,11 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.scenario-layout {
+.resource-layout {
   display: flex;
-  height: calc(100vh - 84px); /* 减去顶部 Workstation 导航 */
-  padding: 16px;
-  background-color: #f5f7fa;
+  height: calc(100vh - 140px); 
+  padding: 0;
+  background-color: transparent;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   gap: 16px;
 }
@@ -549,7 +608,7 @@ onUnmounted(() => {
 }
 
 /* 主内容区 */
-.scenario-main {
+.resource-main {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -559,7 +618,7 @@ onUnmounted(() => {
 
 .premium-header {
   background: #ffffff;
-  padding: 12px 24px;
+  padding: 12px 20px;
   border-radius: 12px;
   display: flex;
   justify-content: space-between;
@@ -570,13 +629,13 @@ onUnmounted(() => {
 .premium-header h2 {
   margin: 0;
   color: #0f172a;
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .premium-header h2 small {
   font-weight: 400;
   color: #64748b;
-  font-size: 14px;
+  font-size: 13px;
   margin-left: 8px;
 }
 
@@ -598,31 +657,31 @@ onUnmounted(() => {
   --el-table-header-bg-color: #f8fafc;
 }
 
-.scenario-info-cell {
+.resource-info-cell {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.scenario-icon {
-  width: 40px;
-  height: 40px;
+.resource-icon {
+  width: 36px;
+  height: 36px;
   background: #eff6ff;
   color: #3b82f6;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 18px;
 }
 
-.scenario-name {
+.resource-name {
   font-weight: 600;
   color: #1e293b;
   font-size: 14px;
 }
 
-.scenario-meta {
+.resource-meta {
   font-size: 12px;
   color: #94a3b8;
   display: flex;
@@ -630,7 +689,7 @@ onUnmounted(() => {
   margin-top: 4px;
 }
 
-.scenario-meta span {
+.resource-meta span {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -701,11 +760,10 @@ onUnmounted(() => {
   color: #475569;
 }
 
-/* 进度条定制 */
 .upload-status {
   padding: 12px;
   background: #f8fafc;
   border-radius: 8px;
-  margin-top: 10px;
+  margin: 0;
 }
 </style>

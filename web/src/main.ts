@@ -8,8 +8,9 @@ import Workstation from './components/Workstation.vue'
 import { moduleManager } from './core/moduleManager'
 import scenarioModule from './modules/scenario'
 
-// 注册内部模块实现
+// 注册内部模块实现 (此处仅注册有特殊定制需求的模块)
 moduleManager.registerImplementation(scenarioModule)
+// model_glb 和 map_terrain 将通过 modules.json 中的元数据自动使用 ResourceList 兜底
 
 const routes = [
   { path: '/', component: Workstation },

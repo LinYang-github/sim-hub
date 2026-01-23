@@ -80,7 +80,31 @@ class ModuleManager {
                 // 注意：保留实现中的 routes/menu，但覆盖 label 等顶层属性
                 this.activeModules.push(merged)
             } else {
-                console.warn(`未找到内部模块 '${item.key}' 的代码实现。`)
+                // 兜底逻辑：如果没有特定实现，自动使用通用的 ResourceList
+                console.log(`未找到内容模块 '${item.key}' 的特定实现，使用通用 ResourceList 兜底。`)
+                const fallback: SimHubModule = {
+                    ...item,
+                    menu: [
+                      {
+                        label: item.label || item.key,
+                        path: `/res/${item.key}`,
+                        icon: 'Box' // 默认图标
+                      }
+                    ],
+                    routes: [
+                      {
+                        path: `/res/${item.key}`,
+                        component: () => import('../components/resource/ResourceList.vue'),
+                        props: {
+                          typeKey: item.key,
+                          typeName: item.typeName || item.label || '资源',
+                          uploadMode: item.uploadMode || 'single',
+                          accept: item.accept
+                        }
+                      }
+                    ]
+                }
+                this.activeModules.push(fallback)
             }
         } else {
             // 激活外部模块
