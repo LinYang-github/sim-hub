@@ -11,7 +11,7 @@ export function useDependency(currentResource: { value: Resource | null }) {
   const bundleLoading = ref(false)
   const packLoading = ref(false)
 
-  const viewDependencies = async (row: Resource) => {
+  const viewDependencies = async (row: Resource, openDrawer = true) => {
     if (!row.latest_version?.id) {
       ElMessage.warning('未能获取该资源的版本信息')
       return
@@ -19,7 +19,7 @@ export function useDependency(currentResource: { value: Resource | null }) {
     // Update the ref passed from useHistory or a shared ref
     currentResource.value = row 
     
-    depDrawerVisible.value = true
+    if (openDrawer) depDrawerVisible.value = true
     depLoading.value = true
     try {
       const res = await axios.get(`/api/v1/resources/versions/${row.latest_version.id}/dependency-tree`)

@@ -9,9 +9,9 @@ export function useHistory(fetchList: () => void) {
   const versionHistory = ref<any[]>([])
   const currentResource = ref<Resource | null>(null)
 
-  const viewHistory = async (row: Resource) => {
+  const viewHistory = async (row: Resource, openDrawer = true) => {
     currentResource.value = row
-    historyDrawerVisible.value = true
+    if (openDrawer) historyDrawerVisible.value = true
     historyLoading.value = true
     try {
       const res = await axios.get(`/api/v1/resources/${row.id}/versions`)

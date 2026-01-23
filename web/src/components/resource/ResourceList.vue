@@ -100,8 +100,7 @@
             :enable-scope="enableScope"
             :status-map="statusMap"
             @edit-tags="openTagEditor"
-            @view-history="viewHistory"
-            @view-dependencies="viewDependencies"
+            @view-details="handleViewDetails"
             @download="download"
             @delete="confirmDelete"
             @change-scope="handleScopeChange"
@@ -110,11 +109,12 @@
             v-else
             :resources="resources"
             :type-key="typeKey"
+            :enable-scope="enableScope"
             @edit-tags="openTagEditor"
-            @view-history="viewHistory"
-            @view-dependencies="viewDependencies"
+            @view-details="handleViewDetails"
             @download="download"
             @delete="confirmDelete"
+            @change-scope="handleScopeChange"
           />
         </template>
 
@@ -159,6 +159,20 @@
     />
 
     <!-- 对话框与抽屉 -->
+    <ResourceDetailDrawer
+      v-model="detailDrawerVisible"
+      :resource="currentResource"
+      :type-name="typeName"
+      :status-map="statusMap"
+      :versions="versionHistory"
+      :dependencies="depTree"
+      :loading-details="historyLoading || depLoading"
+      @edit-tags="openTagEditor"
+      @download="download"
+      @download-version="handleDownloadUrl"
+      @rollback="rollback"
+    />
+
     <TagEditDialog
       v-model="tagDialogVisible"
       :loading="tagLoading"
@@ -178,26 +192,6 @@
       @confirm="() => confirmAndDoUpload(selectedCategoryId, props.typeKey)"
     />
 
-    <DependencyDrawer
-      v-model="depDrawerVisible"
-      :dep-tree="depTree"
-      :loading="depLoading"
-      :bundle-loading="bundleLoading"
-      :pack-loading="packLoading"
-      @download-bundle="downloadBundle"
-      @download-pack="downloadSimPack"
-    />
-
-    <HistoryDrawer
-      v-model="historyDrawerVisible"
-      :version-history="versionHistory"
-      :loading="historyLoading"
-      :current-version-id="currentResource?.latest_version?.id"
-      :status-map="statusMap"
-      @download="(url) => handleDownloadUrl(url)"
-      @rollback="rollback"
-    />
-
   </div>
 </template>
 
@@ -215,6 +209,7 @@ import CategorySidebar from './components/CategorySidebar.vue'
 import ResourceTableView from './components/ResourceTableView.vue'
 import ResourceCardView from './components/ResourceCardView.vue'
 import ResourceSkeleton from './components/ResourceSkeleton.vue'
+import ResourceDetailDrawer from './components/ResourceDetailDrawer.vue'
 import TagEditDialog from './components/TagEditDialog.vue'
 import UploadDialog from './components/UploadDialog.vue'
 import DependencyDrawer from './components/DependencyDrawer.vue'
@@ -247,6 +242,7 @@ const statusMap: Record<string, string> = {
 
 const viewMode = ref('list')
 const searchFocused = ref(false)
+const detailDrawerVisible = ref(false)
 
 // 1. Categories
 const { 
@@ -288,6 +284,13 @@ const {
 
 // 7. Actions
 const { confirmDelete, download, handleDownloadUrl, publishResource: doPublish } = useResourceAction(fetchList)
+
+const handleViewDetails = (row: any) => {
+  currentResource.value = row
+  detailDrawerVisible.value = true
+  viewHistory(row, false) // Fetch versions ONLY, don't open extra drawer
+  viewDependencies(row, false) // Fetch deps ONLY, don't open extra drawer
+}
 
 // Scope Change (kept here as it's simple or move to useResourceAction)
 const handleScopeChange = async (row: any, scope: string) => {
