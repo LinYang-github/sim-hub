@@ -1,0 +1,119 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        // --- Go Backend Tasks ---
+        {
+            "label": "API: Run Server (Dev)",
+            "type": "shell",
+            "command": "lsof -t -i:30030 | xargs kill -9; sleep 1; go run cmd/simhub-api/main.go",
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "API: Build Binary",
+            "type": "shell",
+            "command": "mkdir -p bin && go build -o bin/simhub-api ./cmd/simhub-api/main.go",
+            "group": "build",
+            "problemMatcher": ["$go"]
+        },
+        {
+            "label": "Drivers: Build Scenario Processor",
+            "type": "shell",
+            "command": "go build -o drivers/scenario-processor drivers/main.go",
+            "group": "build"
+        },
+        {
+            "label": "CLI: Build Binary",
+            "type": "shell",
+            "command": "mkdir -p bin && go build -o bin/simhub-cli ./cmd/simhub-cli/main.go",
+            "group": "build"
+        },
+
+        // --- Frontend Tasks ---
+        {
+            "label": "Web: Run Dev Server",
+            "type": "shell",
+            "command": "npm run dev",
+            "options": {
+                "cwd": "${workspaceFolder}/web"
+            },
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Web: Install Dependencies",
+            "type": "shell",
+            "command": "npm install",
+            "options": {
+                "cwd": "${workspaceFolder}/web"
+            }
+        },
+        // --- Apps Tasks ---
+        {
+            "label": "App: Terrain (Dev)",
+            "type": "shell",
+            "command": "npm run dev",
+            "options": {
+                "cwd": "${workspaceFolder}/apps/terrain"
+            }
+        },
+        {
+            "label": "App: Demo Repo (Run)",
+            "type": "shell",
+            "command": "./run-demo-repo.sh"
+        },
+
+        // --- C++ SDK Tasks ---
+        {
+            "label": "SDK: Build (Base HTTP)",
+            "type": "shell",
+            "command": "mkdir -p build && cd build && cmake .. -DUSE_AWS_SDK=OFF && make",
+            "options": {
+                "cwd": "${workspaceFolder}/sdk/cpp"
+            },
+            "group": "build"
+        },
+        {
+            "label": "SDK: Build (All with STS/AWS)",
+            "type": "shell",
+            "command": "mkdir -p build && cd build && cmake .. -DUSE_AWS_SDK=ON && make",
+            "options": {
+                "cwd": "${workspaceFolder}/sdk/cpp"
+            },
+            "group": "build"
+        },
+
+        // --- Utility Tasks ---
+        {
+            "label": "Env: Reset Database",
+            "type": "shell",
+            "command": "rm -f simhub.db && echo '数据库已重置'",
+            "group": "none"
+        },
+        {
+            "label": "Env: Full Cleanup",
+            "type": "shell",
+            "command": "rm -rf bin/ drivers/scenario-processor sdk/cpp/build/ simhub.db web/dist/",
+            "group": "none"
+        },
+
+        // --- Composite Tasks ---
+        {
+            "label": "SimHub: Start All (Main Stack)",
+            "dependsOn": [
+                "API: Run Server (Dev)",
+                "Web: Run Dev Server",
+                "App: Terrain (Dev)",
+                "App: Demo Repo (Run)"
+            ],
+            "group": "test"
+        }
+    ]
+}

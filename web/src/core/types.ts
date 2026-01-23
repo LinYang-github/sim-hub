@@ -20,7 +20,8 @@ export interface SimHubModule {
 
   // External Integration Props
   label?: string       // Menu label for external
-  externalUrl?: string // Target URL
+  externalUrl?: string // 生产环境相对路径
+  devUrl?: string      // 仅开发环境开发端口
   integrationMode?: 'iframe' | 'new-tab' | 'internal'
 }
 

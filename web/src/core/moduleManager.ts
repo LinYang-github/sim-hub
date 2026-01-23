@@ -18,7 +18,7 @@ class ModuleManager {
     this.implementations.set(module.key, module)
   }
 
-  install(app: App, router: Router) {
+  install(_app: App, router: Router) {
     this.activeModules.forEach(m => {
       // 1. 内部路由注册
       if (m.routes) {
@@ -26,12 +26,15 @@ class ModuleManager {
       }
 
       // 2. 外部路由注册 (若为 iframe 模式则自动生成容器路由)
-      if (m.externalUrl && m.integrationMode === 'iframe') {
-        router.addRoute({
-          path: `/ext/${m.key}`,
-          component: IframeContainer,
-          props: { url: m.externalUrl }
-        })
+      if (m.integrationMode === 'iframe') {
+        const url = (import.meta.env.DEV && m.devUrl) ? m.devUrl : m.externalUrl
+        if (url) {
+          router.addRoute({
+            path: `/ext/${m.key}`,
+            component: IframeContainer,
+            props: { url: url }
+          })
+        }
       }
     })
   }
@@ -48,11 +51,13 @@ class ModuleManager {
       }
 
       // 情况 2: 生成的菜单（外部模块）
-      if (m.externalUrl && m.label) {
-        const path = m.integrationMode === 'new-tab' ? m.externalUrl : `/ext/${m.key}`
+      const isExternal = m.integrationMode === 'iframe' || m.integrationMode === 'new-tab'
+      if (isExternal && m.label) {
+        const url = (import.meta.env.DEV && m.devUrl) ? m.devUrl : m.externalUrl
+        const path = m.integrationMode === 'new-tab' ? url : `/ext/${m.key}`
         return [{
           label: m.label,
-          path: path,
+          path: path || '#',
         }]
       }
       return []

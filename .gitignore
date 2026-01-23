@@ -38,6 +38,12 @@ config.local.yaml
 # --- 前端 / Frontend ---
 node_modules/
 dist/
+# 以下是 apps/ 目录下模块的构建产物
+apps/*/dist/
+apps/*/node_modules/
+# 嵌入式 UI 资产收集目录 (由 Makefile 生成，禁止提交)
+internal/ui/dist_*/
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -55,7 +61,7 @@ sdk/cpp/**/demo_*
 sdk/cpp/**/json.hpp
 
 # --- IDE & OS ---
-.vscode/
+.vscode/*
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
@@ -68,3 +74,9 @@ Thumbs.db
 # --- 开发调试 / Debug ---
 *.log
 debug/
+terrain.log
+web-main.log
+web-terrain.log
+web-demo.log
+api.log
+test_binary.log

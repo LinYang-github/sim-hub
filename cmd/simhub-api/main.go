@@ -11,6 +11,7 @@ import (
 	"github.com/liny/sim-hub/internal/core/module"
 	"github.com/liny/sim-hub/internal/data"
 	"github.com/liny/sim-hub/internal/modules/resource"
+	"github.com/liny/sim-hub/internal/ui"
 	"github.com/liny/sim-hub/pkg/logger"
 	"github.com/liny/sim-hub/pkg/storage"
 	"github.com/liny/sim-hub/pkg/storage/minio"
@@ -86,6 +87,10 @@ func main() {
 
 	v1 := r.Group("/api/v1")
 	registry.MapRoutes(v1)
+
+	// 7. 注册嵌入的前端页面 (UI Handlers)
+	// 必须放在 API 注册之后，因为 UI 包含 NoRoute 的兜底逻辑
+	ui.RegisterUIHandlers(r)
 
 	slog.Info("服务器正在启动", "port", 30030)
 	if err := r.Run(":30030"); err != nil {

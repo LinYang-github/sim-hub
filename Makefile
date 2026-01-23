@@ -6,23 +6,28 @@ build: build-web build-terrain build-demo build-api
 # 构建主前端
 build-web:
 	@echo "Building main web..."
-	cd web && npm install && npm run build
+	cd web && npm install && npx vite build
 
 # 构建地形管理前端
 build-terrain:
 	@echo "Building terrain web..."
-	cd apps/terrain && npm install && npm run build
+	cd apps/terrain && npm install && npx vite build
 
 # 构建演示模块
 build-demo:
 	@echo "Syncing demo-repo assets..."
-	# 演示模块是静态 HTML，无需构建，仅确保路径存在
 	ls apps/demo-repo/index.html
 
 # 构建后端 (会自动通过 go:embed 引用上述 dist 目录，需在 Go 代码中适配)
 build-api:
+	@echo "Collecting frontend assets..."
+	rm -rf internal/ui/dist_web internal/ui/dist_terrain internal/ui/dist_demo
+	mkdir -p internal/ui/dist_web internal/ui/dist_terrain internal/ui/dist_demo
+	cp -r web/dist/* internal/ui/dist_web/
+	cp -r apps/terrain/dist/* internal/ui/dist_terrain/
+	cp -r apps/demo-repo/* internal/ui/dist_demo/
 	@echo "Building Go API..."
-	go build -o simhub-api ./cmd/api
+	go build -o simhub-api ./cmd/simhub-api
 
 # 清理构建产物
 clean:
