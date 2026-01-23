@@ -85,34 +85,59 @@
         <el-progress v-else :percentage="uploadPercent" />
       </div>
 
-      <!-- 列表视图 -->
-      <div v-if="viewMode === 'list'" class="content-container">
-        <ResourceTableView
-          :resources="resources"
-          :loading="loading"
-          :type-key="typeKey"
-          :enable-scope="enableScope"
-          :status-map="statusMap"
-          @edit-tags="openTagEditor"
-          @view-history="viewHistory"
-          @view-dependencies="viewDependencies"
-          @download="download"
-          @delete="confirmDelete"
-          @change-scope="handleScopeChange"
-        />
-      </div>
+      <!-- 内容显示区域 -->
+      <div class="content-container" :class="{ 'is-loading': loading && !resources.length }">
+        <!-- 1. 加载中且无数据 -> 骨架屏 -->
+        <ResourceSkeleton v-if="loading && !resources.length" :view-mode="viewMode" />
 
-      <!-- 卡片视图 -->
-      <div v-else-if="viewMode === 'card'" class="content-container">
-        <ResourceCardView 
-          :resources="resources"
-          :type-key="typeKey"
-          @edit-tags="openTagEditor"
-          @view-history="viewHistory"
-          @view-dependencies="viewDependencies"
-          @download="download"
-          @delete="confirmDelete"
-        />
+        <!-- 2. 有数据 -> 正常列表/卡片 -->
+        <template v-else-if="resources.length > 0">
+          <ResourceTableView
+            v-if="viewMode === 'list'"
+            :resources="resources"
+            :loading="loading"
+            :type-key="typeKey"
+            :enable-scope="enableScope"
+            :status-map="statusMap"
+            @edit-tags="openTagEditor"
+            @view-history="viewHistory"
+            @view-dependencies="viewDependencies"
+            @download="download"
+            @delete="confirmDelete"
+            @change-scope="handleScopeChange"
+          />
+          <ResourceCardView 
+            v-else
+            :resources="resources"
+            :type-key="typeKey"
+            @edit-tags="openTagEditor"
+            @view-history="viewHistory"
+            @view-dependencies="viewDependencies"
+            @download="download"
+            @delete="confirmDelete"
+          />
+        </template>
+
+        <!-- 3. 加载结束且无数据 -> 优质空状态 -->
+        <div v-else class="premium-empty">
+          <el-empty :image-size="160">
+            <template #image>
+              <div class="empty-icon-wrap">
+                <el-icon><FolderDelete /></el-icon>
+              </div>
+            </template>
+            <template #description>
+              <div class="empty-desc">
+                <p class="main-text">暂无资源数据</p>
+                <p class="sub-text">您可以尝试同步存储或上传新资源到该分类</p>
+              </div>
+            </template>
+            <div class="empty-actions">
+               <el-button type="primary" plain @click="fetchList(typeKey)">刷新列表</el-button>
+               <el-button @click="syncFromStorage">同步存储</el-button>
+            </div>
+          </el-empty>
+        </div>
       </div>
     </div>
 
@@ -180,7 +205,7 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { 
   Upload as UploadIcon, Connection, DataLine, Grid, Refresh,
-  Search, CircleCloseFilled
+  Search, CircleCloseFilled, FolderDelete
 } from '@element-plus/icons-vue'
 import axios from 'axios' // Needed for scope change in this file or move to action
 import { ElMessage } from 'element-plus'
@@ -189,6 +214,7 @@ import { ElMessage } from 'element-plus'
 import CategorySidebar from './components/CategorySidebar.vue'
 import ResourceTableView from './components/ResourceTableView.vue'
 import ResourceCardView from './components/ResourceCardView.vue'
+import ResourceSkeleton from './components/ResourceSkeleton.vue'
 import TagEditDialog from './components/TagEditDialog.vue'
 import UploadDialog from './components/UploadDialog.vue'
 import DependencyDrawer from './components/DependencyDrawer.vue'
@@ -501,10 +527,50 @@ onUnmounted(() => {
 .content-container {
   flex: 1;
   background: var(--sidebar-bg);
-  border-radius: 12px;
+  border-radius: 8px; /* Sharper to match header */
   border: 1px solid var(--el-border-color-lighter);
-  overflow: hidden;
-  box-shadow: var(--el-box-shadow-lighter);
+  overflow: auto;
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.04);
+  padding: 12px;
+  
+  &.is-loading {
+    border-color: transparent;
+    box-shadow: none;
+  }
+}
+
+.premium-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 0;
+  
+  .empty-icon-wrap {
+    font-size: 80px;
+    color: var(--el-text-color-placeholder);
+    opacity: 0.5;
+  }
+  
+  .empty-desc {
+    .main-text {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+      margin-bottom: 8px;
+    }
+    .sub-text {
+      font-size: 13px;
+      color: var(--el-text-color-secondary);
+    }
+  }
+  
+  .empty-actions {
+    margin-top: 24px;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
 }
 
 .upload-status {

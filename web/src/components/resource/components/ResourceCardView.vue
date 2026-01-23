@@ -44,7 +44,7 @@
         </el-card>
       </el-col>
     </el-row>
-    <el-empty v-if="resources.length === 0" description="暂无资源数据" />
+
   </div>
 </template>
 
