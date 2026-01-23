@@ -3,7 +3,11 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import type { Resource } from './useResourceList'
 
-export function useTags(resources: { value: Resource[] }, onSuccess: () => void) {
+export function useTags(
+  resources: { value: Resource[] }, 
+  onSuccess: () => void,
+  currentResource?: { value: Resource | null }
+) {
   const tagDialogVisible = ref(false)
   const tagLoading = ref(false)
   const editingTags = ref<string[]>([])
@@ -30,6 +34,12 @@ export function useTags(resources: { value: Resource[] }, onSuccess: () => void)
         tags: editingTags.value
       })
       ElMessage.success('标签更新成功')
+      
+      // 同步更新详情抽屉中的引用
+      if (currentResource?.value && currentResource.value.id === currentResourceId.value) {
+        currentResource.value.tags = [...editingTags.value]
+      }
+      
       tagDialogVisible.value = false
       onSuccess()
     } finally {

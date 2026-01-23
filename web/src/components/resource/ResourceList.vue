@@ -264,17 +264,17 @@ const {
   searchTargetResources, confirmAndDoUpload
 } = useUpload(props.typeKey, selectedCategoryId, fetchList)
 
-// 4. Tags
-const {
-  tagDialogVisible, tagLoading, editingTags, existingTags,
-  openTagEditor, saveTags
-} = useTags(resources, fetchList)
-
-// 5. History & Rollback
+// 4. History & Rollback
 const {
   historyDrawerVisible, historyLoading, versionHistory, currentResource,
   viewHistory, rollback
 } = useHistory(fetchList)
+
+// 5. Tags
+const {
+  tagDialogVisible, tagLoading, editingTags, existingTags,
+  openTagEditor, saveTags
+} = useTags(resources, fetchList, currentResource)
 
 // 6. Dependencies
 const {

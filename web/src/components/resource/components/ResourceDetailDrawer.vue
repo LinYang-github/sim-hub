@@ -1,117 +1,153 @@
 <template>
   <el-drawer
     v-model="visible"
-    title="资源详情"
-    size="500px"
-    class="detail-drawer"
+    :size="540"
+    class="serious-detail-drawer"
     destroy-on-close
   >
-    <template #header="{ titleId, titleClass }">
-      <div class="drawer-header">
-        <h4 :id="titleId" :class="titleClass">
-          <el-icon><InfoFilled /></el-icon> 资源详情
-        </h4>
-        <div class="header-actions">
-           <el-button type="primary" size="small" @click="$emit('download', resource)" :disabled="resource?.latest_version?.state !== 'ACTIVE'">
-             下载资源
-           </el-button>
+    <template #header>
+      <div class="serious-header">
+        <div class="title-row">
+          <el-icon class="title-icon"><InfoFilled /></el-icon>
+          <span class="title-text">资源元数据详情</span>
+        </div>
+        <div class="subtitle-row">
+          <span class="resource-id">ID: {{ resource?.id || '-' }}</span>
+          <el-tag size="small" effect="plain" type="info">{{ typeName }}</el-tag>
         </div>
       </div>
     </template>
 
-    <div v-if="resource" class="detail-container">
-      <!-- 1. Basic Info Section -->
-      <section class="detail-section">
-        <div class="section-title">基本信息</div>
-        <div class="info-grid">
-          <div class="info-item">
-            <label>资源名称</label>
-            <div class="value">{{ resource.name }}</div>
-          </div>
-          <div class="info-item">
-            <label>资源类型</label>
-            <div class="value"><el-tag size="small">{{ typeName }}</el-tag></div>
-          </div>
-          <div class="info-item">
-            <label>创建时间</label>
-            <div class="value">{{ formatDate(resource.created_at) }}</div>
-          </div>
-          <div class="info-item">
-            <label>文件大小</label>
-            <div class="value">{{ formatSize(resource.latest_version?.file_size) }}</div>
-          </div>
-          <div class="info-item">
-            <label>可见性</label>
-            <div class="value">
-              <el-tag :type="resource.scope === 'PUBLIC' ? 'success' : 'info'" size="small">
-                {{ resource.scope === 'PUBLIC' ? '公开' : '私有' }}
-              </el-tag>
+    <div v-if="resource" class="drawer-body-wrapper" v-loading="loadingDetails">
+      <!-- 1. 核心属性表 -->
+      <div class="details-section">
+        <div class="section-label">基本属性</div>
+        <el-descriptions :column="2" border class="property-grid">
+          <el-descriptions-item label="资源名称" :span="2">
+            <span class="text-bold">{{ resource.name }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="当前版本">
+            <el-tag size="small" type="success" effect="light">
+              {{ resource.latest_version?.semver || 'v' + (resource.latest_version?.version_num || 1) }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="生命周期">
+            <div class="status-cell">
+              <span :class="['status-dot', resource.latest_version?.state?.toLowerCase()]"></span>
+              {{ statusMap[resource.latest_version?.state] || resource.latest_version?.state }}
             </div>
-          </div>
-        </div>
-      </section>
+          </el-descriptions-item>
+          <el-descriptions-item label="文件大小">
+            {{ formatSize(resource.latest_version?.file_size) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="可见范围">
+            {{ resource.scope === 'PUBLIC' ? '公共 (Public)' : '私有 (Private)' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="创建时间">
+            {{ formatDate(resource.created_at) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="所有者">
+            {{ resource.owner_id || 'System' }}
+          </el-descriptions-item>
+        </el-descriptions>
+      </div>
 
-      <!-- 2. Tags Section -->
-      <section class="detail-section">
-        <div class="section-title">
-          标签管理
-          <el-button link type="primary" size="small" @click="$emit('edit-tags', resource)">编辑</el-button>
+      <!-- 2. 标签系统 -->
+      <div class="details-section">
+        <div class="section-label">
+          管理标签
+          <el-button link type="primary" size="small" @click="$emit('edit-tags', resource)">
+            <el-icon><Edit /></el-icon> 编辑
+          </el-button>
         </div>
-        <div class="tags-container">
-          <el-tag v-for="tag in resource.tags" :key="tag" round size="small" class="detail-tag">
+        <div class="tags-row">
+          <el-tag 
+            v-for="tag in resource.tags" 
+            :key="tag" 
+            size="small" 
+            type="info" 
+            effect="plain"
+            class="util-tag"
+          >
             {{ tag }}
           </el-tag>
-          <span v-if="!resource.tags?.length" class="empty-text">暂无标签</span>
+          <div v-if="!resource.tags?.length" class="empty-data">未打标</div>
         </div>
-      </section>
+      </div>
 
-      <!-- 3. Tabs for Complex Info -->
-      <el-tabs v-model="activeTab" class="detail-tabs">
-        <el-tab-pane label="版本记录" name="versions">
-          <div class="tab-content" v-loading="loadingDetails">
-             <el-timeline v-if="versions.length > 0">
-               <el-timeline-item
-                 v-for="ver in versions"
-                 :key="ver.id"
-                 :timestamp="formatDate(ver.created_at)"
-                 :type="ver.id === resource.latest_version?.id ? 'primary' : undefined"
-               >
-                 <div class="version-item">
-                   <div class="ver-head">
-                     <span class="ver-name">{{ ver.semver || 'v' + ver.version_num }}</span>
-                     <el-tag size="small" :type="getStatusType(ver.state)">{{ statusMap[ver.state] || ver.state }}</el-tag>
-                   </div>
-                   <div class="ver-actions">
-                     <el-button link size="small" @click="$emit('download-version', ver.download_url)" :disabled="ver.state !== 'ACTIVE'">下载</el-button>
-                     <el-button v-if="ver.id !== resource.latest_version?.id" link type="warning" size="small" @click="$emit('rollback', ver.id)">回滚</el-button>
-                   </div>
-                 </div>
-               </el-timeline-item>
-             </el-timeline>
-             <el-empty v-else :image-size="60" description="加载中..." />
+      <!-- 3. 数据选项卡 -->
+      <el-tabs v-model="activeTab" class="serious-tabs">
+        <el-tab-pane name="versions" label="版本更迭历史">
+          <div class="tab-pane-content">
+            <el-table :data="versions" size="small" border stripe class="version-table">
+              <el-table-column prop="version" label="版本" width="90">
+                <template #default="{ row }">
+                  <span class="mono-text">{{ row.semver || 'v' + row.version_num }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="state" label="状态" width="100">
+                <template #default="{ row }">
+                  <el-tag size="small" :type="getStatusType(row.state)" effect="light">
+                    {{ statusMap[row.state] || row.state }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="更新日期" min-width="140">
+                <template #default="{ row }">
+                  {{ formatDate(row.created_at) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="120" align="center">
+                <template #default="{ row }">
+                  <el-button link type="primary" size="small" @click="$emit('download-version', row.download_url)">下载</el-button>
+                  <el-button 
+                    v-if="row.id !== resource.latest_version?.id" 
+                    link 
+                    type="warning" 
+                    size="small" 
+                    @click="$emit('rollback', row.id)"
+                  >
+                    回滚
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
           </div>
         </el-tab-pane>
 
-        <el-tab-pane label="依赖关系" name="dependencies">
-          <div class="tab-content" v-loading="loadingDetails">
-             <div v-if="dependencies && dependencies.length > 0" class="dep-list">
-                <div v-for="dep in dependencies" :key="dep.id" class="dep-node">
-                  <el-icon><Connection /></el-icon>
-                  <span class="dep-name">{{ dep.name }}</span>
-                  <span class="dep-ver">{{ dep.version }}</span>
-                </div>
-             </div>
-             <el-empty v-else :image-size="60" description="无任何依赖项" />
+        <el-tab-pane name="dependencies" label="拓扑依赖">
+          <div class="tab-pane-content">
+            <div v-if="dependencies?.length" class="dep-grid">
+              <div v-for="dep in dependencies" :key="dep.id" class="dep-row">
+                <el-icon><Share /></el-icon>
+                <span class="name">{{ dep.name }}</span>
+                <span class="version">{{ dep.version }}</span>
+              </div>
+            </div>
+            <el-empty v-else :image-size="40" description="无外部依赖关联" />
           </div>
         </el-tab-pane>
       </el-tabs>
     </div>
+
+    <template #footer>
+      <div class="serious-drawer-footer">
+        <el-button @click="visible = false">关闭窗口</el-button>
+        <el-button 
+          type="primary" 
+          @click="$emit('download', resource)" 
+          :disabled="resource?.latest_version?.state !== 'ACTIVE'"
+        >
+          <el-icon><Download /></el-icon> 下载部署包
+        </el-button>
+      </div>
+    </template>
   </el-drawer>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { InfoFilled, Connection } from '@element-plus/icons-vue'
+import { InfoFilled, Edit, Download, Share } from '@element-plus/icons-vue'
 import { formatDate, formatSize } from '../../../core/utils/format'
 
 const props = defineProps<{
@@ -132,12 +168,12 @@ const emit = defineEmits([
   'rollback'
 ])
 
+const activeTab = ref('versions')
+
 const visible = computed({
   get: () => props.modelValue,
   set: (val) => emit('update:modelValue', val)
 })
-
-const activeTab = ref('versions')
 
 const getStatusType = (state: string) => {
   const map: any = { ACTIVE: 'success', PROCESSING: 'primary', FAILED: 'danger' }
@@ -146,75 +182,141 @@ const getStatusType = (state: string) => {
 </script>
 
 <style scoped lang="scss">
-.drawer-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  h4 { margin: 0; display: flex; align-items: center; gap: 8px; }
+.serious-detail-drawer {
+  :deep(.el-drawer__header) {
+    margin-bottom: 0;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+  }
 }
 
-.detail-container {
-  padding: 0 4px;
+.serious-header {
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    
+    .title-icon {
+      color: var(--el-color-primary);
+      font-size: 18px;
+    }
+    .title-text {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--el-text-color-primary);
+    }
+  }
+  .subtitle-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    
+    .resource-id {
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
+      font-family: monospace;
+    }
+  }
 }
 
-.detail-section {
+.drawer-body-wrapper {
+  padding: 24px;
+}
+
+.details-section {
   margin-bottom: 24px;
 
-  .section-title {
-    font-size: 14px;
-    font-weight: 700;
+  .section-label {
+    font-size: 13px;
+    font-weight: 600;
     color: var(--el-text-color-primary);
     margin-bottom: 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border-left: 3px solid var(--el-color-primary);
+    padding-left: 10px;
   }
 }
 
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  background: var(--el-fill-color-lighter);
-  padding: 16px;
-  border-radius: 8px;
+.property-grid {
+  :deep(.el-descriptions__label) {
+    width: 100px;
+    background-color: var(--el-fill-color-light);
+    color: var(--el-text-color-regular);
+    font-weight: 500;
+  }
+  .text-bold {
+    font-weight: 700;
+    color: var(--el-text-color-primary);
+  }
 }
 
-.info-item {
-  label { font-size: 12px; color: var(--el-text-color-secondary); display: block; margin-bottom: 4px; }
-  .value { font-size: 13px; color: var(--el-text-color-primary); font-weight: 500; }
+.status-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--el-text-color-placeholder);
+    
+    &.active { background: var(--el-color-success); border: 2px solid var(--el-color-success-light-8); }
+    &.processing { background: var(--el-color-primary); }
+    &.failed { background: var(--el-color-danger); }
+  }
 }
 
-.tags-container {
+.tags-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+  .util-tag { border-radius: 2px; }
+  .empty-data { font-size: 12px; color: var(--el-text-color-placeholder); }
 }
 
-.detail-tag { margin: 0; }
-
-.detail-tabs {
-  margin-top: 24px;
+.serious-tabs {
+  margin-top: 32px;
+  :deep(.el-tabs__item) {
+    font-size: 13px;
+    font-weight: 600;
+  }
 }
 
-.tab-content {
-  min-height: 200px;
-  padding: 12px 4px;
+.tab-pane-content {
+  padding: 12px 0;
 }
 
-.version-item {
-  .ver-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-  .ver-name { font-weight: 600; font-size: 14px; }
-  .ver-actions { display: flex; gap: 8px; }
+.version-table {
+  .mono-text { font-family: monospace; font-weight: 600; }
 }
 
-.dep-node {
-  display: flex; align-items: center; gap: 12px; padding: 10px;
-  background: var(--el-fill-color-lighter); border-radius: 6px; margin-bottom: 8px;
-  .dep-name { flex: 1; font-size: 13px; font-weight: 500; }
-  .dep-ver { font-size: 12px; color: var(--el-text-color-secondary); }
+.dep-grid {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 4px;
+  
+  .dep-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    gap: 12px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+    &:last-child { border-bottom: none; }
+    
+    .el-icon { color: var(--el-text-color-secondary); font-size: 14px; }
+    .name { flex: 1; font-size: 13px; font-weight: 500; }
+    .version { font-size: 12px; color: var(--el-text-color-secondary); font-family: monospace; }
+  }
 }
 
-.empty-text { font-size: 12px; color: var(--el-text-color-placeholder); }
+.serious-drawer-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
 </style>

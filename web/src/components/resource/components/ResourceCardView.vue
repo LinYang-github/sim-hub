@@ -33,45 +33,55 @@
                 <el-icon><Download /></el-icon> 下载
               </el-button>
               
-              <el-dropdown trigger="click" @command="(cmd) => handleCommand(cmd, item)">
+              <el-dropdown trigger="click" popper-class="resource-popper" @command="(cmd) => handleCommand(cmd, item)">
                 <el-button link>
                   <el-icon><MoreFilled /></el-icon> 更多
                 </el-button>
                 <template #dropdown>
-                  <el-dropdown-menu class="premium-dropdown">
+                  <el-dropdown-menu>
                     <el-dropdown-item command="details">
                       <div class="menu-item-content">
-                        <el-icon class="menu-icon"><InfoFilled /></el-icon>
-                        <span>详情资料</span>
+                        <el-icon><InfoFilled /></el-icon>
+                        <span>查看详情</span>
                       </div>
                     </el-dropdown-item>
                     
                     <el-dropdown-item command="tags">
                       <div class="menu-item-content">
-                        <el-icon class="menu-icon"><PriceTag /></el-icon>
+                        <el-icon><PriceTag /></el-icon>
                         <span>编辑标签</span>
                       </div>
                     </el-dropdown-item>
                     
-                    <el-dropdown-item v-if="enableScope && item.owner_id === 'admin'" class="nested-menu-item">
-                      <el-dropdown trigger="hover" placement="right" @command="(scopeCmd) => $emit('change-scope', item, scopeCmd)">
+                    <el-dropdown-item v-if="enableScope && item.owner_id === 'admin'" class="nested-menu-parent">
+                      <el-dropdown trigger="hover" placement="right" popper-class="resource-popper" @command="(scopeCmd) => $emit('change-scope', item, scopeCmd)">
                          <div class="menu-item-content">
-                           <el-icon class="menu-icon"><Promotion /></el-icon>
+                           <el-icon><Promotion /></el-icon>
                            <span>权限设置</span>
                          </div>
                          <template #dropdown>
                            <el-dropdown-menu>
-                             <el-dropdown-item command="PRIVATE" :disabled="item.scope === 'PRIVATE'">设为私有</el-dropdown-item>
-                             <el-dropdown-item command="PUBLIC" :disabled="item.scope === 'PUBLIC'">设为公开</el-dropdown-item>
+                             <el-dropdown-item command="PRIVATE" :disabled="item.scope === 'PRIVATE'">
+                                <div class="menu-item-content">
+                                  <el-icon><Lock /></el-icon>
+                                  <span>设为私有</span>
+                                </div>
+                             </el-dropdown-item>
+                             <el-dropdown-item command="PUBLIC" :disabled="item.scope === 'PUBLIC'">
+                                <div class="menu-item-content">
+                                  <el-icon><Promotion /></el-icon>
+                                  <span>设为公开</span>
+                                </div>
+                             </el-dropdown-item>
                            </el-dropdown-menu>
                          </template>
                       </el-dropdown>
                     </el-dropdown-item>
 
-                    <el-dropdown-item divided command="delete" class="delete-action">
+                    <el-dropdown-item divided command="delete" class="danger-item">
                       <div class="menu-item-content">
-                        <el-icon class="menu-icon"><Delete /></el-icon>
-                        <span>删除资源</span>
+                        <el-icon><Delete /></el-icon>
+                        <span>从库删除</span>
                       </div>
                     </el-dropdown-item>
                   </el-dropdown-menu>
@@ -86,7 +96,7 @@
 
 <script setup lang="ts">
 import { 
-  Box, Location, Files, Download, Delete, PriceTag, MoreFilled, InfoFilled, Promotion
+  Box, Location, Files, Download, Delete, PriceTag, MoreFilled, InfoFilled, Promotion, Lock
 } from '@element-plus/icons-vue'
 import { formatSize } from '../../../core/utils/format'
 
@@ -106,6 +116,68 @@ const handleCommand = (cmd: string, row: any) => {
   }
 }
 </script>
+
+<style lang="scss">
+/* 全局样式共用 block (确保 Table/Card 视图下拉样式绝对统一) */
+.resource-popper.el-popper {
+  background: var(--el-bg-color-overlay) !important;
+  border: 1px solid var(--el-border-color-light) !important;
+  border-radius: 8px !important;
+  box-shadow: var(--el-box-shadow-light) !important;
+  padding: 0 !important;
+
+  .el-dropdown-menu {
+    padding: 6px 0 !important;
+    min-width: 160px !important;
+  }
+
+  .el-dropdown-menu__item {
+    padding: 0 !important;
+    
+    &:hover {
+      background-color: transparent !important;
+    }
+
+    .menu-item-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 14px;
+      color: var(--el-text-color-regular);
+      transition: all 0.2s;
+
+      .el-icon {
+        font-size: 16px;
+        width: 16px;
+        color: var(--el-text-color-secondary);
+      }
+
+      &:hover {
+        background-color: var(--el-color-primary-light-9);
+        color: var(--el-color-primary);
+        .el-icon { color: var(--el-color-primary); }
+      }
+    }
+
+    &.danger-item .menu-item-content {
+      color: var(--el-color-danger) !important;
+      .el-icon { color: var(--el-color-danger) !important; }
+
+      &:hover {
+        background-color: var(--el-color-danger-light-9);
+      }
+    }
+
+    &.el-dropdown-menu__item--divided {
+      margin-top: 6px;
+      &::before { margin: 0; background-color: var(--el-border-color-lighter); }
+    }
+  }
+}
+</style>
 
 <style scoped lang="scss">
 .card-view-container {
@@ -197,53 +269,6 @@ const handleCommand = (cmd: string, row: any) => {
   justify-content: space-between;
   align-items: center;
   background: var(--el-fill-color-extra-light);
-}
-
-:deep(.premium-dropdown) {
-  padding: 4px 0;
-
-  .el-dropdown-menu__item {
-    padding: 0 !important;
-    background-color: transparent !important;
-    
-    &:hover { background-color: transparent !important; }
-
-    .menu-item-content {
-      display: flex;
-      align-items: center;
-      width: 100%;
-      padding: 9px 16px;
-      gap: 12px;
-      font-size: 14px;
-      color: var(--el-text-color-regular);
-      transition: all 0.2s ease;
-      
-      &:hover {
-        background-color: var(--el-color-primary-light-9);
-        color: var(--el-color-primary);
-        .menu-icon { color: var(--el-color-primary); }
-      }
-
-      .menu-icon {
-        width: 16px;
-        font-size: 16px;
-        display: flex;
-        justify-content: center;
-        color: var(--el-text-color-secondary);
-      }
-    }
-  }
-
-  .delete-action .menu-item-content {
-    color: var(--el-color-danger);
-    .menu-icon { color: var(--el-color-danger); opacity: 0.8; }
-
-    &:hover {
-      background-color: var(--el-color-danger-light-9);
-      color: var(--el-color-danger);
-      .menu-icon { color: var(--el-color-danger); opacity: 1; }
-    }
-  }
 }
 
 :global(.dark) .card-cover {

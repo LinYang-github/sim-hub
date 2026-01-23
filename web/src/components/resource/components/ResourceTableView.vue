@@ -64,44 +64,54 @@
             </el-tooltip>
 
             <!-- Secondary Actions: Dropdown -->
-            <el-dropdown trigger="click" @command="(cmd) => handleCommand(cmd, scope.row)">
+            <el-dropdown trigger="click" popper-class="resource-popper" @command="(cmd) => handleCommand(cmd, scope.row)">
               <el-button circle size="small">
                 <el-icon><MoreFilled /></el-icon>
               </el-button>
               <template #dropdown>
-                <el-dropdown-menu class="premium-dropdown">
+                <el-dropdown-menu>
                   <el-dropdown-item command="details">
                     <div class="menu-item-content">
-                      <el-icon class="menu-icon"><InfoFilled /></el-icon>
+                      <el-icon><InfoFilled /></el-icon>
                       <span>详情资料</span>
                     </div>
                   </el-dropdown-item>
                   
                   <el-dropdown-item command="tags">
                     <div class="menu-item-content">
-                      <el-icon class="menu-icon"><PriceTag /></el-icon>
+                      <el-icon><PriceTag /></el-icon>
                       <span>编辑标签</span>
                     </div>
                   </el-dropdown-item>
                   
-                  <el-dropdown-item v-if="enableScope && scope.row.owner_id === 'admin'" class="nested-menu-item">
-                    <el-dropdown trigger="hover" placement="left" @command="(scopeCmd) => $emit('change-scope', scope.row, scopeCmd)">
+                  <el-dropdown-item v-if="enableScope && scope.row.owner_id === 'admin'" class="nested-menu-parent">
+                    <el-dropdown trigger="hover" placement="left" popper-class="resource-popper" @command="(scopeCmd) => $emit('change-scope', scope.row, scopeCmd)">
                        <div class="menu-item-content">
-                         <el-icon class="menu-icon"><Promotion /></el-icon>
+                         <el-icon><Promotion /></el-icon>
                          <span>权限设置</span>
                        </div>
                        <template #dropdown>
                          <el-dropdown-menu>
-                           <el-dropdown-item command="PRIVATE" :disabled="scope.row.scope === 'PRIVATE'">设为私有</el-dropdown-item>
-                           <el-dropdown-item command="PUBLIC" :disabled="scope.row.scope === 'PUBLIC'">设为公开</el-dropdown-item>
+                           <el-dropdown-item command="PRIVATE" :disabled="scope.row.scope === 'PRIVATE'">
+                              <div class="menu-item-content">
+                                <el-icon><Lock /></el-icon>
+                                <span>设为私有</span>
+                              </div>
+                           </el-dropdown-item>
+                           <el-dropdown-item command="PUBLIC" :disabled="scope.row.scope === 'PUBLIC'">
+                              <div class="menu-item-content">
+                                <el-icon><Promotion /></el-icon>
+                                <span>设为公开</span>
+                              </div>
+                           </el-dropdown-item>
                          </el-dropdown-menu>
                        </template>
                     </el-dropdown>
                   </el-dropdown-item>
 
-                  <el-dropdown-item divided command="delete" class="delete-action">
+                  <el-dropdown-item divided command="delete" class="danger-item">
                     <div class="menu-item-content">
-                      <el-icon class="menu-icon"><Delete /></el-icon>
+                      <el-icon><Delete /></el-icon>
                       <span>删除资源</span>
                     </div>
                   </el-dropdown-item>
@@ -117,7 +127,7 @@
 <script setup lang="ts">
 import { 
   Box, Location, Files, Clock, DataLine, 
-  Download, Delete, Promotion, PriceTag, MoreFilled, InfoFilled
+  Download, Delete, Promotion, PriceTag, MoreFilled, InfoFilled, Lock
 } from '@element-plus/icons-vue'
 import { formatDate, formatSize } from '../../../core/utils/format'
 
@@ -137,6 +147,70 @@ const handleCommand = (cmd: string, row: any) => {
   if (cmd === 'delete') emit('delete', row)
 }
 </script>
+
+<style lang="scss">
+/* 全局样式 block (非 scoped)，确保传送到 body 的 popper 能生效 */
+.resource-popper.el-popper {
+  background: var(--el-bg-color-overlay) !important;
+  border: 1px solid var(--el-border-color-light) !important;
+  border-radius: 8px !important;
+  box-shadow: var(--el-box-shadow-light) !important;
+  padding: 0 !important;
+
+  .el-dropdown-menu {
+    padding: 6px 0 !important;
+    min-width: 160px !important;
+  }
+
+  .el-dropdown-menu__item {
+    padding: 0 !important;
+    
+    &:hover {
+      background-color: transparent !important;
+    }
+
+    .menu-item-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 14px;
+      color: var(--el-text-color-regular);
+      transition: all 0.2s;
+
+      .el-icon {
+        font-size: 16px;
+        width: 16px;
+        color: var(--el-text-color-secondary);
+      }
+
+      &:hover {
+        background-color: var(--el-color-primary-light-9);
+        color: var(--el-color-primary);
+        .el-icon { color: var(--el-color-primary); }
+      }
+    }
+
+    // 严谨的红色危险项处理
+    &.danger-item .menu-item-content {
+      color: var(--el-color-danger) !important;
+      .el-icon { color: var(--el-color-danger) !important; }
+
+      &:hover {
+        background-color: var(--el-color-danger-light-9);
+      }
+    }
+
+    // 处理分界线背景
+    &.el-dropdown-menu__item--divided {
+      margin-top: 6px;
+      &::before { margin: 0; background-color: var(--el-border-color-lighter); }
+    }
+  }
+}
+</style>
 
 <style scoped lang="scss">
 .premium-table {
@@ -235,68 +309,6 @@ const handleCommand = (cmd: string, row: any) => {
   justify-content: center;
   align-items: center;
   gap: 8px;
-}
-
-/* 彻底解决对齐问题的下拉菜单样式 */
-:deep(.premium-dropdown) {
-  padding: 4px 0;
-
-  .el-dropdown-menu__item {
-    padding: 0 !important; // 禁用自带内边距
-    background-color: transparent !important;
-    
-    &:hover {
-      background-color: transparent !important; // 禁用外层 hover 背景，由内层处理
-    }
-
-    &.nested-menu-item {
-      overflow: visible;
-    }
-    
-    // 自定义的统一内容容器
-    .menu-item-content {
-      display: flex;
-      align-items: center;
-      width: 100%;
-      padding: 9px 16px;
-      gap: 12px;
-      font-size: 14px;
-      color: var(--el-text-color-regular);
-      transition: all 0.2s ease;
-      
-      &:hover {
-        background-color: var(--el-color-primary-light-9);
-        color: var(--el-color-primary);
-        .menu-icon { color: var(--el-color-primary); }
-      }
-
-      .menu-icon {
-        width: 16px;
-        font-size: 16px;
-        display: flex;
-        justify-content: center;
-        color: var(--el-text-color-secondary);
-        transition: color 0.2s;
-      }
-
-      span {
-        line-height: 1;
-        white-space: nowrap;
-      }
-    }
-  }
-
-  // 红色删除动作
-  .delete-action .menu-item-content {
-    color: var(--el-color-danger);
-    .menu-icon { color: var(--el-color-danger); opacity: 0.8; }
-
-    &:hover {
-      background-color: var(--el-color-danger-light-9);
-      color: var(--el-color-danger);
-      .menu-icon { color: var(--el-color-danger); opacity: 1; }
-    }
-  }
 }
 
 @keyframes statusPulse {
