@@ -26,7 +26,7 @@
       <template #default="scope">
         <div class="status-indicator">
           <div :class="['status-dot', scope.row.latest_version?.state?.toLowerCase()]"></div>
-          <span class="status-label">{{ statusMap[scope.row.latest_version?.state] || scope.row.latest_version?.state }}</span>
+          <span class="status-label">{{ scope.row.latest_version?.state ? (statusMap[scope.row.latest_version!.state] || scope.row.latest_version!.state) : '-' }}</span>
         </div>
       </template>
     </el-table-column>
@@ -130,18 +130,25 @@ import {
   Download, Delete, Promotion, PriceTag, MoreFilled, InfoFilled, Lock
 } from '@element-plus/icons-vue'
 import { formatDate, formatSize } from '../../../core/utils/format'
+import type { Resource, ResourceScope } from '../../../core/types/resource'
 
 defineProps<{
-  resources: any[]
+  resources: Resource[]
   loading: boolean
   typeKey: string
   enableScope: boolean
   statusMap: Record<string, string>
 }>()
 
-const emit = defineEmits(['edit-tags', 'view-details', 'download', 'delete', 'change-scope'])
+const emit = defineEmits<{
+  (e: 'edit-tags', row: Resource): void
+  (e: 'view-details', row: Resource): void
+  (e: 'download', row: Resource): void
+  (e: 'delete', row: Resource): void
+  (e: 'change-scope', row: Resource, scope: ResourceScope): void
+}>()
 
-const handleCommand = (cmd: string, row: any) => {
+const handleCommand = (cmd: string, row: Resource) => {
   if (cmd === 'details') emit('view-details', row)
   if (cmd === 'tags') emit('edit-tags', row)
   if (cmd === 'delete') emit('delete', row)

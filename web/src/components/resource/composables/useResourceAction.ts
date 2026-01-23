@@ -1,33 +1,34 @@
-import axios from 'axios'
+import request from '../../../core/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { Resource } from './useResourceList'
+import type { Resource } from '../../../core/types/resource'
 
 export function useResourceAction(fetchList: () => void) {
   
-  const confirmDelete = (row: any) => {
+  const confirmDelete = (row: Resource) => {
     ElMessageBox.confirm(`确定要删除资源 "${row.name}" 吗？`, '警告', {
       type: 'warning',
       confirmButtonText: '删除',
       cancelButtonText: '取消'
     }).then(async () => {
       try {
-        await axios.delete(`/api/v1/resources/${row.id}`)
+        await request.delete(`/api/v1/resources/${row.id}`)
         ElMessage.success('删除成功')
         fetchList()
       } catch (err: any) {
-        ElMessage.error('删除失败: ' + (err.response?.data?.error || err.message))
       }
     })
   }
 
-  const download = async (row: any) => {
-    const res = await axios.get(`/api/v1/resources/${row.id}`)
-    const url = res.data.latest_version?.download_url
-    if (url) {
-      window.open(url, '_blank')
-    } else {
-      ElMessage.warning('下载链接无效')
-    }
+  const download = async (row: Resource) => {
+    try {
+      const res = await request.get<Resource>(`/api/v1/resources/${row.id}`)
+      const url = res.latest_version?.download_url
+      if (url) {
+        window.open(url, '_blank')
+      } else {
+        ElMessage.warning('下载链接无效')
+      }
+    } catch (e: any) {}
   }
 
   const handleDownloadUrl = (url?: string) => {
@@ -45,11 +46,10 @@ export function useResourceAction(fetchList: () => void) {
       cancelButtonText: '取消'
     }).then(async () => {
       try {
-        await axios.patch(`/api/v1/resources/${row.id}/scope`, { scope: 'PUBLIC' })
+        await request.patch(`/api/v1/resources/${row.id}/scope`, { scope: 'PUBLIC' })
         ElMessage.success('发布成功')
         fetchList()
       } catch (err: any) {
-        ElMessage.error('发布失败: ' + (err.response?.data?.error || err.message))
       }
     })
   }

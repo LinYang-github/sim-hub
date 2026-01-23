@@ -82,7 +82,10 @@ const props = defineProps<{
   loading: boolean
 }>()
 
-const emit = defineEmits(['update:modelValue', 'save'])
+const emit = defineEmits<{
+  'update:modelValue': [val: boolean]
+  'save': [tags: string[]]
+}>()
 
 const localTags = ref<string[]>([])
 const tagInput = ref('')

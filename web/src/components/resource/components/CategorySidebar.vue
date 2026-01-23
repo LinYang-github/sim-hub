@@ -58,20 +58,26 @@
 import { ref, watch } from 'vue'
 import { FolderOpened, Plus, Grid, Folder, Delete, Search } from '@element-plus/icons-vue'
 import type { ElTree } from 'element-plus'
+import type { CategoryNode } from '../../../core/types/resource'
 
 const props = defineProps<{
-  categoryTree: any[]
-  defaultProps: any
+  categoryTree: CategoryNode[]
+  defaultProps: { label: string; children: string }
   modelValue?: string
 }>()
 
-const emit = defineEmits(['add-category', 'select-category', 'delete-category', 'update:modelValue'])
+const emit = defineEmits<{
+  (e: 'add-category'): void
+  (e: 'select-category', data: CategoryNode): void
+  (e: 'delete-category', id: string): void
+  (e: 'update:modelValue', id: string): void
+}>()
 
 const filterText = ref('')
 const treeRef = ref<InstanceType<typeof ElTree>>()
 
 watch(filterText, (val) => {
-  treeRef.value!.filter(val)
+  treeRef.value?.filter(val)
 })
 
 const filterNode = (value: string, data: any) => {
@@ -79,7 +85,7 @@ const filterNode = (value: string, data: any) => {
   return data.name.toLowerCase().includes(value.toLowerCase())
 }
 
-const handleNodeClick = (data: any) => {
+const handleNodeClick = (data: CategoryNode) => {
   emit('select-category', data)
   emit('update:modelValue', data.id)
 }

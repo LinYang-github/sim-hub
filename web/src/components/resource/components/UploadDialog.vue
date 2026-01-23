@@ -31,7 +31,7 @@
           >
             <div class="search-option">
               <span class="option-name">{{ item.name }}</span>
-              <span class="option-type">{{ item.type_key }}</span>
+              <span class="option-type">{{ item.type }}</span>
             </div>
           </el-option>
         </el-select>
@@ -49,17 +49,23 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { Resource } from '../../../core/types/resource'
+import type { PendingUploadData, UploadFormState } from '../composables/useUpload'
 
 const props = defineProps<{
   modelValue: boolean
-  data: any
-  form: any
+  data: PendingUploadData | null
+  form: UploadFormState
   loading: boolean
-  searchResults: any[]
+  searchResults: Resource[]
   searchLoading: boolean
 }>()
 
-const emit = defineEmits(['update:modelValue', 'confirm', 'search-dependency'])
+const emit = defineEmits<{
+  'update:modelValue': [val: boolean]
+  'confirm': []
+  'search-dependency': [query: string]
+}>()
 
 const visible = computed({
   get: () => props.modelValue,

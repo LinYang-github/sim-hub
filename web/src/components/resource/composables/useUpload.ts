@@ -1,11 +1,14 @@
 import { ref, Ref } from 'vue'
 import axios from 'axios'
+import request from '../../../core/utils/request'
 import JSZip from 'jszip'
 import { ElMessage } from 'element-plus'
 
+import type { Resource } from '../../../core/types/resource'
+
 export interface UploadFormState {
   semver: string
-  dependencies: any[]
+  dependencies: Resource[]
 }
 
 export interface PendingUploadData {
@@ -36,7 +39,7 @@ export function useUpload(
 
   // Search dependencies
   const searchLoading = ref(false)
-  const searchResults = ref<any[]>([])
+  const searchResults = ref<Resource[]>([])
 
   const triggerFolderUpload = () => {
     document.getElementById('folderInput')?.click()
@@ -83,6 +86,7 @@ export function useUpload(
       uploadConfirmVisible.value = true
     } catch (e: any) {
       console.error(e)
+      // 处理逻辑错误，不属于 API 错误，保留 ElMessage
       ElMessage.error('处理失败: ' + (e.message || '未知错误'))
     } finally {
       uploading.value = false
@@ -118,8 +122,8 @@ export function useUpload(
     if (query) {
       searchLoading.value = true
       try {
-        const res = await axios.get('/api/v1/resources', { params: { name: query } })
-        searchResults.value = res.data.items || []
+        const res = await request.get<{ items: Resource[] }>('/api/v1/resources', { params: { name: query } })
+        searchResults.value = res.items || []
       } finally {
         searchLoading.value = false
       }
@@ -129,14 +133,14 @@ export function useUpload(
   }
 
   const performUpload = async (displayName: string, blob: Blob, contentType: string, filename: string, categoryIdVal: string) => {
-    const res = await axios.post('/api/v1/integration/upload/token', {
+    const res = await request.post<{ ticket_id: string; presigned_url: string }>('/api/v1/integration/upload/token', {
       resource_type: typeKey.value,
       checksum: 'skip-for-now',
       size: blob.size,
       filename: filename
     })
     
-    const { ticket_id, presigned_url } = res.data
+    const { ticket_id, presigned_url } = res
     
     await axios.put(presigned_url, blob, {
       headers: { 'Content-Type': contentType },
@@ -147,7 +151,7 @@ export function useUpload(
       }
     })
 
-    await axios.post('/api/v1/integration/upload/confirm', {
+    await request.post('/api/v1/integration/upload/confirm', {
       ticket_id,
       type_key: typeKey.value,
       category_id: categoryIdVal === 'all' ? '' : categoryIdVal,
@@ -176,7 +180,7 @@ export function useUpload(
       pendingUploadData.value = null
       onSuccess()
     } catch (e: any) {
-      ElMessage.error('上传失败: ' + e.message)
+      // 这里的错误会由拦截器处理，手动 catch 仅用于重置状态
     } finally {
       uploading.value = false
     }

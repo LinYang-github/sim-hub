@@ -1,24 +1,6 @@
 import { ref, watch, Ref } from 'vue'
-import axios from 'axios'
-import { ElMessage } from 'element-plus'
-
-export interface Resource {
-  id: string
-  name: string
-  tags: string[]
-  owner_id: string
-  scope: 'PRIVATE' | 'PUBLIC'
-  created_at: string
-  latest_version?: {
-    id: string
-    version_num: number
-    semver?: string
-    state: string
-    meta_data?: any
-    file_size?: number
-    download_url?: string
-  }
-}
+import request from '../../../core/utils/request'
+import type { Resource } from '../../../core/types/resource'
 
 export function useResourceList(
   typeKey: Ref<string>,
@@ -39,7 +21,7 @@ export function useResourceList(
     loading.value = true
     
     try {
-      const params: any = { 
+      const params: Record<string, string> = { 
         type: typeKey.value,
         name: searchQuery.value 
       }
@@ -58,16 +40,14 @@ export function useResourceList(
         params.owner_id = currentUserId
       }
 
-      const res = await axios.get('/api/v1/resources', { params })
+      const res = await request.get<{ items: Resource[] }>('/api/v1/resources', { params })
       
       // 只有最后一次发起的请求才有效，避免旧请求残留数据覆盖新数据
       if (requestId === lastRequestId) {
-        resources.value = res.data.items || []
+        resources.value = res.items || []
       }
     } catch (err: any) {
-      if (requestId === lastRequestId) {
-        ElMessage.error('获取列表失败: ' + (err.response?.data?.error || err.message))
-      }
+      // 错误由拦截器统一处理
     } finally {
       if (requestId === lastRequestId) {
         loading.value = false
@@ -78,11 +58,11 @@ export function useResourceList(
   const syncFromStorage = async () => {
     syncing.value = true
     try {
-      const res = await axios.post('/api/v1/resources/sync')
-      ElMessage.success(`同步完成，共恢复 ${res.data.count} 个资源`)
+      const res = await request.post<{ count: number }>('/api/v1/resources/sync')
+      // 这里可以保留特定的业务成功提示
+      // ElMessage.success(`同步完成，共恢复 ${res.count} 个资源`)
       fetchList()
     } catch (err: any) {
-      ElMessage.error('同步失败: ' + (err.response?.data?.error || err.message))
     } finally {
       syncing.value = false
     }

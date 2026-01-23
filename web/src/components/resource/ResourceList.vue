@@ -19,14 +19,28 @@
         <div class="header-left">
           <div v-if="enableScope" class="scope-segment">
             <div 
-              v-for="opt in [{label:'全部', val:'ALL'}, {label:'公共', val:'PUBLIC'}, {label:'我的', val:'PRIVATE'}]"
+              v-for="opt in scopeOptions"
               :key="opt.val"
               class="segment-item"
               :class="{ active: activeScope === opt.val }"
-              @click="activeScope = opt.val as any"
+              @click="activeScope = opt.val"
             >
               {{ opt.label }}
             </div>
+          </div>
+
+          <div class="divider-vertical"></div>
+
+          <div class="search-box">
+            <el-input
+              v-model="searchQuery"
+              placeholder="搜索资源..."
+              :prefix-icon="Search"
+              clearable
+              class="search-input"
+              @clear="fetchList"
+              @keyup.enter="fetchList"
+            />
           </div>
         </div>
 
@@ -92,7 +106,7 @@
             :resources="resources"
             :loading="loading"
             :type-key="typeKey"
-            :enable-scope="enableScope"
+            :enable-scope="!!enableScope"
             :status-map="statusMap"
             @edit-tags="openTagEditor"
             @view-details="handleViewDetails"
@@ -104,7 +118,8 @@
             v-else
             :resources="resources"
             :type-key="typeKey"
-            :enable-scope="enableScope"
+            :enable-scope="!!enableScope"
+            :status-map="statusMap"
             @edit-tags="openTagEditor"
             @view-details="handleViewDetails"
             @download="download"
@@ -172,7 +187,7 @@
       v-model="tagDialogVisible"
       :loading="tagLoading"
       :existing-tags="existingTags"
-      v-model:tags="editingTags"
+      :tags="editingTags"
       @save="(tags) => { editingTags = tags; saveTags(); }"
     />
 
@@ -194,13 +209,12 @@
 import { ref, onMounted, onUnmounted, watch, toRef, computed } from 'vue'
 import { 
   Upload as UploadIcon, Connection, DataLine, Grid, Refresh,
-  Search, CircleCloseFilled, FolderDelete
+  Search, FolderDelete
 } from '@element-plus/icons-vue'
-import axios from 'axios' // Needed for scope change in this file or move to action
+import request from '../../core/utils/request'
 import { ElMessage } from 'element-plus'
-
-// Components
 import CategorySidebar from './components/CategorySidebar.vue'
+import type { Resource, ResourceScope, CategoryNode } from '../../core/types/resource'
 import ResourceTableView from './components/ResourceTableView.vue'
 import ResourceCardView from './components/ResourceCardView.vue'
 import ResourceSkeleton from './components/ResourceSkeleton.vue'
@@ -218,6 +232,8 @@ import { useTags } from './composables/useTags'
 import { useHistory } from './composables/useHistory'
 import { useDependency } from './composables/useDependency'
 import { useResourceAction } from './composables/useResourceAction'
+
+import { formatDate, formatSize } from '../../core/utils/format'
 
 const props = defineProps<{
   typeKey: string
@@ -238,6 +254,12 @@ const statusMap: Record<string, string> = {
 const viewMode = ref('list')
 const searchFocused = ref(false)
 const detailDrawerVisible = ref(false)
+
+const scopeOptions = [
+  { label: '全部', val: 'ALL' },
+  { label: '公共', val: 'PUBLIC' },
+  { label: '我的', val: 'PRIVATE' }
+] as const
 
 // 1. Categories
 const { 
@@ -284,7 +306,7 @@ const {
 // 7. Actions
 const { confirmDelete, download, handleDownloadUrl, publishResource: doPublish } = useResourceAction(fetchList)
 
-const handleViewDetails = (row: any) => {
+const handleViewDetails = (row: Resource) => {
   currentResource.value = row
   detailDrawerVisible.value = true
   viewHistory(row, false) // Fetch versions ONLY, don't open extra drawer
@@ -292,29 +314,28 @@ const handleViewDetails = (row: any) => {
 }
 
 // Scope Change (kept here as it's simple or move to useResourceAction)
-const handleScopeChange = async (row: any, scope: string) => {
+const handleScopeChange = async (row: Resource, scope: ResourceScope) => {
     try {
-        await axios.patch(`/api/v1/resources/${row.id}/scope`, { scope })
+        await request.patch(`/api/v1/resources/${row.id}/scope`, { scope })
         ElMessage.success('权限更新成功')
         fetchList()
     } catch (err: any) {
-        ElMessage.error('权限更新失败: ' + (err.response?.data?.error || err.message))
     }
 }
 
 // Sidebar handling
-const handleCategorySelect = (data: any) => {
+const handleCategorySelect = (data: CategoryNode) => {
     selectedCategoryId.value = data.id
     fetchList()
 }
 
 // Lifecycle
-let pollInterval: any = null
+let pollInterval: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
     // Polling for processing status
     pollInterval = setInterval(() => {
-        const hasProcessing = resources.value.some((s: any) => 
+        const hasProcessing = resources.value.some((s: Resource) => 
             s.latest_version?.state === 'PROCESSING' || s.latest_version?.state === 'PENDING'
         )
         if (hasProcessing) {
@@ -417,6 +438,24 @@ onUnmounted(() => {
       color: var(--el-color-primary);
       box-shadow: 0 1px 4px -1px rgba(0, 0, 0, 0.1);
       font-weight: 600;
+    }
+  }
+}
+
+.search-box {
+  width: 240px;
+  .search-input {
+    :deep(.el-input__wrapper) {
+      background-color: var(--el-fill-color-lighter);
+      box-shadow: none !important;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+      border-radius: 6px;
+
+      &.is-focus {
+        background-color: var(--el-bg-color);
+        border-color: var(--el-color-primary-light-5);
+      }
     }
   }
 }

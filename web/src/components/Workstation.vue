@@ -51,14 +51,27 @@ import { Files, Document, Promotion, Connection, Box, Location, Folder } from '@
 
 const router = useRouter()
 
-const stats = [
+interface StatItem {
+  label: string
+  value: string
+  icon: any
+  color: string
+}
+
+const stats: StatItem[] = [
   { label: '想定资源', value: '12', icon: Folder, color: '#409eff' },
   { label: '3D 模型', value: '45', icon: Box, color: '#67c23a' },
   { label: '地形图', value: '8', icon: Location, color: '#e6a23c' },
   { label: '系统通知', value: '23', icon: Promotion, color: '#f56c6c' }
 ]
 
-const quickActions = [
+interface QuickAction {
+  name: string
+  path: string
+  icon: any
+}
+
+const quickActions: QuickAction[] = [
   { name: '想定库', path: '/scenarios', icon: Folder },
   { name: '模型库', path: '/res/model_glb', icon: Box },
   { name: '地形库', path: '/res/map_terrain', icon: Location },

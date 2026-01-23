@@ -39,16 +39,21 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Share } from '@element-plus/icons-vue'
+import type { ResourceDependency } from '../../../core/types/resource'
 
 const props = defineProps<{
   modelValue: boolean
-  depTree: any[]
+  depTree: ResourceDependency[]
   loading: boolean
   bundleLoading: boolean
   packLoading: boolean
 }>()
 
-const emit = defineEmits(['update:modelValue', 'download-bundle', 'download-pack'])
+const emit = defineEmits<{
+  'update:modelValue': [val: boolean]
+  'download-bundle': []
+  'download-pack': []
+}>()
 
 const visible = computed({
   get: () => props.modelValue,

@@ -1,12 +1,12 @@
-import { ref } from 'vue'
-import axios from 'axios'
+import { ref, Ref } from 'vue'
+import request from '../../../core/utils/request'
 import { ElMessage } from 'element-plus'
-import type { Resource } from './useResourceList'
+import type { Resource, ResourceDependency } from '../../../core/types/resource'
 
-export function useDependency(currentResource: { value: Resource | null }) {
+export function useDependency(currentResource: Ref<Resource | null>) {
   const depDrawerVisible = ref(false)
   const depLoading = ref(false)
-  const depTree = ref<any[]>([])
+  const depTree = ref<ResourceDependency[]>([])
   
   const bundleLoading = ref(false)
   const packLoading = ref(false)
@@ -22,10 +22,9 @@ export function useDependency(currentResource: { value: Resource | null }) {
     if (openDrawer) depDrawerVisible.value = true
     depLoading.value = true
     try {
-      const res = await axios.get(`/api/v1/resources/versions/${row.latest_version.id}/dependency-tree`)
-      depTree.value = Array.isArray(res.data) ? res.data : []
+      const res = await request.get<ResourceDependency[]>(`/api/v1/resources/versions/${row.latest_version.id}/dependency-tree`)
+      depTree.value = res || []
     } catch (err: any) {
-      ElMessage.error('获取依赖树失败: ' + (err.response?.data?.error || err.message))
     } finally {
       depLoading.value = false
     }
@@ -35,8 +34,7 @@ export function useDependency(currentResource: { value: Resource | null }) {
     if (!currentResource.value?.latest_version?.id) return
     bundleLoading.value = true
     try {
-      const res = await axios.get(`/api/v1/resources/versions/${currentResource.value.latest_version.id}/bundle`)
-      const data = res.data
+      const data = await request.get<any>(`/api/v1/resources/versions/${currentResource.value.latest_version.id}/bundle`)
       
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
@@ -48,7 +46,6 @@ export function useDependency(currentResource: { value: Resource | null }) {
       
       ElMessage.success('依赖包清单已生成并下载')
     } catch (err: any) {
-      ElMessage.error('生成打包清单失败: ' + (err.response?.data?.error || err.message))
     } finally {
       bundleLoading.value = false
     }

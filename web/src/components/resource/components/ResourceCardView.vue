@@ -23,7 +23,7 @@
               <div class="card-meta">
                 <span>{{ formatSize(item.latest_version?.file_size) }}</span>
                 <span :class="['card-status-text', item.latest_version?.state?.toLowerCase()]">
-                  {{ item.latest_version?.state === 'ACTIVE' ? '已就绪' : '处理中' }}
+                  {{ item.latest_version?.state ? (statusMap[item.latest_version!.state] || item.latest_version!.state) : '-' }}
                 </span>
               </div>
           </div>
@@ -99,16 +99,24 @@ import {
   Box, Location, Files, Download, Delete, PriceTag, MoreFilled, InfoFilled, Promotion, Lock
 } from '@element-plus/icons-vue'
 import { formatSize } from '../../../core/utils/format'
+import type { Resource, ResourceScope } from '../../../core/types/resource'
 
 defineProps<{
-  resources: any[]
+  resources: Resource[]
   typeKey: string
   enableScope?: boolean
+  statusMap: Record<string, string>
 }>()
 
-const emit = defineEmits(['edit-tags', 'view-details', 'download', 'delete', 'change-scope'])
+const emit = defineEmits<{
+  (e: 'edit-tags', row: Resource): void
+  (e: 'view-details', row: Resource): void
+  (e: 'download', row: Resource): void
+  (e: 'delete', row: Resource): void
+  (e: 'change-scope', row: Resource, scope: ResourceScope): void
+}>()
 
-const handleCommand = (cmd: string, row: any) => {
+const handleCommand = (cmd: string, row: Resource) => {
   switch(cmd) {
     case 'details': emit('view-details', row); break;
     case 'tags': emit('edit-tags', row); break;

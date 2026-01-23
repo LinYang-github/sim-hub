@@ -1,3 +1,4 @@
+import { Component } from 'vue'
 import { SimHubModule } from '../types'
 import { Folder, Box, Location } from '@element-plus/icons-vue'
 
@@ -6,7 +7,7 @@ export function createResourceModule(
     label: string, 
     typeName: string, 
     path: string, 
-    icon: any,
+    icon: Component,
     uploadMode: 'single' | 'folder-zip' = 'single',
     accept?: string
 ): SimHubModule {

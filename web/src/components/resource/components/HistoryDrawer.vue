@@ -36,10 +36,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { ResourceVersion } from '../../../core/types/resource'
 
 const props = defineProps<{
   modelValue: boolean
-  versionHistory: any[]
+  versionHistory: ResourceVersion[]
   loading: boolean
   currentVersionId?: string
   statusMap: Record<string, string>

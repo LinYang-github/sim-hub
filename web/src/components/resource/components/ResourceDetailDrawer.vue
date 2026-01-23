@@ -28,26 +28,26 @@
           </el-descriptions-item>
           <el-descriptions-item label="当前版本">
             <el-tag size="small" type="success" effect="light">
-              {{ resource.latest_version?.semver || 'v' + (resource.latest_version?.version_num || 1) }}
+              {{ resource?.latest_version?.semver || 'v' + (resource?.latest_version?.version_num || 1) }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="生命周期">
             <div class="status-cell">
-              <span :class="['status-dot', resource.latest_version?.state?.toLowerCase()]"></span>
-              {{ statusMap[resource.latest_version?.state] || resource.latest_version?.state }}
+              <span :class="['status-dot', resource?.latest_version?.state?.toLowerCase()]"></span>
+              {{ resource?.latest_version?.state ? (statusMap[resource.latest_version!.state] || resource.latest_version!.state) : '-' }}
             </div>
           </el-descriptions-item>
           <el-descriptions-item label="文件大小">
-            {{ formatSize(resource.latest_version?.file_size) }}
+            {{ formatSize(resource?.latest_version?.file_size) }}
           </el-descriptions-item>
           <el-descriptions-item label="可见范围">
-            {{ resource.scope === 'PUBLIC' ? '公共 (Public)' : '私有 (Private)' }}
+            {{ resource?.scope === 'PUBLIC' ? '公共 (Public)' : '私有 (Private)' }}
           </el-descriptions-item>
           <el-descriptions-item label="创建时间">
-            {{ formatDate(resource.created_at) }}
+            {{ formatDate(resource?.created_at) }}
           </el-descriptions-item>
           <el-descriptions-item label="所有者">
-            {{ resource.owner_id || 'System' }}
+            {{ resource?.owner_id || 'System' }}
           </el-descriptions-item>
         </el-descriptions>
       </div>
@@ -101,11 +101,11 @@
                 <template #default="{ row }">
                   <el-button link type="primary" size="small" @click="$emit('download-version', row.download_url)">下载</el-button>
                   <el-button 
-                    v-if="row.id !== resource.latest_version?.id" 
+                    v-if="row.id !== resource?.latest_version?.id" 
                     link 
                     type="warning" 
                     size="small" 
-                    @click="$emit('rollback', row.id)"
+                    @click="$emit('rollback', row)"
                   >
                     回滚
                   </el-button>
@@ -120,8 +120,8 @@
             <div v-if="dependencies?.length" class="dep-grid">
               <div v-for="dep in dependencies" :key="dep.id" class="dep-row">
                 <el-icon><Share /></el-icon>
-                <span class="name">{{ dep.name }}</span>
-                <span class="version">{{ dep.version }}</span>
+                <span class="name">{{ dep.resource_name }}</span>
+                <span class="version">{{ dep.semver || 'latest' }}</span>
               </div>
             </div>
             <el-empty v-else :image-size="40" description="无外部依赖关联" />
@@ -135,7 +135,7 @@
         <el-button @click="visible = false">关闭窗口</el-button>
         <el-button 
           type="primary" 
-          @click="$emit('download', resource)" 
+          @click="resource && $emit('download', resource)" 
           :disabled="resource?.latest_version?.state !== 'ACTIVE'"
         >
           <el-icon><Download /></el-icon> 下载部署包
@@ -149,24 +149,25 @@
 import { ref, computed } from 'vue'
 import { InfoFilled, Edit, Download, Share } from '@element-plus/icons-vue'
 import { formatDate, formatSize } from '../../../core/utils/format'
+import type { Resource, ResourceVersion, ResourceDependency } from '../../../core/types/resource'
 
 const props = defineProps<{
   modelValue: boolean
-  resource: any
+  resource: Resource | null
   typeName: string
   statusMap: Record<string, string>
-  versions: any[]
-  dependencies: any[]
+  versions: ResourceVersion[]
+  dependencies: ResourceDependency[]
   loadingDetails: boolean
 }>()
 
-const emit = defineEmits([
-  'update:modelValue', 
-  'edit-tags', 
-  'download', 
-  'download-version', 
-  'rollback'
-])
+const emit = defineEmits<{
+  (e: 'update:modelValue', val: boolean): void
+  (e: 'edit-tags', row: Resource): void
+  (e: 'download', row: Resource): void
+  (e: 'download-version', url: string): void
+  (e: 'rollback', ver: ResourceVersion): void
+}>()
 
 const activeTab = ref('versions')
 

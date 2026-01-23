@@ -1,4 +1,4 @@
-import { SimHubMessage, SimHubResponse } from './types'
+import type { SimHubMessage, SimHubResponse, SimHubMessageType } from './types'
 import { ElNotification } from 'element-plus'
 
 export class SimHubHostBridge {
@@ -22,7 +22,7 @@ export class SimHubHostBridge {
   /**
    * 向所有子应用广播消息 (例如主题更新)
    */
-  broadcast(type: any, payload: any) {
+  broadcast(type: SimHubMessageType, payload: unknown) {
     const message: SimHubMessage = {
       id: Math.random().toString(36).substring(2),
       type,
@@ -54,6 +54,7 @@ export class SimHubHostBridge {
         break
 
       case 'NOTIFY':
+        if (!message.payload) break
         const { type = 'info', title, message: text } = message.payload
         ElNotification({
           type,
@@ -71,7 +72,7 @@ export class SimHubHostBridge {
     }
   }
 
-  private sendResponse(target: Window, requestId: string, data: any) {
+  private sendResponse(target: Window, requestId: string, data: unknown) {
     const response: SimHubResponse = {
       id: requestId,
       success: true,

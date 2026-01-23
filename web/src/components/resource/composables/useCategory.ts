@@ -1,13 +1,8 @@
 import { ref, computed, Ref, watch } from 'vue'
-import axios from 'axios'
+import request from '../../../core/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { buildTree } from '../../../core/utils/tree'
-
-export interface Category {
-  id: string
-  name: string
-  parent_id?: string
-}
+import type { Category, CategoryNode } from '../../../core/types/resource'
 
 export function useCategory(typeKey: Ref<string>) {
   const categories = ref<Category[]>([])
@@ -15,10 +10,9 @@ export function useCategory(typeKey: Ref<string>) {
 
   const fetchCategories = async () => {
     try {
-      const res = await axios.get('/api/v1/categories', { params: { type: typeKey.value } })
-      categories.value = res.data || []
+      const res = await request.get<Category[]>('/api/v1/categories', { params: { type: typeKey.value } })
+      categories.value = res || []
     } catch (e: any) {
-      console.error('Fetch categories failed', e)
     }
   }
 
@@ -28,10 +22,10 @@ export function useCategory(typeKey: Ref<string>) {
     fetchCategories()
   }, { immediate: true })
 
-  const categoryTree = computed(() => {
-    const tree = buildTree(categories.value)
+  const categoryTree = computed<CategoryNode[]>(() => {
+    const tree = buildTree(categories.value) as CategoryNode[]
     return [
-      { id: 'all', name: '全部分类' },
+      { id: 'all', name: '全部分类' } as CategoryNode,
       ...tree
     ]
   })
@@ -48,7 +42,7 @@ export function useCategory(typeKey: Ref<string>) {
       cancelButtonText: '取消',
     }).then(async ({ value }) => {
       if (!value) return
-      await axios.post('/api/v1/categories', {
+      await request.post('/api/v1/categories', {
         type_key: typeKey.value,
         name: value,
         parent_id: ''
@@ -65,7 +59,7 @@ export function useCategory(typeKey: Ref<string>) {
     return ElMessageBox.confirm(`确定要删除分类 "${categoryName}" 吗？`, '警告', {
       type: 'warning'
     }).then(async () => {
-      await axios.delete(`/api/v1/categories/${id}`)
+      await request.delete(`/api/v1/categories/${id}`)
       ElMessage.success('删除成功')
       if (selectedCategoryId.value === id) {
         selectedCategoryId.value = 'all'

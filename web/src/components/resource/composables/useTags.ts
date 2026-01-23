@@ -1,12 +1,12 @@
-import { ref, computed } from 'vue'
-import axios from 'axios'
+import { ref, computed, Ref } from 'vue'
+import request from '../../../core/utils/request'
 import { ElMessage } from 'element-plus'
-import type { Resource } from './useResourceList'
+import type { Resource } from '../../../core/types/resource'
 
 export function useTags(
-  resources: { value: Resource[] }, 
+  resources: Ref<Resource[]>, 
   onSuccess: () => void,
-  currentResource?: { value: Resource | null }
+  currentResource?: Ref<Resource | null>
 ) {
   const tagDialogVisible = ref(false)
   const tagLoading = ref(false)
@@ -30,7 +30,7 @@ export function useTags(
   const saveTags = async () => {
     tagLoading.value = true
     try {
-      await axios.patch(`/api/v1/resources/${currentResourceId.value}/tags`, {
+      await request.patch(`/api/v1/resources/${currentResourceId.value}/tags`, {
         tags: editingTags.value
       })
       ElMessage.success('标签更新成功')
@@ -42,6 +42,7 @@ export function useTags(
       
       tagDialogVisible.value = false
       onSuccess()
+    } catch (e: any) {
     } finally {
       tagLoading.value = false
     }

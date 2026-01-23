@@ -2,6 +2,7 @@ import { App, shallowRef } from 'vue'
 import { Router } from 'vue-router'
 import { SimHubModule } from './types'
 import IframeContainer from './views/IframeContainer.vue'
+import request from './utils/request'
 
 class ModuleManager {
   // 已配置（活跃）的模块列表 (使用 shallowRef 确保 UI 响应式同步)
@@ -67,12 +68,8 @@ class ModuleManager {
 
   async loadConfig(url: string) {
     try {
-      const response = await fetch(url)
-      if (!response.ok) {
-        console.warn(`加载模块配置失败: ${response.statusText}`)
-        return
-      }
-      const configItems: SimHubModule[] = await response.json()
+      const configItems = await request.get<SimHubModule[]>(url) as unknown as SimHubModule[]
+      if (!configItems) return
       
       const newActiveModules: SimHubModule[] = []
 
