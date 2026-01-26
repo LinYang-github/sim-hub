@@ -33,6 +33,7 @@ export interface Resource {
   tags: string[];
   created_at: string;
   updated_at: string;
+  latest_version_id?: string;
   latest_version?: ResourceVersion;
 }
 

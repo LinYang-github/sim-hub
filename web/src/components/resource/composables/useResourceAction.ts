@@ -20,21 +20,24 @@ export function useResourceAction(fetchList: () => void) {
   }
 
   const download = async (row: Resource) => {
-    if (!row.latest_version_id) {
+    // 优先取主表 ID，兜底取嵌套版本 ID
+    const versionId = row.latest_version_id || row.latest_version?.id
+    
+    if (!versionId) {
       ElMessage.warning('暂无可用版本')
       return
     }
 
     try {
       ElMessage.info('正在请求打包下载...')
-      const response = await request.get(`/api/v1/resources/versions/${row.latest_version_id}/download-pack`, {
+      const response = await request.get(`/api/v1/resources/versions/${versionId}/download-pack`, {
         responseType: 'blob'
       })
       
       const url = window.URL.createObjectURL(new Blob([response as any]))
       const link = document.createElement('a')
       link.href = url
-      link.setAttribute('download', `bundle-${row.name}-${row.latest_version_id}.zip`)
+      link.setAttribute('download', `bundle-${row.name}-${versionId}.zip`)
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)

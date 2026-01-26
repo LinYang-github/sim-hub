@@ -17,6 +17,7 @@ export interface PendingUploadData {
   blob: Blob
   contentType: string
   filename: string
+  files?: string[]
 }
 
 export function useUpload(
@@ -63,8 +64,14 @@ export function useUpload(
 
     try {
       const zip = new JSZip()
+      let firstImageFile: File | null = null
+      const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']
+      
       files.forEach(file => {
         zip.file(file.webkitRelativePath, file)
+        if (!firstImageFile && imageExtensions.some(ext => file.name.toLowerCase().endsWith(ext))) {
+          firstImageFile = file
+        }
       })
 
       const content = await zip.generateAsync({ 
@@ -82,7 +89,8 @@ export function useUpload(
         displayName: rootFolderName,
         blob: content,
         contentType: 'application/zip',
-        filename: rootFolderName + '.zip'
+        filename: rootFolderName + '.zip',
+        files: files.map(f => f.webkitRelativePath)
       }
       uploadConfirmVisible.value = true
     } catch (e: any) {
@@ -133,7 +141,14 @@ export function useUpload(
     }
   }
 
-  const performUpload = async (displayName: string, blob: Blob, contentType: string, filename: string, categoryIdVal: string) => {
+  const performUpload = async (
+    displayName: string, 
+    blob: Blob, 
+    contentType: string, 
+    filename: string, 
+    categoryIdVal: string, 
+    fileList?: string[]
+  ) => {
     const res = await request.post<{ ticket_id: string; presigned_url: string }>('/api/v1/integration/upload/token', {
       resource_type: typeKey.value,
       checksum: 'skip-for-now',
@@ -164,7 +179,9 @@ export function useUpload(
         target_resource_id: d.id,
         constraint: 'latest'
       })),
-      extra_meta: {}
+      extra_meta: {
+        files: fileList
+      }
     })
   }
 
@@ -175,7 +192,14 @@ export function useUpload(
     
     uploading.value = true
     try {
-      await performUpload(displayName, blob, contentType, filename, categoryIdVal)
+      await performUpload(
+        displayName, 
+        blob, 
+        contentType, 
+        filename, 
+        categoryIdVal, 
+        pendingUploadData.value.files
+      )
       ElMessage.success('任务已提交并自动关联依赖')
       uploadConfirmVisible.value = false
       pendingUploadData.value = null

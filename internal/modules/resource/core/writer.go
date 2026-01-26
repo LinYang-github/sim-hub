@@ -222,6 +222,11 @@ func (w *ResourceWriter) CreateResourceAndVersion(tx *gorm.DB, typeKey, category
 		if err := tx.Create(&ver).Error; err != nil {
 			return err
 		}
+
+		// 如果资源还没有最新版本 ID，或者这是手动创建的第一个版本，设为最新
+		if res.LatestVersionID == "" {
+			tx.Model(&res).Update("latest_version_id", ver.ID)
+		}
 	} else {
 		return err
 	}

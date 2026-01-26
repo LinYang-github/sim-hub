@@ -7,7 +7,7 @@
     "typeName": "想定",
     "uploadMode": "folder-zip",
     "enableScope": true,
-    "viewer": "DefaultIconPreview"
+    "viewer": "FolderPreview"
   },
   {
     "key": "model_glb",

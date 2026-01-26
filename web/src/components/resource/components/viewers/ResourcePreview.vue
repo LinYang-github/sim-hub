@@ -42,6 +42,7 @@ const AsyncImagePreview = defineAsyncComponent(() => import('./ImagePreview.vue'
 const AsyncVideoPreview = defineAsyncComponent(() => import('./VideoPreview.vue'))
 const AsyncDocPreview = defineAsyncComponent(() => import('./DocPreview.vue'))
 const AsyncGeoPreview = defineAsyncComponent(() => import('./GeoPreview.vue'))
+const AsyncFolderPreview = defineAsyncComponent(() => import('./FolderPreview.vue'))
 
 // 2. 映射表，支持按需返回组件
 const getViewerComponent = (name?: string) => {
@@ -51,6 +52,7 @@ const getViewerComponent = (name?: string) => {
     'VideoPreview': AsyncVideoPreview,
     'DocPreview': AsyncDocPreview,
     'GeoPreview': AsyncGeoPreview,
+    'FolderPreview': AsyncFolderPreview,
     'DefaultIconPreview': DefaultIconPreview
   }
   return (name && viewerMap[name]) ? markRaw(viewerMap[name]) : DefaultIconPreview
