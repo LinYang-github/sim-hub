@@ -108,7 +108,7 @@ func (r *ResourceReader) ListResources(ctx context.Context, typeKey string, cate
 			State:      v.State,
 			MetaData:   v.MetaData,
 		}
-		if v.State == "ACTIVE" {
+		if v.State == "ACTIVE" && r.store != nil {
 			url, _ := r.store.PresignGet(ctx, r.bucket, v.FilePath, time.Hour)
 			dv.DownloadURL = url
 		}
@@ -151,7 +151,10 @@ func (r *ResourceReader) ListResourceVersions(ctx context.Context, resourceID st
 
 	res := make([]*ResourceVersionDTO, 0, len(versions))
 	for _, v := range versions {
-		url, _ := r.store.PresignGet(ctx, r.bucket, v.FilePath, time.Hour)
+		var url string
+		if r.store != nil {
+			url, _ = r.store.PresignGet(ctx, r.bucket, v.FilePath, time.Hour)
+		}
 		res = append(res, &ResourceVersionDTO{
 			ID:          v.ID,
 			VersionNum:  v.VersionNum,

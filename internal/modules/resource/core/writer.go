@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -94,11 +95,36 @@ func (w *ResourceWriter) UpdateResourceScope(ctx context.Context, id string, sco
 }
 
 // SetResourceLatestVersion 回滚/设置最新版本
+// SetResourceLatestVersion 回滚/设置最新版本
 func (w *ResourceWriter) SetResourceLatestVersion(ctx context.Context, resourceID string, versionID string) error {
-	// 这个逻辑待定，可能需要更新 Resource 表指向 LatestVersionID，或者只是插入一个新版本作为 Copy？
-	// 暂时空实现或简单的 Log
-	slog.Info("Set latest version not fully implemented", "resource", resourceID, "ver", versionID)
-	return nil
+	return w.data.DB.Transaction(func(tx *gorm.DB) error {
+		// 1. Verify existence and ownership
+		var ver model.ResourceVersion
+		if err := tx.First(&ver, "id = ? AND resource_id = ?", versionID, resourceID).Error; err != nil {
+			return err
+		}
+
+		// 2. Ensure version is ACTIVE (optional constraint, but safer for "latest")
+		// if ver.State != "ACTIVE" {
+		// 	 return fmt.Errorf("cannot set non-active version as latest")
+		// }
+
+		// 3. Update Resource
+		if err := tx.Model(&model.Resource{}).Where("id = ?", resourceID).Update("latest_version_id", versionID).Error; err != nil {
+			return err
+		}
+
+		// 4. Trigger Sidecar Refresh
+		// Only trigger if state is active, otherwise sidecar gen might fail or be empty?
+		// Assuming we want to refresh anyway.
+		w.dispatcher.Dispatch(ProcessJob{
+			Action:    ActionRefresh,
+			ObjectKey: ver.FilePath,
+			VersionID: ver.ID,
+		})
+
+		return nil
+	})
 }
 
 // CreateResourceAndVersion 核心注册逻辑
@@ -138,14 +164,9 @@ func (w *ResourceWriter) CreateResourceAndVersion(tx *gorm.DB, typeKey, category
 		})
 	}
 
-	// 2. 确定版本号
-	var lastVer int
-	// 注意：这里如果在 Transaction 中，应该能读到？需注意隔离级别
-	// 简单起见，假设 version_num 自增
-	var count int64
-	tx.Model(&model.ResourceVersion{}).Where("resource_id = ?", res.ID).Count(&count)
-	lastVer = int(count)
-	currentVer := lastVer + 1
+	// 2. 检查版本是否存在
+	var ver model.ResourceVersion
+	err = tx.Where("resource_id = ? AND sem_ver = ?", res.ID, semver).First(&ver).Error
 
 	// 3. 决定初始状态
 	initialState := "PENDING"
@@ -154,17 +175,45 @@ func (w *ResourceWriter) CreateResourceAndVersion(tx *gorm.DB, typeKey, category
 		initialState = "ACTIVE"
 	}
 
-	// 4. 创建版本
-	ver := model.ResourceVersion{
-		ResourceID: res.ID,
-		VersionNum: currentVer,
-		SemVer:     semver,
-		FilePath:   objectKey,
-		FileSize:   size,
-		MetaData:   meta,
-		State:      initialState,
-	}
-	if err := tx.Create(&ver).Error; err != nil {
+	if err == nil {
+		// 版本已存在
+		if ver.State == "ACTIVE" {
+			return fmt.Errorf("version %s already exists and is ACTIVE", semver)
+		}
+		// 允许覆盖 PENDING/ERROR 状态的版本
+		ver.FilePath = objectKey
+		ver.FileSize = size
+		ver.MetaData = meta
+		ver.State = initialState
+
+		if err := tx.Save(&ver).Error; err != nil {
+			return err
+		}
+
+		// 清理旧依赖
+		if err := tx.Delete(&model.ResourceDependency{}, "source_version_id = ?", ver.ID).Error; err != nil {
+			return err
+		}
+	} else if err == gorm.ErrRecordNotFound {
+		// 创建新版本
+		var count int64
+		// 注意：这里的 VersionNum 仍然可能存在并发问题，但在同一资源下冲突概率较低
+		tx.Model(&model.ResourceVersion{}).Where("resource_id = ?", res.ID).Count(&count)
+		currentVer := int(count) + 1
+
+		ver = model.ResourceVersion{
+			ResourceID: res.ID,
+			VersionNum: currentVer,
+			SemVer:     semver,
+			FilePath:   objectKey,
+			FileSize:   size,
+			MetaData:   meta,
+			State:      initialState,
+		}
+		if err := tx.Create(&ver).Error; err != nil {
+			return err
+		}
+	} else {
 		return err
 	}
 
@@ -207,16 +256,76 @@ func (w *ResourceWriter) SyncFromStorage(ctx context.Context) (int, error) {
 			continue
 		}
 
+		// Expected format: resources/<typeKey>/<resourceUUID>/<filename>
+		// Example: resources/model_glb/3004b46b-8960-4e4a-bf9e-a4e7481f2b6f/sample_triangle.glb
 		slashParts := strings.Split(object.Key, "/")
 		if len(slashParts) < 4 {
 			continue
 		}
-		// typeKey := slashParts[1]
-		// resourceID := slashParts[2] // 这里其实是 UUID，不是 DB ID，逻辑需调整
-		// fileName := slashParts[3]
 
-		// 暂不完整实现 Sync 逻辑迁移，保持原有功能的骨架
-		syncedCount++
+		typeKey := slashParts[1]
+		resourceIDOrName := slashParts[2]         // This might be UUID or Name depending on how it was uploaded
+		fileName := slashParts[len(slashParts)-1] // last part
+
+		// Simple heuristic: if 3. part is UUID, use it as ID, else use it as Name
+		// But current uploader uses UUID folder.
+		// Let's assume folder name IS the Resource ID for now, or we treat it as "Imported-" + folder
+
+		// For robustness: Auto-register
+		err := w.data.DB.Transaction(func(tx *gorm.DB) error {
+			var res model.Resource
+			// Try to find by ID (if folder is UUID)
+			if err := tx.First(&res, "id = ?", resourceIDOrName).Error; err != nil {
+				// If not found by ID, create a new Resource
+				// Use folder name as ID if it looks like UUID, otherwise generate new
+				res = model.Resource{
+					ID:        resourceIDOrName, // Assuming folder is stable ID
+					TypeKey:   typeKey,
+					Name:      fileName, // Use filename as resource name initially
+					OwnerID:   "admin",  // Default owner
+					Scope:     "PRIVATE",
+					IsDeleted: false,
+				}
+				if len(resourceIDOrName) != 36 { // Not a UUID?
+					// Fallback: create random ID, put folder name in Name?
+					// Actually uploader enforces UUID. But if manual upload:
+					res.ID = "" // Let GORM/BeforeCreate gen UUID
+					res.Name = resourceIDOrName + "-" + fileName
+				}
+
+				if err := tx.Create(&res).Error; err != nil {
+					// Fallback if ID conflict (unlikely if UUID)
+					return err
+				}
+			}
+
+			// Create Version
+			var ver model.ResourceVersion
+			// Check if this file path is already registered
+			if err := tx.First(&ver, "file_path = ?", object.Key).Error; err == nil {
+				return nil // Already synced
+			}
+
+			// Not found, insert version
+			// Determine version num
+			var count int64
+			tx.Model(&model.ResourceVersion{}).Where("resource_id = ?", res.ID).Count(&count)
+
+			newVer := model.ResourceVersion{
+				ResourceID: res.ID,
+				VersionNum: int(count) + 1,
+				SemVer:     fmt.Sprintf("v1.0.%d", int(count)), // Dummy Semver
+				FilePath:   object.Key,
+				FileSize:   object.Size,
+				State:      "ACTIVE", // Auto synced is active
+				MetaData:   map[string]any{"imported": true},
+			}
+			return tx.Create(&newVer).Error
+		})
+
+		if err == nil {
+			syncedCount++
+		}
 	}
 
 	return syncedCount, nil
@@ -238,11 +347,11 @@ func (w *ResourceWriter) ReportProcessResult(ctx context.Context, versionID stri
 			ver.MetaData[k] = v
 		}
 
-		updates := map[string]any{
-			"state":     req.State,
-			"meta_data": ver.MetaData,
+		updates := model.ResourceVersion{
+			State:    req.State,
+			MetaData: ver.MetaData,
 		}
-		if err := tx.Model(&ver).Updates(updates).Error; err != nil {
+		if err := tx.Model(&ver).Select("state", "meta_data").Updates(updates).Error; err != nil {
 			return err
 		}
 

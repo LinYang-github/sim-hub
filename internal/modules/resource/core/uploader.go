@@ -34,13 +34,13 @@ func NewUploadManager(d *data.Data, store storage.MultipartBlobStore, stsProvide
 func (u *UploadManager) RequestUploadToken(ctx context.Context, req ApplyUploadTokenRequest) (*UploadTicket, error) {
 	ticketID := uuid.New().String()
 	// objectKey 格式: resources/{type}/{uuid}/{filename}
+	// objectKey 格式: resources/{type}/{uuid}/{filename}
 	objectKey := "resources/" + req.ResourceType + "/" + ticketID + "/" + req.Filename
 
-	if u.stsProvider == nil {
-		return nil, fmt.Errorf("sts provider not configured")
-	}
-
 	if req.Mode == "sts" {
+		if u.stsProvider == nil {
+			return nil, fmt.Errorf("sts provider not configured")
+		}
 		creds, err := u.stsProvider.GenerateSTSToken(ctx, u.bucket, objectKey, time.Hour)
 		if err != nil {
 			return nil, err
@@ -134,13 +134,21 @@ func (u *UploadManager) ConfirmUpload(ctx context.Context, req ConfirmUploadRequ
 	}
 
 	// 0. 验证 MinIO 中对象是否存在
+	slog.Info("Checking object existence", "bucket", u.bucket, "key", objectKey)
 	objInfo, err := u.store.Stat(ctx, u.bucket, objectKey)
 	if err != nil {
 		slog.Error("无法获取对象信息", "key", objectKey, "error", err)
 		return fmt.Errorf("uploaded file not found: %w", err)
 	}
+	slog.Info("Object found", "size", objInfo.Size)
 
 	return u.data.DB.Transaction(func(tx *gorm.DB) error {
-		return u.registrar.CreateResourceAndVersion(tx, req.TypeKey, req.CategoryID, req.Name, req.OwnerID, req.Scope, objectKey, objInfo.Size, req.Tags, req.SemVer, req.Dependencies, req.ExtraMeta)
+		slog.Info("Starting DB transaction for resource creation", "name", req.Name)
+		err := u.registrar.CreateResourceAndVersion(tx, req.TypeKey, req.CategoryID, req.Name, req.OwnerID, req.Scope, objectKey, objInfo.Size, req.Tags, req.SemVer, req.Dependencies, req.ExtraMeta)
+		if err != nil {
+			slog.Error("CreateResourceAndVersion failed", "error", err)
+			return err
+		}
+		return nil
 	})
 }

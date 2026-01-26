@@ -20,15 +20,29 @@ export function useResourceAction(fetchList: () => void) {
   }
 
   const download = async (row: Resource) => {
+    if (!row.latest_version_id) {
+      ElMessage.warning('暂无可用版本')
+      return
+    }
+
     try {
-      const res = await request.get<Resource>(`/api/v1/resources/${row.id}`)
-      const url = res.latest_version?.download_url
-      if (url) {
-        window.open(url, '_blank')
-      } else {
-        ElMessage.warning('下载链接无效')
-      }
-    } catch (e: any) {}
+      ElMessage.info('正在请求打包下载...')
+      const response = await request.get(`/api/v1/resources/versions/${row.latest_version_id}/download-pack`, {
+        responseType: 'blob'
+      })
+      
+      const url = window.URL.createObjectURL(new Blob([response as any]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `bundle-${row.name}-${row.latest_version_id}.zip`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (e: any) {
+      // Error handled by interceptor or here
+      console.error('Download failed', e)
+    }
   }
 
   const handleDownloadUrl = (url?: string) => {

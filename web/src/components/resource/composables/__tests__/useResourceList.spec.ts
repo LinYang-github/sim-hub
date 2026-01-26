@@ -157,4 +157,41 @@ describe('useResourceList', () => {
     expect(request.post).toHaveBeenCalledWith('/api/v1/resources/sync')
     expect(request.get).toHaveBeenCalled() // fetchList should be called after sync
   })
+
+  it('should trigger fetch on search query change', async () => {
+    const typeKey = ref('model_glb')
+    const enableScope = ref(true)
+    const selectedCategoryId = ref(ROOT_CATEGORY_ID)
+    
+    ;(request.get as any).mockResolvedValue({ items: [] })
+
+    const { searchQuery } = useResourceList(typeKey, enableScope, selectedCategoryId)
+    
+    // Initial fetch happens immediately
+    await new Promise(resolve => setTimeout(resolve, 0))
+    vi.clearAllMocks()
+
+    searchQuery.value = 'test-search'
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(request.get).toHaveBeenCalledWith('/api/v1/resources', expect.objectContaining({
+      params: expect.objectContaining({ name: 'test-search' })
+    }))
+  })
+
+  it('should handle fetch error gracefully', async () => {
+    const typeKey = ref('model_glb')
+    const enableScope = ref(true)
+    const selectedCategoryId = ref(ROOT_CATEGORY_ID)
+
+    ;(request.get as any).mockRejectedValue(new Error('Network Error'))
+
+    const { loading, resources } = useResourceList(typeKey, enableScope, selectedCategoryId)
+    
+    // Initial fetch triggered by watch
+    await new Promise(resolve => setTimeout(resolve, 0))
+    
+    expect(loading.value).toBe(false)
+    expect(resources.value).toEqual([])
+  })
 })

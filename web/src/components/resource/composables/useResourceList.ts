@@ -10,7 +10,7 @@ export function useResourceList(
 ) {
   const resources = ref<Resource[]>([])
   const loading = ref(false)
-  const activeScope = ref<keyof typeof RESOURCE_SCOPE>(enableScope.value ? RESOURCE_SCOPE.ALL : RESOURCE_SCOPE.PUBLIC)
+  const activeScope = ref<keyof typeof RESOURCE_SCOPE>(RESOURCE_SCOPE.ALL)
   const searchQuery = ref('')
   const syncing = ref(false)
 
@@ -70,13 +70,13 @@ export function useResourceList(
   }
 
   // 监听所有可能触发列表刷新的响应式变量，并立即执行一次首屏加载
-  watch([typeKey, selectedCategoryId, activeScope], () => {
+  watch([typeKey, selectedCategoryId, activeScope, searchQuery], () => {
     fetchList()
   }, { immediate: true })
 
   // 当 enableScope 配置变化时同步 internal state
-  watch(enableScope, (val) => {
-    activeScope.value = val ? RESOURCE_SCOPE.ALL : RESOURCE_SCOPE.PUBLIC
+  watch(enableScope, () => {
+    activeScope.value = RESOURCE_SCOPE.ALL
   })
 
   return {

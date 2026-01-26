@@ -77,12 +77,13 @@ func main() {
 	for _, rt := range cfg.ResourceTypes {
 		if rt.ProcessConf != nil {
 			// 如果配置了 pipeline，则视为有处理器（目前简单以 typeKey 为索引）
-			handlers[rt.TypeKey] = "placeholder"
+			// 使用 echo 作为简单的模拟处理器，确保命令执行成功 (exit 0) 从而触发后续流程
+			handlers[rt.TypeKey] = "echo"
 		}
 	}
 
 	registry := module.NewRegistry()
-	registry.Register(resource.NewModule(dbConn, blobStore, stsProvider, cfg.MinIO.Bucket, natsClient, "api", "", handlers))
+	registry.Register(resource.NewModule(dbConn, blobStore, stsProvider, cfg.MinIO.Bucket, natsClient, "combined", "", handlers))
 
 	// 6. 配置 HTTP 路由
 	r := gin.Default()
