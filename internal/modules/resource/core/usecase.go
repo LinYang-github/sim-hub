@@ -92,6 +92,14 @@ func (uc *UseCase) UpdateResourceScope(ctx context.Context, id string, scope str
 	return uc.writer.UpdateResourceScope(ctx, id, scope)
 }
 
+func (uc *UseCase) UpdateResource(ctx context.Context, id string, req UpdateResourceRequest) error {
+	return uc.writer.UpdateResource(ctx, id, req)
+}
+
+func (uc *UseCase) UpdateVersionMetadata(ctx context.Context, versionID string, meta map[string]any) error {
+	return uc.writer.UpdateVersionMetadata(ctx, versionID, meta)
+}
+
 func (uc *UseCase) SyncFromStorage(ctx context.Context) (int, error) {
 	return uc.writer.SyncFromStorage(ctx)
 }

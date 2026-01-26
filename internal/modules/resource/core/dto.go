@@ -43,6 +43,15 @@ type UpdateResourceScopeRequest struct {
 	Scope string `json:"scope"`
 }
 
+type UpdateResourceRequest struct {
+	Name       string `json:"name,omitempty"`
+	CategoryID string `json:"category_id,omitempty"`
+}
+
+type UpdateVersionMetadataRequest struct {
+	MetaData map[string]any `json:"meta_data"`
+}
+
 // Multipart Upload DTOs
 type InitMultipartUploadRequest struct {
 	ResourceType string `json:"resource_type"`

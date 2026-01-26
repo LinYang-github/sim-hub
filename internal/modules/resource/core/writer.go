@@ -103,6 +103,69 @@ func (w *ResourceWriter) UpdateResourceScope(ctx context.Context, id string, sco
 	})
 }
 
+// UpdateResource 更新资源基本信息 (更名、移动分类)
+func (w *ResourceWriter) UpdateResource(ctx context.Context, id string, req UpdateResourceRequest) error {
+	updates := make(map[string]any)
+	if req.Name != "" {
+		updates["name"] = req.Name
+	}
+	if req.CategoryID != "" {
+		updates["category_id"] = req.CategoryID
+	}
+
+	if len(updates) == 0 {
+		return nil
+	}
+
+	return w.data.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.Resource{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+			return err
+		}
+
+		// 触发异步刷新 Sidecar (获取最新版本)
+		var v model.ResourceVersion
+		if err := tx.Order("version_num desc").First(&v, "resource_id = ?", id).Error; err == nil {
+			w.dispatcher.Dispatch(ProcessJob{
+				Action:    ActionRefresh,
+				ObjectKey: v.FilePath,
+				VersionID: v.ID,
+			})
+		}
+		return nil
+	})
+}
+
+// UpdateVersionMetadata 更新指定版本的元数据
+func (w *ResourceWriter) UpdateVersionMetadata(ctx context.Context, versionID string, meta map[string]any) error {
+	return w.data.DB.Transaction(func(tx *gorm.DB) error {
+		var ver model.ResourceVersion
+		if err := tx.First(&ver, "id = ?", versionID).Error; err != nil {
+			return err
+		}
+
+		// 合并元数据
+		if ver.MetaData == nil {
+			ver.MetaData = make(map[string]any)
+		}
+		for k, v := range meta {
+			ver.MetaData[k] = v
+		}
+
+		if err := tx.Model(&ver).Update("meta_data", ver.MetaData).Error; err != nil {
+			return err
+		}
+
+		// 触发更新 Sidecar
+		w.dispatcher.Dispatch(ProcessJob{
+			Action:    ActionRefresh,
+			ObjectKey: ver.FilePath,
+			VersionID: ver.ID,
+		})
+
+		return nil
+	})
+}
+
 // SetResourceLatestVersion 回滚/设置最新版本
 // SetResourceLatestVersion 回滚/设置最新版本
 func (w *ResourceWriter) SetResourceLatestVersion(ctx context.Context, resourceID string, versionID string) error {

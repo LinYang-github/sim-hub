@@ -43,6 +43,7 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 		resources.POST("/sync", m.SyncFromStorage) // 新增：同步存储
 		resources.POST("/clear", m.ClearResources) // 新增：清空资源库
 		resources.GET("/:id", m.GetResource)
+		resources.PATCH("/:id", m.UpdateResource) // 新增：更新基本信息 (更名/移动)
 		resources.DELETE("/:id", m.DeleteResource)
 		resources.PATCH("/:id/tags", m.UpdateResourceTags)
 		resources.PATCH("/:id/scope", m.UpdateResourceScope) // 新增：更新作用域
@@ -53,6 +54,7 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 		resources.POST("/:id/latest", m.SetLatestVersion)
 		resources.GET("/versions/:vid/dependencies", m.GetDependencies)
 		resources.GET("/versions/:vid/dependency-tree", m.GetDependencyTree)
+		resources.PATCH("/versions/:vid/meta", m.UpdateVersionMetadata) // 新增：更新版本元数据 (PATCH)
 		resources.GET("/versions/:vid/bundle", m.GetBundle)
 
 		// 新增：实时同步打包下载
@@ -374,4 +376,36 @@ func (m *Module) DownloadBundle(c *gin.Context) {
 		// 注意：如果已经开始写入数据，这里再写 JSON 错误可能会破坏响应
 		return
 	}
+}
+
+// UpdateResource 更新资源基本信息
+func (m *Module) UpdateResource(c *gin.Context) {
+	id := c.Param("id")
+	var req core.UpdateResourceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := m.uc.UpdateResource(c.Request.Context(), id, req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Resource updated"})
+}
+
+// UpdateVersionMetadata 更新版本元数据
+func (m *Module) UpdateVersionMetadata(c *gin.Context) {
+	vid := c.Param("vid")
+	var req core.UpdateVersionMetadataRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := m.uc.UpdateVersionMetadata(c.Request.Context(), vid, req.MetaData); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Metadata updated"})
 }
