@@ -15,6 +15,7 @@
               :download-url="item.latest_version?.download_url"
               :state="item.latest_version?.state"
               :status-text="item.latest_version?.state ? (statusMap[item.latest_version!.state] || item.latest_version!.state) : '-'"
+              :meta-data="item.latest_version?.meta_data"
             />
             <div class="card-ver-badge">
                 {{ item.latest_version?.semver || 'v' + (item.latest_version?.version_num || 0) }}

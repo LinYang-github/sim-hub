@@ -37,5 +37,16 @@
     "icon": "Monitor",
     "externalUrl": "/demo/",
     "devUrl": "http://localhost:30031"
+  },
+  {
+    "key": "documents",
+    "label": "技术文档库",
+    "integrationMode": "internal",
+    "icon": "Document",
+    "typeName": "文档",
+    "uploadMode": "single",
+    "accept": ".md,.pdf,.txt",
+    "enableScope": true,
+    "viewer": "DocPreview"
   }
 ]

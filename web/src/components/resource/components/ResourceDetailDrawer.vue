@@ -28,6 +28,7 @@
           :download-url="resource.latest_version?.download_url"
           :state="resource.latest_version?.state"
           :status-text="resource.latest_version?.state ? (statusMap[resource.latest_version!.state] || resource.latest_version!.state) : '-'"
+          :meta-data="resource.latest_version?.meta_data"
           force
         />
       </div>

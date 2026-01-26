@@ -8,6 +8,7 @@
         :type-key="typeKey"
         :icon="icon"
         :icon-size="48"
+        :meta-data="metaData"
       />
     </template>
     <div v-else class="preview-fallback">
@@ -20,8 +21,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import GLBPreview from './GLBPreview.vue'
+import { computed, defineAsyncComponent, markRaw } from 'vue'
 import DefaultIconPreview from './DefaultIconPreview.vue'
 import { RESOURCE_STATE } from '../../../../core/constants/resource'
 
@@ -33,15 +33,27 @@ const props = defineProps<{
   force?: boolean
   viewer?: string
   icon?: string
+  metaData?: Record<string, any>
 }>()
 
-const viewerMap: Record<string, any> = {
-  'GLBPreview': GLBPreview,
-  'DefaultIconPreview': DefaultIconPreview
-}
+// 1. 定义异步组件 - 只有在使用时才会请求网络下载对应的 JS 包
+const AsyncGLBPreview = defineAsyncComponent(() => import('./GLBPreview.vue'))
+const AsyncImagePreview = defineAsyncComponent(() => import('./ImagePreview.vue'))
+const AsyncVideoPreview = defineAsyncComponent(() => import('./VideoPreview.vue'))
+const AsyncDocPreview = defineAsyncComponent(() => import('./DocPreview.vue'))
+const AsyncGeoPreview = defineAsyncComponent(() => import('./GeoPreview.vue'))
 
+// 2. 映射表，支持按需返回组件
 const getViewerComponent = (name?: string) => {
-  return (name && viewerMap[name]) ? viewerMap[name] : DefaultIconPreview
+  const viewerMap: Record<string, any> = {
+    'GLBPreview': AsyncGLBPreview,
+    'ImagePreview': AsyncImagePreview,
+    'VideoPreview': AsyncVideoPreview,
+    'DocPreview': AsyncDocPreview,
+    'GeoPreview': AsyncGeoPreview,
+    'DefaultIconPreview': DefaultIconPreview
+  }
+  return (name && viewerMap[name]) ? markRaw(viewerMap[name]) : DefaultIconPreview
 }
 
 const isActive = computed(() => props.state === RESOURCE_STATE.ACTIVE)
