@@ -146,9 +146,9 @@ func (w *ResourceWriter) CreateResourceAndVersion(tx *gorm.DB, typeKey, category
 		scope = "PRIVATE"
 	}
 
-	// 1. 查找或创建资源主体
+	// 1. 查找或创建资源主体 (引入 category_id 实现目录命名空间隔离)
 	var res model.Resource
-	err := tx.Where("type_key = ? AND name = ? AND owner_id = ? AND is_deleted = ?", typeKey, name, ownerID, false).First(&res).Error
+	err := tx.Where("type_key = ? AND category_id = ? AND name = ? AND owner_id = ? AND is_deleted = ?", typeKey, categoryID, name, ownerID, false).First(&res).Error
 
 	if err == gorm.ErrRecordNotFound {
 		res = model.Resource{
