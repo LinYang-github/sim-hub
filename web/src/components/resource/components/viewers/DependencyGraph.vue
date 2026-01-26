@@ -1,52 +1,19 @@
 <template>
   <div class="dependency-graph-container" ref="container">
-    <v-network-graph
+    <VNetworkGraph
       v-if="Object.keys(nodes).length > 0"
       ref="graph"
       :nodes="nodes"
       :edges="edges"
       :configs="configs"
-    >
-      <!-- Custom node to show icons or better labels -->
-      <template #override-node="{ nodeId, scale, config, outputs, x, y }">
-        <circle
-          :r="config.radius * scale"
-          :fill="nodes[nodeId].isRoot ? '#409EFF' : '#67C23A'"
-          :stroke="config.strokeColor"
-          :stroke-width="config.strokeWidth * scale"
-          @mouseenter="outputs.onMouseenter"
-          @mouseleave="outputs.onMouseout"
-        />
-        <text
-          class="node-label"
-          :x="x"
-          :y="y + config.radius * scale + 15"
-          text-anchor="middle"
-          :font-size="12 * scale"
-          fill="var(--el-text-color-primary)"
-        >
-          {{ nodes[nodeId].name }}
-        </text>
-        <text
-          class="node-version"
-          :x="x"
-          :y="y + config.radius * scale + 30"
-          text-anchor="middle"
-          :font-size="10 * scale"
-          fill="var(--el-text-color-secondary)"
-        >
-          {{ nodes[nodeId].version }}
-        </text>
-      </template>
-    </v-network-graph>
+    />
     <el-empty v-else description="暂无依赖数据" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import { defineConfigs } from "v-network-graph"
-import "v-network-graph/lib/style.css"
+import { ref, onMounted, watch, nextTick } from 'vue'
+import { VNetworkGraph, defineConfigs } from "v-network-graph"
 import type { ResourceDependency } from '../../../../core/types/resource'
 
 const props = defineProps<{
@@ -56,8 +23,10 @@ const props = defineProps<{
 
 interface Node {
   name: string
-  version: string
-  isRoot?: boolean
+  label: string
+  color: string
+  isRoot: boolean
+  size: number
 }
 
 interface Edge {
@@ -69,26 +38,44 @@ const nodes = ref<Record<string, Node>>({})
 const edges = ref<Record<string, Edge>>({})
 const graph = ref<any>(null)
 
+// 深度定制可视化配置
 const configs = defineConfigs({
+  view: {
+    autoPanAndZoomOnLoad: "fit-content",
+    // 使用内置布局处理器，确保节点不会重叠
+    layoutHandler: undefined, 
+  },
   node: {
-    radius: 18,
-    strokeWidth: 2,
-    strokeColor: "#ffffff",
+    normal: {
+      type: "circle",
+      radius: (node: any) => node.size,
+      color: (node: any) => node.color,
+      strokeWidth: 2,
+      strokeColor: "#1d1e1f",
+    },
     hover: {
-      radius: 20,
+      radius: (node: any) => node.size + 2,
       color: "#409EFF",
     },
     label: {
-      visible: false,
+      visible: true,
+      fontFamily: "Inter, sans-serif",
+      fontSize: 12,
+      color: "#E5EAF3", // 亮白色，适配暗色背景
+      margin: 8,
+      direction: "south",
     },
     focusring: {
       color: "#409EFF",
     },
   },
   edge: {
-    width: 2,
-    color: "#DCDFE6",
-    margin: 4,
+    normal: {
+      width: 2,
+      color: "#4C4D4F",
+      dasharray: "0",
+      linecap: "round",
+    },
     hover: {
       width: 3,
       color: "#409EFF",
@@ -101,9 +88,6 @@ const configs = defineConfigs({
       },
     },
   },
-  view: {
-    autoPanAndZoomOnLoad: "fit-content",
-  },
 })
 
 const buildGraph = () => {
@@ -111,73 +95,83 @@ const buildGraph = () => {
   const newEdges: Record<string, Edge> = {}
   let edgeCounter = 0
 
+  // 1. 注册主节点
   newNodes['root'] = {
     name: props.rootName,
-    version: '当前资源',
-    isRoot: true
+    label: `${props.rootName}\n(当前资源)`,
+    color: "#409EFF", // 科技蓝
+    isRoot: true,
+    size: 24
   }
 
-  const traverse = (deps: ResourceDependency[], parentId: string) => {
+  // 2. 递归构建依赖
+  const traverse = (deps: ResourceDependency[], parentId: string, depth: number) => {
     deps.forEach(dep => {
-      const nodeId = dep.resource_id
+      // 这里的 ID 必须唯一，否则连线会错乱
+      const nodeId = dep.id || dep.resource_id || `dep-${edgeCounter++}`
+      
       if (!newNodes[nodeId]) {
         newNodes[nodeId] = {
           name: dep.resource_name,
-          version: dep.semver || 'latest'
+          label: `${dep.resource_name}\n${dep.semver || 'latest'}`,
+          color: "#67C23A", // 成功绿
+          isRoot: false,
+          size: 18
         }
       }
 
       const edgeId = `edge-${edgeCounter++}`
-      newEdges[edgeId] = {
-        source: parentId,
-        target: nodeId
-      }
+      newEdges[edgeId] = { source: parentId, target: nodeId }
 
       if (dep.dependencies && dep.dependencies.length > 0) {
-        traverse(dep.dependencies, nodeId)
+        traverse(dep.dependencies, nodeId, depth + 1)
       }
     })
   }
 
-  traverse(props.dependencies, 'root')
+  if (props.dependencies && props.dependencies.length > 0) {
+    traverse(props.dependencies, 'root', 1)
+  }
 
   nodes.value = newNodes
   edges.value = newEdges
+
+  // 自适应视野
+  nextTick(() => {
+    setTimeout(() => {
+      if (graph.value) graph.value.fitToContents()
+    }, 150)
+  })
 }
 
 const container = ref<HTMLElement | null>(null)
-let resizeObserver: ResizeObserver | null = null
 
 onMounted(() => {
   buildGraph()
-  if (container.value) {
-    resizeObserver = new ResizeObserver(() => {
-      graph.value?.fitToContents()
-    })
-    resizeObserver.observe(container.value)
-  }
 })
 
-watch(() => props.dependencies, buildGraph)
+watch(() => props.dependencies, buildGraph, { deep: true })
 watch(() => props.rootName, buildGraph)
 </script>
 
 <style scoped>
 .dependency-graph-container {
   width: 100%;
-  height: 400px;
-  background-color: var(--el-fill-color-extra-light);
-  border-radius: 8px;
-  border: 1px solid var(--el-border-color-lighter);
+  height: 420px;
+  background-color: #1a1a1a;
+  border-radius: 12px;
+  border: 1px solid #333;
+  overflow: hidden;
+  position: relative;
 }
 
-.node-label {
-  font-weight: 600;
-  pointer-events: none;
+/* 简单的进场动画 */
+.dependency-graph-container :deep(svg) {
+  animation: fadeIn 0.6s ease-out;
 }
 
-.node-version {
-  font-family: monospace;
-  pointer-events: none;
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
 }
 </style>

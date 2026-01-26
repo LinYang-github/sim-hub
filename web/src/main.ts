@@ -9,6 +9,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Workstation from './components/Workstation.vue'
 import { moduleManager } from './core/moduleManager'
 import scenarioModule from './modules/scenario'
+import VNetworkGraph from "v-network-graph"
+import "v-network-graph/lib/style.css"
 
 // 注册内部模块实现 (此处仅注册有特殊定制需求的模块)
 moduleManager.registerImplementation(scenarioModule)
@@ -24,6 +26,7 @@ const initApp = async () => {
   app.use(ElementPlus, {
     locale: zhCn,
   })
+  app.use(VNetworkGraph)
 
   for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
     app.component(key, component)
