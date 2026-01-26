@@ -17,6 +17,7 @@
     "element-plus": "^2.5.0",
     "jszip": "^3.10.1",
     "three": "^0.182.0",
+    "v-network-graph": "^0.9.22",
     "vue": "^3.4.0",
     "vue-router": "^4.2.0"
   },

@@ -218,7 +218,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, toRef, computed } from 'vue'
+import { ref, onMounted, onUnmounted, toRef, computed } from 'vue'
 import { 
   Upload as UploadIcon, Connection, DataLine, Grid, Refresh,
   Search, FolderDelete, Delete
@@ -233,8 +233,6 @@ import ResourceSkeleton from './components/ResourceSkeleton.vue'
 import ResourceDetailDrawer from './components/ResourceDetailDrawer.vue'
 import TagEditDialog from './components/TagEditDialog.vue'
 import UploadDialog from './components/UploadDialog.vue'
-import DependencyDrawer from './components/DependencyDrawer.vue'
-import HistoryDrawer from './components/HistoryDrawer.vue'
 
 // Composables
 import { useCategory } from './composables/useCategory'
@@ -245,7 +243,6 @@ import { useHistory } from './composables/useHistory'
 import { useDependency } from './composables/useDependency'
 import { useResourceAction } from './composables/useResourceAction'
 
-import { formatDate, formatSize } from '../../core/utils/format'
 import { RESOURCE_STATUS_TEXT, SCOPE_OPTIONS, RESOURCE_STATE } from '../../core/constants/resource'
 
 const props = defineProps<{

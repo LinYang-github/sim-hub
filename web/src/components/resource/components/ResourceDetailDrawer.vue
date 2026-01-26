@@ -130,13 +130,11 @@
 
         <el-tab-pane name="dependencies" label="拓扑依赖">
           <div class="tab-pane-content">
-            <div v-if="dependencies?.length" class="dep-grid">
-              <div v-for="dep in dependencies" :key="dep.id" class="dep-row">
-                <el-icon><Share /></el-icon>
-                <span class="name">{{ dep.resource_name }}</span>
-                <span class="version">{{ dep.semver || 'latest' }}</span>
-              </div>
-            </div>
+            <DependencyGraph 
+              v-if="dependencies?.length" 
+              :dependencies="dependencies" 
+              :root-name="resource.name"
+            />
             <el-empty v-else :image-size="40" description="无外部依赖关联" />
           </div>
         </el-tab-pane>
@@ -165,6 +163,7 @@ import { formatDate, formatSize } from '../../../core/utils/format'
 import type { Resource, ResourceVersion, ResourceDependency } from '../../../core/types/resource'
 import { RESOURCE_STATE } from '../../../core/constants/resource'
 import ResourcePreview from './viewers/ResourcePreview.vue'
+import DependencyGraph from './viewers/DependencyGraph.vue'
 
 const props = defineProps<{
   modelValue: boolean

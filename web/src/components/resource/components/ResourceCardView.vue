@@ -99,7 +99,7 @@
 
 <script setup lang="ts">
 import { 
-  Box, Location, Files, Download, Delete, PriceTag, MoreFilled, InfoFilled, Promotion, Lock
+  Download, Delete, PriceTag, MoreFilled, InfoFilled, Promotion, Lock
 } from '@element-plus/icons-vue'
 import { formatSize } from '../../../core/utils/format'
 import type { Resource, ResourceScope } from '../../../core/types/resource'

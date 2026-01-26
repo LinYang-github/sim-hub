@@ -7,7 +7,6 @@
 </template>
 
 <script setup lang="ts">
-import { Box, Location, Files, FolderOpened, Monitor } from '@element-plus/icons-vue'
 
 defineProps<{
   typeKey: string
