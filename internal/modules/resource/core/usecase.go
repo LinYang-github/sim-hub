@@ -100,6 +100,10 @@ func (uc *UseCase) DeleteResource(ctx context.Context, id string) error {
 	return uc.writer.DeleteResource(ctx, id)
 }
 
+func (uc *UseCase) ClearResources(ctx context.Context, typeKey string) error {
+	return uc.writer.ClearResources(ctx, typeKey)
+}
+
 func (uc *UseCase) GetResourceDependencies(ctx context.Context, vid string) ([]DependencyDTO, error) {
 	return uc.reader.GetResourceDependencies(ctx, vid)
 }

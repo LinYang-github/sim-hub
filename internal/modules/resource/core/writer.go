@@ -74,6 +74,15 @@ func (w *ResourceWriter) UpdateResourceTags(ctx context.Context, id string, tags
 	})
 }
 
+// ClearResources 清空指定类型的资源库
+func (w *ResourceWriter) ClearResources(ctx context.Context, typeKey string) error {
+	if typeKey == "" {
+		return fmt.Errorf("type_key is required")
+	}
+	// 批量软删除
+	return w.data.DB.Model(&model.Resource{}).Where("type_key = ?", typeKey).Update("is_deleted", true).Error
+}
+
 // UpdateResourceScope 更新资源作用域 (公开/私有)
 func (w *ResourceWriter) UpdateResourceScope(ctx context.Context, id string, scope string) error {
 	return w.data.DB.Transaction(func(tx *gorm.DB) error {

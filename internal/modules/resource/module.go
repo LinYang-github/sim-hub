@@ -41,6 +41,7 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 	{
 		resources.GET("", m.ListResources)
 		resources.POST("/sync", m.SyncFromStorage) // 新增：同步存储
+		resources.POST("/clear", m.ClearResources) // 新增：清空资源库
 		resources.GET("/:id", m.GetResource)
 		resources.DELETE("/:id", m.DeleteResource)
 		resources.PATCH("/:id/tags", m.UpdateResourceTags)
@@ -281,6 +282,16 @@ func (m *Module) DeleteResource(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Resource deleted"})
+}
+
+// ClearResources 清空资源库
+func (m *Module) ClearResources(c *gin.Context) {
+	typeKey := c.Query("type")
+	if err := m.uc.ClearResources(c.Request.Context(), typeKey); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Repository cleared"})
 }
 
 // GetDependencies 获取版本依赖

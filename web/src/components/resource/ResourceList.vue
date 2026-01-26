@@ -75,6 +75,12 @@
                 <el-icon><Refresh /></el-icon>
               </el-button>
             </el-tooltip>
+
+            <el-tooltip content="清空当前库" placement="bottom">
+              <el-button class="icon-btn delete-all-btn" @click="handleClear" circle>
+                <el-icon><Delete /></el-icon>
+              </el-button>
+            </el-tooltip>
             
             <div class="view-toggle-group">
                <div class="toggle-item" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">
@@ -209,10 +215,10 @@
 import { ref, onMounted, onUnmounted, watch, toRef, computed } from 'vue'
 import { 
   Upload as UploadIcon, Connection, DataLine, Grid, Refresh,
-  Search, FolderDelete
+  Search, FolderDelete, Delete
 } from '@element-plus/icons-vue'
 import request from '../../core/utils/request'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import CategorySidebar from './components/CategorySidebar.vue'
 import type { Resource, ResourceScope, CategoryNode } from '../../core/types/resource'
 import ResourceTableView from './components/ResourceTableView.vue'
@@ -302,6 +308,33 @@ const handleViewDetails = (row: Resource) => {
   detailDrawerVisible.value = true
   viewHistory(row, false) // Fetch versions ONLY, don't open extra drawer
   viewDependencies(row, false) // Fetch deps ONLY, don't open extra drawer
+}
+
+// Clear Repository
+const handleClear = async () => {
+    try {
+        await ElMessageBox.confirm(
+            `此操作将彻底清空当前 [${props.typeName}] 库下的所有资源，是否继续？`,
+            '危险操作提示',
+            {
+                confirmButtonText: '确定并清空',
+                cancelButtonText: '取消',
+                type: 'warning',
+                confirmButtonClass: 'el-button--danger'
+            }
+        )
+        
+        loading.value = true
+        await request.post(`/api/v1/resources/clear?type=${props.typeKey}`)
+        ElMessage.success('资源库已清空')
+        fetchList()
+    } catch (err: any) {
+        if (err !== 'cancel') {
+            console.error(err)
+        }
+    } finally {
+        loading.value = false
+    }
 }
 
 // Scope Change (kept here as it's simple or move to useResourceAction)
@@ -505,6 +538,13 @@ onUnmounted(() => {
     &:hover {
       background: var(--el-fill-color-light);
       color: var(--el-color-primary);
+    }
+
+    &.delete-all-btn {
+      &:hover {
+        background: var(--el-color-danger-light-9);
+        color: var(--el-color-danger);
+      }
     }
   }
 }
