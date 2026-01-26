@@ -26,7 +26,7 @@ export interface ResourceVersion {
 export interface Resource {
   id: string;
   name: string;
-  type: string;
+  type_key: string;
   category_id?: string;
   owner_id: string;
   scope: ResourceScope;

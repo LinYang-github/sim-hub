@@ -8,11 +8,14 @@
             <div class="card-status-badge">
                 <el-tag v-if="item.scope === RESOURCE_SCOPE.PUBLIC" size="small" type="success" effect="dark">公共</el-tag>
             </div>
-            <div class="card-icon-placeholder">
-                <el-icon v-if="typeKey === 'model_glb'" :size="48"><Box /></el-icon>
-                <el-icon v-else-if="typeKey === 'map_terrain'" :size="48"><Location /></el-icon>
-                <el-icon v-else :size="48"><Files /></el-icon>
-            </div>
+            <ResourcePreview 
+              :type-key="typeKey" 
+              :viewer="viewer"
+              :icon="icon"
+              :download-url="item.latest_version?.download_url"
+              :state="item.latest_version?.state"
+              :status-text="item.latest_version?.state ? (statusMap[item.latest_version!.state] || item.latest_version!.state) : '-'"
+            />
             <div class="card-ver-badge">
                 {{ item.latest_version?.semver || 'v' + (item.latest_version?.version_num || 0) }}
             </div>
@@ -101,12 +104,15 @@ import {
 import { formatSize } from '../../../core/utils/format'
 import type { Resource, ResourceScope } from '../../../core/types/resource'
 import { RESOURCE_STATE, RESOURCE_SCOPE, DEFAULT_ADMIN_ID } from '../../../core/constants/resource'
+import ResourcePreview from './viewers/ResourcePreview.vue'
 
 defineProps<{
   resources: Resource[]
   typeKey: string
   enableScope?: boolean
   statusMap: Record<string, string>
+  viewer?: string
+  icon?: string
 }>()
 
 const emit = defineEmits<{
@@ -203,11 +209,6 @@ const handleCommand = (cmd: string, row: Resource) => {
   &:hover {
     transform: translateY(-4px);
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
-
-    .card-icon-placeholder {
-      transform: scale(1.05);
-      color: var(--el-color-primary);
-    }
   }
 }
 
@@ -219,16 +220,13 @@ const handleCommand = (cmd: string, row: Resource) => {
   justify-content: center;
   position: relative;
   cursor: pointer;
+  overflow: hidden;
   
   .card-status-badge {
     position: absolute;
     top: 10px;
     right: 10px;
-  }
-  
-  .card-icon-placeholder {
-    color: var(--el-text-color-placeholder);
-    transition: all 0.3s;
+    z-index: 10;
   }
   
   .card-ver-badge {
@@ -241,6 +239,7 @@ const handleCommand = (cmd: string, row: Resource) => {
     border-radius: 4px;
     font-size: 11px;
     font-weight: 500;
+    z-index: 10;
   }
 }
 

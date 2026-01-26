@@ -5,9 +5,9 @@
       <template #default="scope">
         <div class="resource-info-cell clickable" @click="$emit('view-details', scope.row)">
           <div class="resource-icon">
-            <el-icon v-if="typeKey === 'model_glb'"><Box /></el-icon>
-            <el-icon v-else-if="typeKey === 'map_terrain'"><Location /></el-icon>
-            <el-icon v-else><Files /></el-icon>
+            <el-icon>
+              <component :is="icon || 'Files'" />
+            </el-icon>
           </div>
           <span class="resource-name" :title="scope.row.name">{{ scope.row.name }}</span>
         </div>
@@ -139,6 +139,8 @@ defineProps<{
   typeKey: string
   enableScope: boolean
   statusMap: Record<string, string>
+  viewer?: string
+  icon?: string
 }>()
 
 const emit = defineEmits<{

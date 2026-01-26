@@ -6,7 +6,8 @@
     "icon": "FolderOpened",
     "typeName": "想定",
     "uploadMode": "folder-zip",
-    "enableScope": true
+    "enableScope": true,
+    "viewer": "DefaultIconPreview"
   },
   {
     "key": "model_glb",
@@ -16,7 +17,8 @@
     "typeName": "模型",
     "uploadMode": "single",
     "accept": ".glb",
-    "enableScope": false
+    "enableScope": false,
+    "viewer": "GLBPreview"
   },
   {
     "key": "map_terrain",
@@ -25,7 +27,8 @@
     "icon": "Location",
     "externalUrl": "/terrain/",
     "devUrl": "http://localhost:30032",
-    "typeName": "地形"
+    "typeName": "地形",
+    "viewer": "DefaultIconPreview"
   },
   {
     "key": "test-repo",

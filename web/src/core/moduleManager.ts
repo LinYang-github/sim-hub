@@ -103,7 +103,9 @@ class ModuleManager {
                           typeName: item.typeName || item.label || '资源',
                           uploadMode: item.uploadMode || 'single',
                           accept: item.accept,
-                          enableScope: item.enableScope
+                          enableScope: item.enableScope,
+                          viewer: item.viewer,
+                          icon: item.icon
                         }
                       }
                     ]

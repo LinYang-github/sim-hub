@@ -11,10 +11,12 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
+    "@types/three": "^0.182.0",
     "@vueuse/core": "^14.1.0",
     "axios": "^1.6.0",
     "element-plus": "^2.5.0",
     "jszip": "^3.10.1",
+    "three": "^0.182.0",
     "vue": "^3.4.0",
     "vue-router": "^4.2.0"
   },

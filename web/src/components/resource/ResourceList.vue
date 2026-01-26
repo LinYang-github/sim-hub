@@ -114,6 +114,8 @@
             :type-key="typeKey"
             :enable-scope="!!enableScope"
             :status-map="statusMap"
+            :viewer="viewer"
+            :icon="icon"
             @edit-tags="openTagEditor"
             @view-details="handleViewDetails"
             @download="download"
@@ -126,6 +128,8 @@
             :type-key="typeKey"
             :enable-scope="!!enableScope"
             :status-map="statusMap"
+            :viewer="viewer"
+            :icon="icon"
             @edit-tags="openTagEditor"
             @view-details="handleViewDetails"
             @download="download"
@@ -183,6 +187,8 @@
       :versions="versionHistory"
       :dependencies="depTree"
       :loading-details="historyLoading || depLoading"
+      :viewer="viewer"
+      :icon="icon"
       @edit-tags="openTagEditor"
       @download="download"
       @download-version="handleDownloadUrl"
@@ -248,6 +254,8 @@ const props = defineProps<{
   uploadMode?: 'single' | 'folder-zip'
   accept?: string
   enableScope?: boolean
+  viewer?: string
+  icon?: string
 }>()
 
 const statusMap = RESOURCE_STATUS_TEXT

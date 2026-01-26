@@ -19,6 +19,19 @@
     </template>
 
     <div v-if="resource" class="drawer-body-wrapper" v-loading="loadingDetails">
+      <!-- 0. 预览区域 (动态渲染) -->
+      <div class="detailed-preview-section">
+        <ResourcePreview 
+          :type-key="resource.type_key" 
+          :viewer="viewer"
+          :icon="icon"
+          :download-url="resource.latest_version?.download_url"
+          :state="resource.latest_version?.state"
+          :status-text="resource.latest_version?.state ? (statusMap[resource.latest_version!.state] || resource.latest_version!.state) : '-'"
+          force
+        />
+      </div>
+
       <!-- 1. 核心属性表 -->
       <div class="details-section">
         <div class="section-label">基本属性</div>
@@ -151,6 +164,7 @@ import { InfoFilled, Edit, Download, Share } from '@element-plus/icons-vue'
 import { formatDate, formatSize } from '../../../core/utils/format'
 import type { Resource, ResourceVersion, ResourceDependency } from '../../../core/types/resource'
 import { RESOURCE_STATE } from '../../../core/constants/resource'
+import ResourcePreview from './viewers/ResourcePreview.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -160,6 +174,8 @@ const props = defineProps<{
   versions: ResourceVersion[]
   dependencies: ResourceDependency[]
   loadingDetails: boolean
+  viewer?: string
+  icon?: string
 }>()
 
 const emit = defineEmits<{
@@ -224,6 +240,20 @@ const getStatusType = (state: string) => {
 
 .drawer-body-wrapper {
   padding: 24px;
+}
+
+.detailed-preview-section {
+  width: 100%;
+  height: 240px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 12px;
+  margin-bottom: 24px;
+  border: 1px solid var(--el-border-color-lighter);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.02);
 }
 
 .details-section {

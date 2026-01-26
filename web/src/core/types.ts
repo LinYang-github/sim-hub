@@ -25,4 +25,5 @@ export interface SimHubModule {
   externalUrl?: string 
   devUrl?: string      
   integrationMode?: 'iframe' | 'new-tab' | 'internal'
+  viewer?: string
 }
