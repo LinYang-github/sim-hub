@@ -16,11 +16,14 @@ type UseCase struct {
 }
 
 func NewUseCase(d *data.Data, store storage.MultipartBlobStore, stsProvider storage.SecurityTokenProvider, bucket string, natsClient *data.NATSClient, role string, apiBaseURL string, handlers map[string]string) *UseCase {
-	// 1. 初始化 Scheduler
+	// 1. 初始化事件发射器
+	emitter := NewEventEmitter(natsClient)
+
+	// 2. 初始化 Scheduler
 	scheduler := NewScheduler(d, store, natsClient, bucket, role, apiBaseURL, handlers)
 
-	// 2. 初始化 Writer (依赖 Scheduler)
-	writer := NewResourceWriter(d, store, bucket, scheduler, handlers)
+	// 3. 初始化 Writer (依赖 Scheduler 和 EventEmitter)
+	writer := NewResourceWriter(d, store, bucket, scheduler, emitter, handlers)
 
 	// 3. 解决 Reciprocating Dependency: Scheduler 需要回调 Writer
 	// (通过闭包或接口设置)

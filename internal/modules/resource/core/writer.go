@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/liny/sim-hub/internal/data"
 	"github.com/liny/sim-hub/internal/model"
@@ -17,15 +18,17 @@ type ResourceWriter struct {
 	store      storage.MultipartBlobStore
 	bucket     string
 	dispatcher JobDispatcher
+	emitter    *EventEmitter
 	handlers   map[string]string // 为了判断是否需要调度任务
 }
 
-func NewResourceWriter(d *data.Data, store storage.MultipartBlobStore, bucket string, dispatcher JobDispatcher, handlers map[string]string) *ResourceWriter {
+func NewResourceWriter(d *data.Data, store storage.MultipartBlobStore, bucket string, dispatcher JobDispatcher, emitter *EventEmitter, handlers map[string]string) *ResourceWriter {
 	return &ResourceWriter{
 		data:       d,
 		store:      store,
 		bucket:     bucket,
 		dispatcher: dispatcher,
+		emitter:    emitter,
 		handlers:   handlers,
 	}
 }
@@ -48,10 +51,19 @@ func (w *ResourceWriter) DeleteCategory(ctx context.Context, id string) error {
 	return w.data.DB.Delete(&model.Category{}, "id = ?", id).Error
 }
 
-// DeleteResource 删除资源
 func (w *ResourceWriter) DeleteResource(ctx context.Context, id string) error {
 	// 软删除
-	return w.data.DB.Model(&model.Resource{}).Where("id = ?", id).Update("is_deleted", true).Error
+	if err := w.data.DB.Model(&model.Resource{}).Where("id = ?", id).Update("is_deleted", true).Error; err != nil {
+		return err
+	}
+
+	// 发送删除事件
+	w.emitter.Emit(LifecycleEvent{
+		Type:       EventResourceDeleted,
+		ResourceID: id,
+		Timestamp:  time.Now(),
+	})
+	return nil
 }
 
 // UpdateResourceTags 更新资源标签 并同步刷新 Sidecar
@@ -131,6 +143,15 @@ func (w *ResourceWriter) UpdateResource(ctx context.Context, id string, req Upda
 				VersionID: v.ID,
 			})
 		}
+
+		// 发送资源更新事件
+		w.emitter.Emit(LifecycleEvent{
+			Type:       EventResourceUpdated,
+			ResourceID: id,
+			Timestamp:  time.Now(),
+			Data:       updates,
+		})
+
 		return nil
 	})
 }
@@ -314,7 +335,33 @@ func (w *ResourceWriter) CreateResourceAndVersion(tx *gorm.DB, typeKey, category
 		})
 	} else {
 		slog.Info("资源类型无需后端处理，跳过 NATS 任务分发", "type", typeKey, "name", name)
+
+		// 发送版本就绪事件
+		w.emitter.Emit(LifecycleEvent{
+			Type:       EventVersionActivated,
+			ResourceID: res.ID,
+			VersionID:  ver.ID,
+			Timestamp:  time.Now(),
+			Data: map[string]any{
+				"semver":    ver.SemVer,
+				"file_path": ver.FilePath,
+			},
+		})
 	}
+
+	// 如果是新资源，发送创建事件
+	if res.CreatedAt.After(time.Now().Add(-5 * time.Second)) {
+		w.emitter.Emit(LifecycleEvent{
+			Type:       EventResourceCreated,
+			ResourceID: res.ID,
+			TypeKey:    res.TypeKey,
+			Timestamp:  time.Now(),
+			Data: map[string]any{
+				"name": res.Name,
+			},
+		})
+	}
+
 	return nil
 }
 
@@ -439,6 +486,18 @@ func (w *ResourceWriter) ReportProcessResult(ctx context.Context, versionID stri
 				Action:    ActionRefresh,
 				ObjectKey: ver.FilePath,
 				VersionID: ver.ID,
+			})
+
+			// 发送版本就绪事件
+			w.emitter.Emit(LifecycleEvent{
+				Type:       EventVersionActivated,
+				ResourceID: ver.ResourceID,
+				VersionID:  ver.ID,
+				Timestamp:  time.Now(),
+				Data: map[string]any{
+					"semver":    ver.SemVer,
+					"file_path": ver.FilePath,
+				},
 			})
 		}
 
