@@ -250,11 +250,13 @@ func (w *ResourceWriter) CreateResourceAndVersion(tx *gorm.DB, typeKey, category
 		return err
 	} else {
 		// 如果资源已存在，更新其标签和分类（可选）
-		tx.Model(&res).Updates(map[string]any{
+		if err := tx.Model(&res).Updates(map[string]any{
 			"category_id": categoryID,
 			"tags":        tags,
 			"scope":       scope,
-		})
+		}).Error; err != nil {
+			return err
+		}
 	}
 
 	// 2. 检查版本是否存在
@@ -322,7 +324,9 @@ func (w *ResourceWriter) CreateResourceAndVersion(tx *gorm.DB, typeKey, category
 			TargetResourceID: d.TargetResourceID,
 			Constraint:       d.Constraint,
 		}
-		tx.Create(&dependency)
+		if err := tx.Create(&dependency).Error; err != nil {
+			return err
+		}
 	}
 
 	// 6. 只有在有处理器的情况下才触发异步处理
@@ -377,6 +381,10 @@ func (w *ResourceWriter) SyncFromStorage(ctx context.Context) (int, error) {
 	// 由于 ListObjects 是同步阻塞或 Channel，我们在外部循环
 	for object := range objectCh {
 		if strings.HasSuffix(object.Key, ".meta.json") {
+			continue
+		}
+		// 修复：忽略目录（通常以 / 结尾且大小为 0）
+		if strings.HasSuffix(object.Key, "/") && object.Size == 0 {
 			continue
 		}
 
@@ -444,7 +452,15 @@ func (w *ResourceWriter) SyncFromStorage(ctx context.Context) (int, error) {
 				State:      "ACTIVE", // Auto synced is active
 				MetaData:   map[string]any{"imported": true},
 			}
-			return tx.Create(&newVer).Error
+			if err := tx.Create(&newVer).Error; err != nil {
+				return err
+			}
+
+			// 修复：更新资源的最新版本 ID，否则 UI 会显示为没有版本的资源
+			if res.LatestVersionID == "" {
+				return tx.Model(&res).Update("latest_version_id", newVer.ID).Error
+			}
+			return nil
 		})
 
 		if err == nil {
