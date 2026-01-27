@@ -83,6 +83,20 @@
                       <span>编辑标签</span>
                     </div>
                   </el-dropdown-item>
+
+                  <el-dropdown-item command="rename">
+                    <div class="menu-item-content">
+                      <el-icon><Edit /></el-icon>
+                      <span>重命名</span>
+                    </div>
+                  </el-dropdown-item>
+
+                  <el-dropdown-item command="move">
+                    <div class="menu-item-content">
+                      <el-icon><Promotion /></el-icon>
+                      <span>移动目录</span>
+                    </div>
+                  </el-dropdown-item>
                   
                   <el-dropdown-item v-if="enableScope && scope.row.owner_id === DEFAULT_ADMIN_ID" class="nested-menu-parent">
                     <el-dropdown trigger="hover" placement="left" popper-class="resource-popper" @command="(scopeCmd) => $emit('change-scope', scope.row, scopeCmd)">
@@ -127,7 +141,7 @@
 <script setup lang="ts">
 import { 
   Box, Location, Files, Clock, DataLine, 
-  Download, Delete, Promotion, PriceTag, MoreFilled, InfoFilled, Lock
+  Download, Delete, Promotion, PriceTag, MoreFilled, InfoFilled, Lock, Edit
 } from '@element-plus/icons-vue'
 import { formatDate, formatSize } from '../../../core/utils/format'
 import type { Resource, ResourceScope } from '../../../core/types/resource'
@@ -149,12 +163,18 @@ const emit = defineEmits<{
   (e: 'download', row: Resource): void
   (e: 'delete', row: Resource): void
   (e: 'change-scope', row: Resource, scope: ResourceScope): void
+  (e: 'rename', row: Resource): void
+  (e: 'move', row: Resource): void
 }>()
 
 const handleCommand = (cmd: string, row: Resource) => {
-  if (cmd === 'details') emit('view-details', row)
-  if (cmd === 'tags') emit('edit-tags', row)
-  if (cmd === 'delete') emit('delete', row)
+  switch(cmd) {
+    case 'details': emit('view-details', row); break;
+    case 'tags': emit('edit-tags', row); break;
+    case 'rename': emit('rename', row); break;
+    case 'move': emit('move', row); break;
+    case 'delete': emit('delete', row); break;
+  }
 }
 </script>
 

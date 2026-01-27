@@ -57,6 +57,20 @@
                       </div>
                     </el-dropdown-item>
                     
+                    <el-dropdown-item command="rename">
+                      <div class="menu-item-content">
+                        <el-icon><Edit /></el-icon>
+                        <span>重命名</span>
+                      </div>
+                    </el-dropdown-item>
+
+                    <el-dropdown-item command="move">
+                      <div class="menu-item-content">
+                        <el-icon><Promotion /></el-icon>
+                        <span>移动分类</span>
+                      </div>
+                    </el-dropdown-item>
+                    
                     <el-dropdown-item v-if="enableScope && item.owner_id === DEFAULT_ADMIN_ID" class="nested-menu-parent">
                       <el-dropdown trigger="hover" placement="right" popper-class="resource-popper" @command="(scopeCmd) => $emit('change-scope', item, scopeCmd)">
                          <div class="menu-item-content">
@@ -100,7 +114,7 @@
 
 <script setup lang="ts">
 import { 
-  Download, Delete, PriceTag, MoreFilled, InfoFilled, Promotion, Lock
+  Download, Delete, PriceTag, MoreFilled, InfoFilled, Promotion, Lock, Edit
 } from '@element-plus/icons-vue'
 import { formatSize } from '../../../core/utils/format'
 import type { Resource, ResourceScope } from '../../../core/types/resource'
@@ -122,12 +136,16 @@ const emit = defineEmits<{
   (e: 'download', row: Resource): void
   (e: 'delete', row: Resource): void
   (e: 'change-scope', row: Resource, scope: ResourceScope): void
+  (e: 'rename', row: Resource): void
+  (e: 'move', row: Resource): void
 }>()
 
 const handleCommand = (cmd: string, row: Resource) => {
   switch(cmd) {
     case 'details': emit('view-details', row); break;
     case 'tags': emit('edit-tags', row); break;
+    case 'rename': emit('rename', row); break;
+    case 'move': emit('move', row); break;
     case 'delete': emit('delete', row); break;
   }
 }

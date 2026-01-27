@@ -20,7 +20,7 @@
 
     <div v-if="resource" class="drawer-body-wrapper" v-loading="loadingDetails">
       <!-- 0. 预览区域 (动态渲染) -->
-      <div class="detailed-preview-section">
+      <div class="detailed-preview-section" :class="{ 'is-fullscreen': isPreviewFullScreen }">
         <ResourcePreview 
           :type-key="resource.type_key" 
           :viewer="viewer"
@@ -31,6 +31,35 @@
           :meta-data="resource.latest_version?.meta_data"
           force
         />
+        <el-button 
+          class="fullscreen-btn" 
+          circle 
+          size="small" 
+          @click="isPreviewFullScreen = !isPreviewFullScreen"
+        >
+          <el-icon><FullScreen v-if="!isPreviewFullScreen" /><Close v-else /></el-icon>
+        </el-button>
+
+        <!-- Fullscreen Teleport for Preview -->
+        <Teleport to="body">
+          <div v-if="isPreviewFullScreen" class="steward-fullscreen-overlay" @click.self="isPreviewFullScreen = false">
+            <div class="fullscreen-content-wrap preview-full">
+              <ResourcePreview 
+                :type-key="resource.type_key" 
+                :viewer="viewer"
+                :icon="icon"
+                :download-url="resource.latest_version?.download_url"
+                :state="resource.latest_version?.state"
+                :status-text="resource.latest_version?.state ? (statusMap[resource.latest_version!.state] || resource.latest_version!.state) : '-'"
+                :meta-data="resource.latest_version?.meta_data"
+                force
+              />
+              <el-button class="close-fs-btn" circle @click="isPreviewFullScreen = false">
+                <el-icon><Close /></el-icon>
+              </el-button>
+            </div>
+          </div>
+        </Teleport>
       </div>
 
       <!-- 1. 核心属性表 -->
@@ -38,7 +67,12 @@
         <div class="section-label">基本属性</div>
         <el-descriptions :column="2" border class="property-grid">
           <el-descriptions-item label="资源名称" :span="2">
-            <span class="text-bold">{{ resource.name }}</span>
+            <div class="name-edit-cell">
+              <span class="text-bold">{{ resource.name }}</span>
+              <el-button link type="primary" size="small" @click="$emit('rename', resource)">
+                <el-icon><Edit /></el-icon> 重命名
+              </el-button>
+            </div>
           </el-descriptions-item>
           <el-descriptions-item label="当前版本">
             <el-tag size="small" type="success" effect="light">
@@ -54,8 +88,18 @@
           <el-descriptions-item label="文件大小">
             {{ formatSize(resource?.latest_version?.file_size) }}
           </el-descriptions-item>
-          <el-descriptions-item label="可见范围">
-            {{ resource?.scope === 'PUBLIC' ? '公共 (Public)' : '私有 (Private)' }}
+          <el-descriptions-item label="可见范围" :span="1">
+            <div class="scope-edit-cell">
+              {{ resource?.scope === 'PUBLIC' ? '公共' : '私有' }}
+            </div>
+          </el-descriptions-item>
+          <el-descriptions-item label="归属分类" :span="2">
+            <div class="scope-edit-cell">
+              <span class="category-path">{{ currentCategoryName || '默认分类' }}</span>
+              <el-button link type="primary" size="small" @click="$emit('move', resource)">
+                <el-icon><Rank /></el-icon> 移动
+              </el-button>
+            </div>
           </el-descriptions-item>
           <el-descriptions-item label="创建时间">
             {{ formatDate(resource?.created_at) }}
@@ -130,13 +174,50 @@
         </el-tab-pane>
 
         <el-tab-pane name="dependencies" label="拓扑依赖">
-          <div class="tab-pane-content">
+          <div class="tab-pane-content graph-tab-pane">
+            <el-button 
+              class="fullscreen-btn tab-fs-btn" 
+              circle 
+              size="small" 
+              @click="isGraphFullScreen = true"
+            >
+              <el-icon><FullScreen /></el-icon>
+            </el-button>
+
             <DependencyGraph 
               v-if="dependencies?.length" 
               :dependencies="dependencies" 
               :root-name="resource.name"
             />
             <el-empty v-else :image-size="40" description="无外部依赖关联" />
+
+            <!-- Fullscreen Teleport for Dependency Graph -->
+            <Teleport to="body">
+              <div v-if="isGraphFullScreen" class="steward-fullscreen-overlay" @click.self="isGraphFullScreen = false">
+                <div class="fullscreen-content-wrap">
+                  <div class="fs-header">
+                     <span class="fs-title">资源依赖拓扑图 - {{ resource.name }}</span>
+                     <el-button circle @click="isGraphFullScreen = false">
+                        <el-icon><Close /></el-icon>
+                     </el-button>
+                  </div>
+                  <DependencyGraph 
+                    :dependencies="dependencies" 
+                    :root-name="resource.name"
+                  />
+                </div>
+              </div>
+            </Teleport>
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane name="steward" label="元数据治理">
+          <div class="tab-pane-content">
+            <MetadataEditor 
+              :version-id="resource.latest_version?.id"
+              :initial-data="resource.latest_version?.meta_data"
+              @success="$emit('refresh')"
+            />
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -159,12 +240,13 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { InfoFilled, Edit, Download, Share } from '@element-plus/icons-vue'
+import { InfoFilled, Edit, Download, Share, Rank, FullScreen, Close } from '@element-plus/icons-vue'
 import { formatDate, formatSize } from '../../../core/utils/format'
 import type { Resource, ResourceVersion, ResourceDependency } from '../../../core/types/resource'
 import { RESOURCE_STATE } from '../../../core/constants/resource'
 import ResourcePreview from './viewers/ResourcePreview.vue'
 import DependencyGraph from './viewers/DependencyGraph.vue'
+import MetadataEditor from './MetadataEditor.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -174,6 +256,7 @@ const props = defineProps<{
   versions: ResourceVersion[]
   dependencies: ResourceDependency[]
   loadingDetails: boolean
+  currentCategoryName?: string
   viewer?: string
   icon?: string
 }>()
@@ -184,6 +267,9 @@ const emit = defineEmits<{
   (e: 'download', row: Resource): void
   (e: 'download-version', url: string): void
   (e: 'rollback', ver: ResourceVersion): void
+  (e: 'rename', res: Resource): void
+  (e: 'move', res: Resource): void
+  (e: 'refresh'): void
 }>()
 
 const activeTab = ref('versions')
@@ -192,6 +278,9 @@ const visible = computed({
   get: () => props.modelValue,
   set: (val) => emit('update:modelValue', val)
 })
+
+const isPreviewFullScreen = ref(false)
+const isGraphFullScreen = ref(false)
 
 const getStatusType = (state: string) => {
   const map: any = { ACTIVE: 'success', PROCESSING: 'primary', FAILED: 'danger' }
@@ -254,6 +343,102 @@ const getStatusType = (state: string) => {
   align-items: center;
   justify-content: center;
   box-shadow: inset 0 2px 8px rgba(0,0,0,0.02);
+  position: relative;
+
+  .fullscreen-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    opacity: 0;
+    transition: all 0.3s ease;
+    z-index: 10;
+    
+    &:hover {
+      background: rgba(var(--el-color-primary-rgb), 0.8);
+      transform: scale(1.1);
+    }
+  }
+
+  &:hover .fullscreen-btn {
+    opacity: 1;
+  }
+}
+
+.graph-tab-pane {
+  position: relative;
+  
+  .tab-fs-btn {
+    top: 0;
+    right: 0;
+    background: var(--el-fill-color);
+  }
+}
+
+/* Fullscreen Overlay Styles */
+.steward-fullscreen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(13, 13, 15, 0.95);
+  backdrop-filter: blur(8px);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s ease;
+}
+
+.fullscreen-content-wrap {
+  width: 90%;
+  height: 90%;
+  background: #1d1e1f;
+  border-radius: 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: 0 24px 48px rgba(0,0,0,0.5);
+
+  &.preview-full {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .fs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    
+    .fs-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+    }
+  }
+
+  .close-fs-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    &:hover {
+      background: var(--el-color-danger);
+    }
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .details-section {
@@ -282,6 +467,12 @@ const getStatusType = (state: string) => {
   .text-bold {
     font-weight: 700;
     color: var(--el-text-color-primary);
+  }
+
+  .name-edit-cell, .scope-edit-cell {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 }
 

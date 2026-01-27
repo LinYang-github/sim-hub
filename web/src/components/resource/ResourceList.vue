@@ -121,6 +121,8 @@
             @download="download"
             @delete="confirmDelete"
             @change-scope="handleScopeChange"
+            @rename="(res) => stewardRef?.openRename(res)"
+            @move="(res) => stewardRef?.openMove(res)"
           />
           <ResourceCardView 
             v-else
@@ -135,6 +137,8 @@
             @download="download"
             @delete="confirmDelete"
             @change-scope="handleScopeChange"
+            @rename="(res) => stewardRef?.openRename(res)"
+            @move="(res) => stewardRef?.openMove(res)"
           />
         </template>
 
@@ -193,6 +197,17 @@
       @download="download"
       @download-version="handleDownloadUrl"
       @rollback="rollback"
+      @rename="(res) => stewardRef?.openRename(res)"
+      @move="(res) => stewardRef?.openMove(res)"
+      @refresh="fetchList"
+      :current-category-name="currentCategoryName"
+    />
+
+    <ResourceStewardDialogs
+      ref="stewardRef"
+      :resource="currentResource"
+      :category-tree="categoryTree"
+      @success="fetchList"
     />
 
     <TagEditDialog
@@ -233,6 +248,7 @@ import ResourceSkeleton from './components/ResourceSkeleton.vue'
 import ResourceDetailDrawer from './components/ResourceDetailDrawer.vue'
 import TagEditDialog from './components/TagEditDialog.vue'
 import UploadDialog from './components/UploadDialog.vue'
+import ResourceStewardDialogs from './components/ResourceStewardDialogs.vue'
 
 // Composables
 import { useCategory } from './composables/useCategory'
@@ -260,6 +276,7 @@ const statusMap = RESOURCE_STATUS_TEXT
 const viewMode = ref('list')
 const searchFocused = ref(false)
 const detailDrawerVisible = ref(false)
+const stewardRef = ref<InstanceType<typeof ResourceStewardDialogs>>()
 
 const scopeOptions = SCOPE_OPTIONS
 
