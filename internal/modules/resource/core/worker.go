@@ -53,7 +53,7 @@ func (w *Worker) HandleJob(ctx context.Context, job ProcessJob) {
 }
 
 func (w *Worker) processResourceInternal(ctx context.Context, typeKey, objectKey, versionID string) {
-	slog.Debug("Worker 开始处理资源", "key", objectKey, "type", typeKey)
+	slog.Log(ctx, slog.LevelDebug, "Worker 开始处理资源", "key", objectKey, "type", typeKey)
 
 	processorCmd := w.handlers[typeKey]
 	finalMeta := make(map[string]any)
@@ -111,7 +111,7 @@ func (w *Worker) processResourceInternal(ctx context.Context, typeKey, objectKey
 
 		// 3. 解析结果
 		if err := json.Unmarshal(stdout.Bytes(), &finalMeta); err != nil {
-			slog.Warn("处理器输出非 JSON 格式，尝试记录原始输出", "output", stdout.String())
+			slog.Log(ctx, slog.LevelWarn, "处理器输出非 JSON 格式，尝试记录原始输出", "output", stdout.String())
 			finalMeta["raw_output"] = stdout.String()
 		}
 		finalMeta["processed_by"] = "simhub-worker"
@@ -127,7 +127,7 @@ func (w *Worker) processResourceInternal(ctx context.Context, typeKey, objectKey
 }
 
 func (w *Worker) reportError(ctx context.Context, versionID string, err error) {
-	slog.Error("任务执行失败", "version", versionID, "error", err)
+	slog.Log(ctx, slog.LevelError, "任务执行失败", "version", versionID, "error", err)
 	w.emitter.EmitResult(ctx, versionID, ProcessResultRequest{
 		State:   "ERROR",
 		Message: err.Error(),

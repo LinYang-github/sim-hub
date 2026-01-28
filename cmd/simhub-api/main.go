@@ -11,6 +11,7 @@ import (
 	"github.com/liny/sim-hub/internal/core/module"
 	"github.com/liny/sim-hub/internal/data"
 	"github.com/liny/sim-hub/internal/modules/resource"
+	"github.com/liny/sim-hub/internal/server"
 	"github.com/liny/sim-hub/internal/ui"
 	"github.com/liny/sim-hub/pkg/logger"
 	"github.com/liny/sim-hub/pkg/storage"
@@ -86,7 +87,9 @@ func main() {
 	registry.Register(resource.NewModule(dbConn, blobStore, stsProvider, cfg.MinIO.Bucket, natsClient, "combined", "", handlers))
 
 	// 6. 配置 HTTP 路由
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(server.RequestIDMiddleware())
 
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{

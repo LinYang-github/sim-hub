@@ -1,5 +1,7 @@
 package core
 
+import "context"
+
 type JobDispatcher interface {
-	Dispatch(job ProcessJob)
+	Dispatch(ctx context.Context, job ProcessJob)
 }

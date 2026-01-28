@@ -72,7 +72,7 @@ func (u *UploadManager) InitMultipartUpload(ctx context.Context, req InitMultipa
 
 	uploadID, err := u.store.InitMultipart(ctx, u.bucket, objectKey)
 	if err != nil {
-		slog.Error("初始化分片上传失败", "error", err, "key", objectKey)
+		slog.ErrorContext(ctx, "初始化分片上传失败", "error", err, "key", objectKey)
 		return nil, err
 	}
 
@@ -93,7 +93,7 @@ func (u *UploadManager) GetMultipartUploadPartURL(ctx context.Context, req GetPa
 
 	url, err := u.store.PresignPart(ctx, u.bucket, objectKey, req.UploadID, req.PartNumber, time.Hour)
 	if err != nil {
-		slog.Error("生成分片上传 URL 失败", "error", err, "key", objectKey, "part", req.PartNumber)
+		slog.ErrorContext(ctx, "生成分片上传 URL 失败", "error", err, "key", objectKey, "part", req.PartNumber)
 		return nil, err
 	}
 
@@ -109,14 +109,14 @@ func (u *UploadManager) CompleteMultipartUpload(ctx context.Context, req Complet
 
 	// 1. 在存储层完成分片合并
 	if err := u.store.CompleteMultipart(ctx, u.bucket, objectKey, req.UploadID, req.Parts); err != nil {
-		slog.Error("完成分片上传失败", "error", err, "key", objectKey, "upload_id", req.UploadID)
+		slog.ErrorContext(ctx, "完成分片上传失败", "error", err, "key", objectKey, "upload_id", req.UploadID)
 		return err
 	}
 
 	// 2. 获取最终对象信息（获取真实大小）
 	objInfo, err := u.store.Stat(ctx, u.bucket, objectKey)
 	if err != nil {
-		slog.Error("无法获取合并后对象信息", "key", objectKey, "error", err)
+		slog.ErrorContext(ctx, "无法获取合并后对象信息", "key", objectKey, "error", err)
 		return fmt.Errorf("uploaded file not found after completion: %w", err)
 	}
 
@@ -134,19 +134,19 @@ func (u *UploadManager) ConfirmUpload(ctx context.Context, req ConfirmUploadRequ
 	}
 
 	// 0. 验证 MinIO 中对象是否存在
-	slog.Info("Checking object existence", "bucket", u.bucket, "key", objectKey)
+	slog.InfoContext(ctx, "Checking object existence", "bucket", u.bucket, "key", objectKey)
 	objInfo, err := u.store.Stat(ctx, u.bucket, objectKey)
 	if err != nil {
-		slog.Error("无法获取对象信息", "key", objectKey, "error", err)
+		slog.ErrorContext(ctx, "无法获取对象信息", "key", objectKey, "error", err)
 		return fmt.Errorf("uploaded file not found: %w", err)
 	}
-	slog.Info("Object found", "size", objInfo.Size)
+	slog.InfoContext(ctx, "Object found", "size", objInfo.Size)
 
 	return u.data.DB.Transaction(func(tx *gorm.DB) error {
-		slog.Info("Starting DB transaction for resource creation", "name", req.Name)
+		slog.InfoContext(ctx, "Starting DB transaction for resource creation", "name", req.Name)
 		err := u.registrar.CreateResourceAndVersion(tx, req.TypeKey, req.CategoryID, req.Name, req.OwnerID, req.Scope, objectKey, objInfo.Size, req.Tags, req.SemVer, req.Dependencies, req.ExtraMeta)
 		if err != nil {
-			slog.Error("CreateResourceAndVersion failed", "error", err)
+			slog.ErrorContext(ctx, "CreateResourceAndVersion failed", "error", err)
 			return err
 		}
 		return nil

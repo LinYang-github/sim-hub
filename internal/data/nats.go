@@ -59,3 +59,10 @@ func (n *NATSClient) Close() {
 		n.Encoded.Close()
 	}
 }
+
+func (n *NATSClient) Publish(v any) error {
+	if n.Encoded == nil {
+		return nats.ErrConnectionClosed
+	}
+	return n.Encoded.Publish(n.Config.Subject, v)
+}

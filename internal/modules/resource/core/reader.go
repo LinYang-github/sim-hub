@@ -336,7 +336,7 @@ func (r *ResourceReader) DownloadBundleZip(ctx context.Context, versionID string
 		// 获取 MinIO 对象流
 		obj, err := r.store.Get(ctx, r.bucket, rawPath)
 		if err != nil {
-			slog.Warn("跳过文件下载失败", "key", rawPath, "error", err)
+			slog.WarnContext(ctx, "跳过文件下载失败", "key", rawPath, "error", err)
 			continue
 		}
 

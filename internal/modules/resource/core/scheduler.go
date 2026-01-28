@@ -9,6 +9,7 @@ import (
 
 	"github.com/liny/sim-hub/internal/data"
 	"github.com/liny/sim-hub/internal/model"
+	"github.com/liny/sim-hub/pkg/logger"
 	"github.com/liny/sim-hub/pkg/storage"
 )
 
@@ -23,6 +24,7 @@ type ProcessJob struct {
 	TypeKey   string `json:"type_key"`
 	ObjectKey string `json:"object_key"`
 	VersionID string `json:"version_id"`
+	TraceID   string `json:"trace_id"`
 }
 
 // Scheduler 负责任务的调度与分发 (Dispatcher 角色)
@@ -65,16 +67,21 @@ func NewScheduler(d *data.Data, store storage.MultipartBlobStore, nats *data.NAT
 }
 
 // Dispatch 发送任务
-func (s *Scheduler) Dispatch(job ProcessJob) {
+func (s *Scheduler) Dispatch(ctx context.Context, job ProcessJob) {
+	// 注入 TraceID
+	if job.TraceID == "" {
+		job.TraceID = logger.GetTraceID(ctx)
+	}
+
 	// ActionRefresh 需要数据库访问，通常在 API 节点(本地)执行
 	if job.Action == ActionRefresh {
-		go s.syncSidecarInternal(context.Background(), job.ObjectKey, job.VersionID)
+		go s.syncSidecarInternal(ctx, job.ObjectKey, job.VersionID)
 		return
 	}
 
 	if s.nats != nil && s.nats.Config.Enabled {
-		if err := s.nats.Encoded.Publish(s.nats.Config.Subject, &job); err != nil {
-			slog.Error("发送 NATS 消息失败，回退到本地队列", "error", err)
+		if err := s.nats.Publish(&job); err != nil {
+			slog.ErrorContext(ctx, "发送 NATS 消息失败，回退到本地队列", "error", err)
 			s.jobChan <- job
 		}
 		return
@@ -83,12 +90,12 @@ func (s *Scheduler) Dispatch(job ProcessJob) {
 }
 
 func (s *Scheduler) startNATSSubscriber() {
-	slog.Info("NATS 任务订阅者已启动", "subject", s.nats.Config.Subject)
+	slog.InfoContext(context.Background(), "NATS 任务订阅者已启动", "subject", s.nats.Config.Subject)
 	_, err := s.nats.Encoded.Subscribe(s.nats.Config.Subject, func(job *ProcessJob) {
 		s.handleJob(context.Background(), *job)
 	})
 	if err != nil {
-		slog.Error("NATS 订阅失败", "error", err)
+		slog.ErrorContext(context.Background(), "NATS 订阅失败", "error", err)
 	}
 }
 
@@ -99,6 +106,11 @@ func (s *Scheduler) startLocalWorker(id int) {
 }
 
 func (s *Scheduler) handleJob(ctx context.Context, job ProcessJob) {
+	// 恢复 TraceID 到 context 中，以便后续 slog 使用
+	if job.TraceID != "" {
+		ctx = logger.WithTraceID(ctx, job.TraceID)
+	}
+
 	if job.Action == ActionRefresh {
 		s.syncSidecarInternal(ctx, job.ObjectKey, job.VersionID)
 		return
@@ -107,25 +119,24 @@ func (s *Scheduler) handleJob(ctx context.Context, job ProcessJob) {
 	if s.worker != nil {
 		s.worker.HandleJob(ctx, job)
 	} else {
-		slog.Warn("接收到处理任务但本地未配置 Worker 实例", "action", job.Action, "version", job.VersionID)
+		slog.Log(ctx, slog.LevelWarn, "接收到处理任务但本地未配置 Worker 实例", "action", job.Action, "version", job.VersionID)
 	}
 }
 
 // syncSidecarInternal 仅由 API 节点(或具备 DB 访问权限的节点)执行
 // 它负责将 DB 中的最新元数据打包成 sidecar 文件同步到对象存储
 func (s *Scheduler) syncSidecarInternal(ctx context.Context, objectKey, versionID string) {
-	if s.data == nil || s.data.DB == nil {
-		slog.Error("尝试运行 syncSidecar 但 DB 实例不可用")
+	if s.data == nil {
+		slog.ErrorContext(ctx, "尝试运行 syncSidecar 但 DB 实例不可用")
 		return
 	}
 
 	var ver model.ResourceVersion
 	if err := s.data.DB.Preload("Resource").First(&ver, "id = ?", versionID).Error; err != nil {
-		slog.Error("同步 Sidecar 时找不到版本记录", "id", versionID, "error", err)
+		slog.ErrorContext(ctx, "同步 Sidecar 时找不到版本记录", "id", versionID, "error", err)
 		return
 	}
 
-	sidecarKey := objectKey + ".meta.json"
 	sidecarData := map[string]any{
 		"resource_id":   ver.Resource.ID,
 		"resource_name": ver.Resource.Name,
@@ -137,10 +148,11 @@ func (s *Scheduler) syncSidecarInternal(ctx context.Context, objectKey, versionI
 	}
 
 	if sidecarBytes, err := json.Marshal(sidecarData); err == nil {
+		sidecarKey := objectKey + ".json"
 		if err := s.store.Put(ctx, s.bucket, sidecarKey, bytes.NewReader(sidecarBytes), int64(len(sidecarBytes)), "application/json"); err != nil {
-			slog.Error("更新 Sidecar 失败", "key", sidecarKey, "error", err)
+			slog.ErrorContext(ctx, "更新 Sidecar 失败", "key", sidecarKey, "error", err)
 		} else {
-			slog.Debug("Sidecar 刷新成功", "key", sidecarKey)
+			slog.DebugContext(ctx, "Sidecar 刷新成功", "key", sidecarKey)
 		}
 	}
 }

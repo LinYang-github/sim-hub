@@ -80,7 +80,7 @@ func (w *ResourceWriter) UpdateResourceTags(ctx context.Context, id string, tags
 		// 触发异步刷新 Sidecar (获取最新版本)
 		var v model.ResourceVersion
 		if err := tx.Order("version_num desc").First(&v, "resource_id = ?", id).Error; err == nil {
-			w.dispatcher.Dispatch(ProcessJob{
+			w.dispatcher.Dispatch(ctx, ProcessJob{
 				Action:    ActionRefresh,
 				ObjectKey: v.FilePath,
 				VersionID: v.ID,
@@ -109,7 +109,7 @@ func (w *ResourceWriter) UpdateResourceScope(ctx context.Context, id string, sco
 		// 触发异步刷新 Sidecar
 		var v model.ResourceVersion
 		if err := tx.Order("version_num desc").First(&v, "resource_id = ?", id).Error; err == nil {
-			w.dispatcher.Dispatch(ProcessJob{
+			w.dispatcher.Dispatch(ctx, ProcessJob{
 				Action:    ActionRefresh,
 				ObjectKey: v.FilePath,
 				VersionID: v.ID,
@@ -141,7 +141,7 @@ func (w *ResourceWriter) UpdateResource(ctx context.Context, id string, req Upda
 		// 触发异步刷新 Sidecar (获取最新版本)
 		var v model.ResourceVersion
 		if err := tx.Order("version_num desc").First(&v, "resource_id = ?", id).Error; err == nil {
-			w.dispatcher.Dispatch(ProcessJob{
+			w.dispatcher.Dispatch(ctx, ProcessJob{
 				Action:    ActionRefresh,
 				ObjectKey: v.FilePath,
 				VersionID: v.ID,
@@ -181,7 +181,7 @@ func (w *ResourceWriter) UpdateVersionMetadata(ctx context.Context, versionID st
 		}
 
 		// 触发更新 Sidecar
-		w.dispatcher.Dispatch(ProcessJob{
+		w.dispatcher.Dispatch(ctx, ProcessJob{
 			Action:    ActionRefresh,
 			ObjectKey: ver.FilePath,
 			VersionID: ver.ID,
@@ -214,7 +214,7 @@ func (w *ResourceWriter) SetResourceLatestVersion(ctx context.Context, resourceI
 		// 4. Trigger Sidecar Refresh
 		// Only trigger if state is active, otherwise sidecar gen might fail or be empty?
 		// Assuming we want to refresh anyway.
-		w.dispatcher.Dispatch(ProcessJob{
+		w.dispatcher.Dispatch(ctx, ProcessJob{
 			Action:    ActionRefresh,
 			ObjectKey: ver.FilePath,
 			VersionID: ver.ID,
@@ -335,14 +335,14 @@ func (w *ResourceWriter) CreateResourceAndVersion(tx *gorm.DB, typeKey, category
 
 	// 6. 只有在有处理器的情况下才触发异步处理
 	if hasHandler {
-		w.dispatcher.Dispatch(ProcessJob{
+		w.dispatcher.Dispatch(tx.Statement.Context, ProcessJob{
 			Action:    ActionProcess,
 			TypeKey:   typeKey,
 			ObjectKey: objectKey,
 			VersionID: ver.ID,
 		})
 	} else {
-		slog.Info("资源类型无需后端处理，跳过 NATS 任务分发", "type", typeKey, "name", name)
+		slog.InfoContext(tx.Statement.Context, "资源类型无需后端处理，跳过 NATS 任务分发", "type", typeKey, "name", name)
 
 		// 发送版本就绪事件
 		w.emitter.Emit(LifecycleEvent{
@@ -502,7 +502,7 @@ func (w *ResourceWriter) ReportProcessResult(ctx context.Context, versionID stri
 		// Sidecar update is triggered via UseCase/Scheduler usually?
 		// Or we trigger it here.
 		if req.State == "ACTIVE" {
-			w.dispatcher.Dispatch(ProcessJob{
+			w.dispatcher.Dispatch(ctx, ProcessJob{
 				Action:    ActionRefresh,
 				ObjectKey: ver.FilePath,
 				VersionID: ver.ID,

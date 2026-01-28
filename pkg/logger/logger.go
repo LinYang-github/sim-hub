@@ -13,6 +13,28 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
+type contextKey string
+
+const (
+	TraceIDKey contextKey = "trace_id"
+)
+
+// WithTraceID 为 context 注入 TraceID
+func WithTraceID(ctx context.Context, traceID string) context.Context {
+	return context.WithValue(ctx, TraceIDKey, traceID)
+}
+
+// GetTraceID 从 context 获取 TraceID
+func GetTraceID(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	if v, ok := ctx.Value(TraceIDKey).(string); ok {
+		return v
+	}
+	return ""
+}
+
 // InitLogger 初始化全局默认 Logger
 func InitLogger(c *conf.Log) {
 	var w io.Writer
@@ -94,10 +116,15 @@ func (h *SimHubHandler) Handle(ctx context.Context, r slog.Record) error {
 	level := r.Level.String()
 	buf = fmt.Appendf(buf, "[%s] ", level)
 
-	// 3. Message
+	// 3. TraceID (if exists in context)
+	if traceID := GetTraceID(ctx); traceID != "" {
+		buf = fmt.Appendf(buf, "[%s] ", traceID)
+	}
+
+	// 4. Message
 	buf = fmt.Appendf(buf, "%s", r.Message)
 
-	// 4. Attributes (合并预设属性和记录属性)
+	// 5. Attributes (合并预设属性和记录属性)
 	// 先处理 WithAttrs 添加的属性
 	for _, a := range h.attrs {
 		buf = h.appendAttr(buf, a)
