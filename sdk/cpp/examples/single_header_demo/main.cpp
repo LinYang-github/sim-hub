@@ -1,67 +1,64 @@
 #include <iostream>
 #include <fstream>
+#define SIMHUB_IMPLEMENTATION
 #include "simhub/simhub.hpp"
 #include <iomanip>
 
-// Simple progress bar
-void printProgress(double progress) {
-    int barWidth = 50;
-    std::cout << "[";
-    int pos = barWidth * progress;
-    for (int i = 0; i < barWidth; ++i) {
-        if (i < pos) std::cout << "=";
-        else if (i == pos) std::cout << ">";
-        else std::cout << " ";
+/**
+ * 示例 01: 快速起步
+ * 展示如何连接服务器、列举资源并读取其元数据。
+ */
+
+void printResourceInfo(const simhub::Resource& res) {
+    if (!res.isValid()) return;
+    
+    std::cout << "[Resource Info]" << std::endl;
+    std::cout << " - Name:  " << res.name() << std::endl;
+    std::cout << " - ID:    " << res.id() << std::endl;
+    std::cout << " - Owner: " << res.ownerId() << std::endl;
+    std::cout << " - Tags:  ";
+    for (const auto& tag : res.tags()) std::cout << tag << " ";
+    std::cout << std::endl;
+
+    auto ver = res.latestVersion();
+    if (ver.isValid()) {
+        std::cout << " - Latest Version: " << ver.semver() << " (" << ver.state() << ")" << std::endl;
+        std::cout << " - File Size:      " << ver.fileSize() << " bytes" << std::endl;
     }
-    std::cout << "] " << int(progress * 100.0) << " %\r";
-    std::cout.flush();
+    std::cout << "-----------------------------------" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
-    // 1. Global Init
+    // 全局初始化，确保底层资源准备就绪
     simhub::Client::GlobalInit();
 
-    std::cout << "SimHub SDK Demo" << std::endl;
-    std::cout << "----------------" << std::endl;
-
-    // 2. Create Client
     std::string baseUrl = "http://localhost:30030";
     if (argc > 1) baseUrl = argv[1];
     
+    std::cout << "Connecting to " << baseUrl << "..." << std::endl;
     simhub::Client client(baseUrl);
 
-    // 3. List Resources
-    std::cout << "\n[1] Listing resources..." << std::endl;
+    // 1. 列举所有资源
     auto listRes = client.listResources();
-    if (!listRes.ok()) {
-        std::cerr << "Failed to list resources: " << listRes.message << std::endl;
-        return 1;
-    }
-
-    std::cout << "Found " << listRes.value.size() << " resources:" << std::endl;
-    for (const auto& res : listRes.value) {
-        std::cout << " - " << res.name << " (" << res.latest_version.file_size << " bytes)" << std::endl;
-    }
-
-    // 4. Create a dummy file for upload
-    std::string dummyFile = "test_upload.txt";
-    {
-        std::ofstream f(dummyFile);
-        f << "This is a test file uploaded via SimHub C++ SDK Single Header." << std::endl;
-        for(int i=0; i<100; i++) f << "Line " << i << " data..." << std::endl;
-    }
-
-    // 5. Upload File
-    std::cout << "\n[2] Uploading " << dummyFile << "..." << std::endl;
-    auto uploadStatus = client.uploadFileSimple("documents", dummyFile, "SDK Upload Test", printProgress);
-    
-    if (uploadStatus.ok()) {
-        std::cout << "\nUpload successful!" << std::endl;
+    if (listRes.ok()) {
+        std::cout << "Found " << listRes.value.size() << " resources.\n" << std::endl;
+        for (const auto& res : listRes.value) {
+            printResourceInfo(res);
+        }
     } else {
-        std::cerr << "\nUpload failed: " << uploadStatus.message << std::endl;
+        std::cerr << "List failed: " << listRes.message << std::endl;
     }
 
-    // 6. Cleanup
+    // 2. 获取单个资源
+    if (!listRes.value.empty()) {
+        std::string firstId = listRes.value[0].id();
+        std::cout << "\nFetching resource by ID: " << firstId << std::endl;
+        auto singleRes = client.getResource(firstId);
+        if (singleRes.ok()) {
+            std::cout << "Get successful. Name: " << singleRes.value.name() << std::endl;
+        }
+    }
+
     simhub::Client::GlobalCleanup();
     return 0;
 }

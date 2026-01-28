@@ -16,23 +16,44 @@ type UseCase struct {
 }
 
 func NewUseCase(d *data.Data, store storage.MultipartBlobStore, stsProvider storage.SecurityTokenProvider, bucket string, natsClient *data.NATSClient, role string, apiBaseURL string, handlers map[string]string) *UseCase {
-	// 1. 初始化事件发射器
+	// 1. 初始化事件发射器 (用于业务事件推送)
 	emitter := NewEventEmitter(natsClient)
 
-	// 2. 初始化 Scheduler
-	scheduler := NewScheduler(d, store, natsClient, bucket, role, apiBaseURL, handlers)
+	// 2. 初始化核心 Writer (暂时不传 Scheduler，因为它依赖结果上报链)
+	writer := NewResourceWriter(d, store, bucket, nil, emitter, handlers)
 
-	// 3. 初始化 Writer (依赖 Scheduler 和 EventEmitter)
-	writer := NewResourceWriter(d, store, bucket, scheduler, emitter, handlers)
+	// 3. 配置结果上报链 (Worker -> API)
+	var resEmitter ResultEmitter
+	if natsClient != nil && natsClient.Config.Enabled {
+		// 分布式模式：结果通过 NATS 上报
+		resEmitter = &NatsResultEmitter{Nats: natsClient}
 
-	// 3. 解决 Reciprocating Dependency: Scheduler 需要回调 Writer
-	// (通过闭包或接口设置)
-	scheduler.SetResultHandler(writer.ReportProcessResult)
+		// 如果节点具有 API 职责，启动监听器来处理结果并更新 DB
+		if role == "api" || role == "combined" {
+			watcher := NewResultWatcher(natsClient, writer.ReportProcessResult)
+			watcher.Start()
+		}
+	} else {
+		// 单机模式：直接在内存中回调 Writer
+		resEmitter = &LocalResultEmitter{ResultHandler: writer.ReportProcessResult}
+	}
 
-	// 4. 初始化 Reader
+	// 4. 初始化 Worker (执行器)
+	var worker *Worker
+	if role == "worker" || role == "combined" {
+		worker = NewWorker(store, bucket, handlers, resEmitter, apiBaseURL)
+	}
+
+	// 5. 初始化 Scheduler (分发器)
+	scheduler := NewScheduler(d, store, natsClient, bucket, role, worker)
+
+	// 6. 完善 Writer：注入分发器实现环路闭合 (接口解耦)
+	writer.SetDispatcher(scheduler)
+
+	// 7. 初始化 Reader
 	reader := NewResourceReader(d, store, bucket)
 
-	// 5. 初始化 Uploader (依赖 Writer)
+	// 8. 初始化 Uploader
 	uploader := NewUploadManager(d, store, stsProvider, bucket, writer)
 
 	return &UseCase{
@@ -140,6 +161,5 @@ func (uc *UseCase) DownloadBundleZip(ctx context.Context, vid string, w io.Write
 }
 
 func (uc *UseCase) ReportProcessResult(ctx context.Context, id string, req ProcessResultRequest) error {
-	// 注意，这里可能需要转给 Writer
 	return uc.writer.ReportProcessResult(ctx, id, req)
 }

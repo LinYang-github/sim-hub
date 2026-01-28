@@ -33,6 +33,10 @@ func NewResourceWriter(d *data.Data, store storage.MultipartBlobStore, bucket st
 	}
 }
 
+func (w *ResourceWriter) SetDispatcher(dispatcher JobDispatcher) {
+	w.dispatcher = dispatcher
+}
+
 // CreateCategory 创建分类
 func (w *ResourceWriter) CreateCategory(ctx context.Context, req CreateCategoryRequest) (*CategoryDTO, error) {
 	cat := model.Category{

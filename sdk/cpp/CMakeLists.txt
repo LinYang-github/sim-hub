@@ -14,67 +14,48 @@ option(SIMHUB_BUILD_TESTS "Build unit tests" OFF)
 find_package(CURL REQUIRED)
 
 if(SIMHUB_ENABLE_AWS)
-    # Hint: You might need to set -DCMAKE_PREFIX_PATH=/path/to/aws/sdk
     find_package(AWSSDK REQUIRED COMPONENTS s3 core)
 endif()
 
 # --- Library ---
+# We provide a static library for those who want to link normally, 
+# but the header is also usable as a Standalone Single-Header.
 set(SDK_SOURCES
-    src/client.cpp
-)
-
-set(SDK_HEADERS
-    include/simhub/simhub.hpp
+    src/simhub_impl.cpp
 )
 
 add_library(simhub_sdk STATIC ${SDK_SOURCES})
 add_library(SimHub::SDK ALIAS simhub_sdk)
 
-# Include Directories
 target_include_directories(simhub_sdk PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 
-# Compile Definitions & Links
 target_link_libraries(simhub_sdk PRIVATE CURL::libcurl)
 
 if(SIMHUB_ENABLE_AWS)
     target_compile_definitions(simhub_sdk PUBLIC USE_AWS_SDK)
     target_link_libraries(simhub_sdk PRIVATE ${AWSSDK_LINK_LIBRARIES})
-    message(STATUS "SimHub SDK: AWS Support Enabled")
-else()
-    message(STATUS "SimHub SDK: AWS Support Disabled (HTTP Only)")
+endif()
+
+# --- Examples ---
+if(SIMHUB_BUILD_EXAMPLES)
+    # Demo 1: Quickstart
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples/single_header_demo/main.cpp")
+        add_executable(example_01_quickstart examples/single_header_demo/main.cpp)
+        target_link_libraries(example_01_quickstart PRIVATE SimHub::SDK)
+    endif()
+
+    # Demo 2: Advanced Upload
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples/02_advanced_upload/main.cpp")
+        add_executable(example_02_upload examples/02_advanced_upload/main.cpp)
+        target_link_libraries(example_02_upload PRIVATE SimHub::SDK)
+    endif()
 endif()
 
 # --- Installation ---
 include(GNUInstallDirs)
-install(TARGETS simhub_sdk
-    EXPORT SimHubSDKTargets
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-)
-
+install(TARGETS simhub_sdk EXPORT SimHubSDKTargets DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(DIRECTORY include/simhub DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-
-# Export Config
-install(EXPORT SimHubSDKTargets
-    FILE SimHubSDKTargets.cmake
-    NAMESPACE SimHub::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/SimHubSDK
-)
-
-# --- Examples ---
-if(SIMHUB_BUILD_EXAMPLES)
-    # Simple multipart example
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples/multipart_upload.cpp")
-        add_executable(multipart_example examples/multipart_upload.cpp)
-        target_link_libraries(multipart_example PRIVATE SimHub::SDK)
-    endif()
-    
-    # Single header demo (if we want to include it here, or let it be separate)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples/single_header_demo/main.cpp")
-         add_executable(single_header_demo examples/single_header_demo/main.cpp)
-         target_link_libraries(single_header_demo PRIVATE SimHub::SDK)
-    endif()
-endif()
+install(EXPORT SimHubSDKTargets FILE SimHubSDKTargets.cmake NAMESPACE SimHub:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/SimHubSDK)
