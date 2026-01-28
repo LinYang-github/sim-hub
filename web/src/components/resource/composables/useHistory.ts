@@ -32,9 +32,20 @@ export function useHistory(fetchList: () => void) {
           version_id: ver.id
         })
         ElMessage.success('版本切换成功')
-        fetchList()
+        
+        // 1. 刷新全局列表数据
+        if (fetchList) await fetchList()
+        
+        // 2. 重新获取当前资源的最新元数据 (关键: 修复回滚后界面显示不更新问题)
+        const updatedRes = await request.get<Resource>(`/api/v1/resources/${currentResource.value?.id}`)
+        if (updatedRes) {
+          currentResource.value = updatedRes
+        }
+        
+        // 3. 刷新版本列表视图
         viewHistory(currentResource.value!)
       } catch (err: any) {
+        console.error('Rollback failed:', err)
       }
     })
   }

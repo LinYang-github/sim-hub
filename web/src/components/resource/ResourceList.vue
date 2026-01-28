@@ -364,6 +364,12 @@ const handleScopeChange = async (row: Resource, scope: ResourceScope) => {
     try {
         await request.patch(`/api/v1/resources/${row.id}/scope`, { scope })
         ElMessage.success('权限更新成功')
+        
+        // 如果详情面板开着且是同一个资源，同步更新引用
+        if (currentResource.value && currentResource.value.id === row.id) {
+            currentResource.value.scope = scope
+        }
+        
         fetchList()
     } catch (err: any) {
     }

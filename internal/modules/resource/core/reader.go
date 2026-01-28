@@ -36,9 +36,18 @@ func (r *ResourceReader) GetResource(ctx context.Context, id string) (*ResourceD
 		return nil, err
 	}
 
+	// 获取当前指定的最新版本
 	var v model.ResourceVersion
-	if err := r.data.DB.Order("version_num desc").First(&v, "resource_id = ?", id).Error; err != nil {
-		return nil, err
+	if res.LatestVersionID != "" {
+		if err := r.data.DB.First(&v, "id = ?", res.LatestVersionID).Error; err != nil {
+			// 如果指针失效，退回到最高版本号
+			r.data.DB.Order("version_num desc").First(&v, "resource_id = ?", id)
+		}
+	} else {
+		// 默认取最高版本号
+		if err := r.data.DB.Order("version_num desc").First(&v, "resource_id = ?", id).Error; err != nil {
+			return nil, err
+		}
 	}
 
 	url, err := r.store.PresignGet(ctx, r.bucket, v.FilePath, time.Hour)
@@ -96,9 +105,15 @@ func (r *ResourceReader) ListResources(ctx context.Context, typeKey string, cate
 
 	cw := make([]*ResourceDTO, 0, len(resources))
 	for _, res := range resources {
-		// 获取最新版本以显示状态
+		// 获取当前指向的最新版本
 		var v model.ResourceVersion
-		r.data.DB.Order("version_num desc").First(&v, "resource_id = ?", res.ID)
+		if res.LatestVersionID != "" {
+			if err := r.data.DB.First(&v, "id = ?", res.LatestVersionID).Error; err != nil {
+				r.data.DB.Order("version_num desc").First(&v, "resource_id = ?", res.ID)
+			}
+		} else {
+			r.data.DB.Order("version_num desc").First(&v, "resource_id = ?", res.ID)
+		}
 
 		dv := &ResourceVersionDTO{
 			ID:         v.ID,
