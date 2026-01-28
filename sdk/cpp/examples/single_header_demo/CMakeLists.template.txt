@@ -1,0 +1,35 @@
+cmake_minimum_required(VERSION 3.14)
+project(SimHubSDKConsumer)
+
+set(CMAKE_CXX_STANDARD 17)
+
+# --- Option to enable AWS ---
+option(ENABLE_AWS "Enable AWS Support" OFF)
+
+# --- Dependencies ---
+find_package(CURL REQUIRED)
+
+if(ENABLE_AWS)
+    find_package(AWSSDK REQUIRED COMPONENTS s3 core)
+    add_definitions(-DUSE_AWS_SDK) # Define for your app if you use AWS types, otherwise SDK handles it internally via its public defines
+endif()
+
+# --- SimHub SDK Setup ---
+# Method 1: If using as a subdirectory
+# add_subdirectory(path/to/simhub/sdk/cpp)
+
+# Method 2: If compiling source directly (Simplest for single-files)
+set(SIMHUB_ROOT "/path/to/sim-hub/sdk/cpp")
+include_directories(${SIMHUB_ROOT}/include)
+
+set(SIMHUB_SOURCES ${SIMHUB_ROOT}/src/client.cpp)
+
+add_executable(my_app main.cpp ${SIMHUB_SOURCES})
+
+target_link_libraries(my_app PRIVATE CURL::libcurl)
+
+if(ENABLE_AWS)
+    target_link_libraries(my_app PRIVATE ${AWSSDK_LINK_LIBRARIES})
+    # Ensure the implementation knows to compile AWS code
+    target_compile_definitions(my_app PRIVATE USE_AWS_SDK)
+endif()

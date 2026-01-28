@@ -17,6 +17,9 @@ drivers/*
 # --- Go 相关 ---
 go.work
 .cache/
+coverage.txt
+coverage.out
+vendor/
 
 # --- 数据库与存储 / Storage ---
 simhub.db
@@ -38,6 +41,7 @@ config.local.yaml
 # --- 前端 / Frontend ---
 node_modules/
 dist/
+log/
 # 以下是 apps/ 目录下模块的构建产物
 apps/*/dist/
 apps/*/node_modules/
@@ -47,18 +51,28 @@ internal/ui/dist_*/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 .eslintcache
 .stylelintcache
 
-# --- C++ SDK ---
+# --- C++ SDK & CMake ---
 sdk/cpp/build/
 sdk/cpp/bin/
+sdk/cpp/**/build/
 sdk/cpp/**/cmake-build-*/
+sdk/cpp/**/CMakeFiles/
+sdk/cpp/**/CMakeCache.txt
+sdk/cpp/**/cmake_install.cmake
+sdk/cpp/**/Makefile
 sdk/cpp/**/*.o
 sdk/cpp/**/*.a
 sdk/cpp/**/*.dylib
-sdk/cpp/**/demo_*
-sdk/cpp/**/json.hpp
+sdk/cpp/**/*.lib
+sdk/cpp/**/demo
+sdk/cpp/**/demo.exe
+sdk/cpp/**/single_header_demo/demo
+sdk/cpp/**/multipart_example
+sdk/cpp/**/query_and_download_example
 
 # --- IDE & OS ---
 .vscode/*
@@ -70,6 +84,9 @@ sdk/cpp/**/json.hpp
 *.swo
 .DS_Store
 Thumbs.db
+.classpath
+.project
+.settings/
 
 # --- 开发调试 / Debug ---
 *.log

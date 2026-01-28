@@ -1,64 +1,80 @@
-cmake_minimum_required(VERSION 3.10)
-project(SimHubSDK)
+cmake_minimum_required(VERSION 3.14)
+project(SimHubSDK VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# 依赖项查找
-find_package(CURL REQUIRED)
-option(USE_AWS_SDK "Build with AWS SDK support for STS uploads" OFF)
+# --- Options ---
+option(SIMHUB_ENABLE_AWS "Enable AWS SDK support for STS direct uploads" OFF)
+option(SIMHUB_BUILD_EXAMPLES "Build example applications" ON)
+option(SIMHUB_BUILD_TESTS "Build unit tests" OFF)
 
-if(USE_AWS_SDK)
+# --- Dependencies ---
+find_package(CURL REQUIRED)
+
+if(SIMHUB_ENABLE_AWS)
+    # Hint: You might need to set -DCMAKE_PREFIX_PATH=/path/to/aws/sdk
     find_package(AWSSDK REQUIRED COMPONENTS s3 core)
-    add_definitions(-DUSE_AWS_SDK)
 endif()
 
-# 头文件目录
-include_directories(include)
-include_directories(${CURL_INCLUDE_DIRS})
-
-# 源文件
+# --- Library ---
 set(SDK_SOURCES
     src/client.cpp
 )
 
-# 构建静态库
+set(SDK_HEADERS
+    include/simhub/simhub.hpp
+)
+
 add_library(simhub_sdk STATIC ${SDK_SOURCES})
+add_library(SimHub::SDK ALIAS simhub_sdk)
 
-# 链接库
-target_link_libraries(simhub_sdk PRIVATE ${CURL_LIBRARIES})
+# Include Directories
+target_include_directories(simhub_sdk PUBLIC 
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
 
-if(USE_AWS_SDK)
+# Compile Definitions & Links
+target_link_libraries(simhub_sdk PRIVATE CURL::libcurl)
+
+if(SIMHUB_ENABLE_AWS)
+    target_compile_definitions(simhub_sdk PUBLIC USE_AWS_SDK)
     target_link_libraries(simhub_sdk PRIVATE ${AWSSDK_LINK_LIBRARIES})
+    message(STATUS "SimHub SDK: AWS Support Enabled")
+else()
+    message(STATUS "SimHub SDK: AWS Support Disabled (HTTP Only)")
 endif()
 
-# 安装配置 (可选)
-install(TARGETS simhub_sdk DESTINATION lib)
-install(DIRECTORY include/simhub DESTINATION include)
+# --- Installation ---
+include(GNUInstallDirs)
+install(TARGETS simhub_sdk
+    EXPORT SimHubSDKTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
 
-# 示例程序 (可选开关)
-# 示例程序 (可选开关)
-option(BUILD_EXAMPLES "Build SDK examples" ON)
-if(BUILD_EXAMPLES)
-    add_executable(multipart_upload_example examples/multipart_upload.cpp)
-    target_link_libraries(multipart_upload_example PRIVATE simhub_sdk ${CURL_LIBRARIES})
+install(DIRECTORY include/simhub DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-    add_executable(query_and_download_example examples/query_and_download.cpp)
-    target_link_libraries(query_and_download_example PRIVATE simhub_sdk ${CURL_LIBRARIES})
-endif()
+# Export Config
+install(EXPORT SimHubSDKTargets
+    FILE SimHubSDKTargets.cmake
+    NAMESPACE SimHub::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/SimHubSDK
+)
 
-# --- 单元测试 / Unit Tests ---
-option(BUILD_TESTS "Build SDK unit tests" ON)
-if(BUILD_TESTS)
-    include(FetchContent)
-    FetchContent_Declare(
-      googletest
-      URL https://github.com/google/googletest/archive/refs/heads/main.zip
-    )
-    # For Windows: Prevent overriding the parent project's compiler/linker settings
-    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(googletest)
-
-    enable_testing()
-    add_subdirectory(tests)
+# --- Examples ---
+if(SIMHUB_BUILD_EXAMPLES)
+    # Simple multipart example
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples/multipart_upload.cpp")
+        add_executable(multipart_example examples/multipart_upload.cpp)
+        target_link_libraries(multipart_example PRIVATE SimHub::SDK)
+    endif()
+    
+    # Single header demo (if we want to include it here, or let it be separate)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples/single_header_demo/main.cpp")
+         add_executable(single_header_demo examples/single_header_demo/main.cpp)
+         target_link_libraries(single_header_demo PRIVATE SimHub::SDK)
+    endif()
 endif()
