@@ -113,6 +113,10 @@ func (uc *UseCase) DeleteCategory(ctx context.Context, id string) error {
 	return uc.writer.DeleteCategory(ctx, id)
 }
 
+func (uc *UseCase) UpdateCategory(ctx context.Context, id string, req UpdateCategoryRequest) error {
+	return uc.writer.UpdateCategory(ctx, id, req)
+}
+
 func (uc *UseCase) CreateResourceFromData(ctx context.Context, req CreateResourceFromDataRequest) (*ResourceDTO, error) {
 	return uc.writer.CreateResourceFromData(ctx, req)
 }

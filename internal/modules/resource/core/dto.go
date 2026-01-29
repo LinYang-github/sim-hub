@@ -108,6 +108,11 @@ type CreateCategoryRequest struct {
 	ParentID string `json:"parent_id"`
 }
 
+type UpdateCategoryRequest struct {
+	Name     string  `json:"name,omitempty"`
+	ParentID *string `json:"parent_id,omitempty"`
+}
+
 type UploadTicket struct {
 	TicketID     string                  `json:"ticket_id"`
 	PresignedURL string                  `json:"presigned_url"`

@@ -12,6 +12,7 @@
       @add-subcategory="(pid) => promptAddCategory(pid)"
       @select-category="handleCategorySelect"
       @delete-category="(id) => confirmDeleteCategory(id, fetchList)"
+      @move-category="(id, newParentId) => updateCategory(id, { parent_id: newParentId })"
     />
 
     <!-- 主内容区 -->
@@ -410,7 +411,7 @@ const scopeOptions = SCOPE_OPTIONS
 // 1. Categories
 const { 
   categories, selectedCategoryId, categoryTree, currentCategoryName, 
-  fetchCategories, promptAddCategory, confirmDeleteCategory 
+  fetchCategories, promptAddCategory, confirmDeleteCategory, updateCategory 
 } = useCategory(toRef(props, 'typeKey'))
 
 // 2. Resource List

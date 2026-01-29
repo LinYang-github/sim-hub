@@ -131,6 +131,7 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 		categories.GET("", m.ListCategories)
 		categories.POST("", m.CreateCategory)
 		categories.DELETE("/:id", m.DeleteCategory)
+		categories.PATCH("/:id", m.UpdateCategory)
 	}
 }
 
@@ -297,6 +298,22 @@ func (m *Module) DeleteCategory(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"msg": "Category deleted"})
+}
+
+// UpdateCategory 更新分类 (重命名/移动)
+func (m *Module) UpdateCategory(c *gin.Context) {
+	id := c.Param("id")
+	var req core.UpdateCategoryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := m.uc.UpdateCategory(c.Request.Context(), id, req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Category updated"})
 }
 
 // UpdateResourceTags 更新资源标签

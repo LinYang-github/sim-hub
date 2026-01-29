@@ -37,6 +37,10 @@
           highlight-current
           :default-expanded-keys="[ROOT_CATEGORY_ID]"
           :filter-node-method="filterNode"
+          draggable
+          :allow-drag="allowDrag"
+          :allow-drop="allowDrop"
+          @node-drop="handleNodeDrop"
         >
           <template #default="{ node, data }">
             <div class="custom-tree-node">
@@ -78,9 +82,9 @@ const emit = defineEmits<{
   (e: 'add-category'): void
   (e: 'add-subcategory', parentId: string): void
   (e: 'select-category', data: CategoryNode): void
-  (e: 'select-category', data: CategoryNode): void
   (e: 'delete-category', id: string): void
   (e: 'update:modelValue', id: string): void
+  (e: 'move-category', id: string, parentId: string): void
 }>()
 
 const filterText = ref('')
@@ -98,6 +102,41 @@ const filterNode = (value: string, data: any) => {
 const handleNodeClick = (data: CategoryNode) => {
   emit('select-category', data)
   emit('update:modelValue', data.id)
+}
+
+const allowDrag = (node: any) => {
+  // Prevent dragging the root "All Categories" node
+  return node.data.id !== ROOT_CATEGORY_ID
+}
+
+// type can be 'prev', 'next', 'inner'
+const allowDrop = (draggingNode: any, dropNode: any, type: string) => {
+  // 1. Cannot drop 'prev' or 'next' relative to Root node (it must stay at top)
+  if (dropNode.data.id === ROOT_CATEGORY_ID && type !== 'inner') {
+    return false
+  }
+  return true
+}
+
+const handleNodeDrop = (draggingNode: any, dropNode: any, type: string, ev: DragEvent) => {
+  // Calculate new parent ID
+  let newParentId = ''
+  if (type === 'inner') {
+    newParentId = dropNode.data.id
+  } else {
+    // 'prev' or 'next' -> same parent as dropNode
+    newParentId = dropNode.parent.data.id || ROOT_CATEGORY_ID // default to root if parent is missing logic
+    // Note: el-tree internal structure. If dropNode is top level (under fake root), its parent might be root.
+    // Our fake root has id ROOT_CATEGORY_ID.
+    // If dropNode is child of "Full Categories", dropNode.parent.data.id should be ROOT_CATEGORY_ID.
+  }
+  
+  const targetId = draggingNode.data.id
+  // If moving to root (ID='all'), send empty string to backend
+  if (newParentId === ROOT_CATEGORY_ID) {
+    newParentId = ''
+  }
+  emit('move-category', targetId, newParentId)
 }
 </script>
 

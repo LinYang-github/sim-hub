@@ -70,6 +70,17 @@ export function useCategory(typeKey: Ref<string>) {
     }).catch(() => {})
   }
 
+
+  const updateCategory = async (id: string, data: { name?: string; parent_id?: string }) => {
+    try {
+      await request.patch(`/api/v1/categories/${id}`, data)
+      ElMessage.success('更新成功')
+      fetchCategories()
+    } catch (e: any) {
+      ElMessage.error('更新失败: ' + e.message)
+    }
+  }
+
   return {
     categories,
     selectedCategoryId,
@@ -77,6 +88,7 @@ export function useCategory(typeKey: Ref<string>) {
     currentCategoryName,
     fetchCategories,
     promptAddCategory,
-    confirmDeleteCategory
+    confirmDeleteCategory,
+    updateCategory
   }
 }

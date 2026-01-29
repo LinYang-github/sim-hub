@@ -50,6 +50,23 @@ func (w *ResourceWriter) CreateCategory(ctx context.Context, req CreateCategoryR
 	return &CategoryDTO{ID: cat.ID, Name: cat.Name, ParentID: cat.ParentID}, nil
 }
 
+// UpdateCategory 更新分类
+func (w *ResourceWriter) UpdateCategory(ctx context.Context, id string, req UpdateCategoryRequest) error {
+	updates := make(map[string]any)
+	if req.Name != "" {
+		updates["name"] = req.Name
+	}
+	if req.ParentID != nil {
+		updates["parent_id"] = *req.ParentID
+	}
+
+	if len(updates) == 0 {
+		return nil
+	}
+
+	return w.data.DB.Model(&model.Category{}).Where("id = ?", id).Updates(updates).Error
+}
+
 // DeleteCategory 删除分类
 func (w *ResourceWriter) DeleteCategory(ctx context.Context, id string) error {
 	return w.data.DB.Delete(&model.Category{}, "id = ?", id).Error
