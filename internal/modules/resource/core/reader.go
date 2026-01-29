@@ -77,7 +77,7 @@ func (r *ResourceReader) GetResource(ctx context.Context, id string) (*ResourceD
 }
 
 // ListResources 列出资源
-func (r *ResourceReader) ListResources(ctx context.Context, typeKey string, categoryID string, ownerID string, scope string, page, size int) ([]*ResourceDTO, int64, error) {
+func (r *ResourceReader) ListResources(ctx context.Context, typeKey string, categoryID string, ownerID string, scope string, keyword string, page, size int) ([]*ResourceDTO, int64, error) {
 	var resources []model.Resource
 	var total int64
 	offset := (page - 1) * size
@@ -88,6 +88,9 @@ func (r *ResourceReader) ListResources(ctx context.Context, typeKey string, cate
 	}
 	if categoryID != "" {
 		query = query.Where("category_id = ?", categoryID)
+	}
+	if keyword != "" {
+		query = query.Where("name LIKE ?", "%"+keyword+"%")
 	}
 
 	// 作用域逻辑
@@ -234,6 +237,7 @@ func (r *ResourceReader) resolveDependencyTree(ctx context.Context, versionID st
 		node := map[string]any{
 			"resource_id":   d.TargetResourceID,
 			"resource_name": targetRes.Name,
+			"type_key":      targetRes.TypeKey,
 			"version_id":    targetVer.ID,
 			"semver":        targetVer.SemVer,
 			"dependencies":  subDeps,

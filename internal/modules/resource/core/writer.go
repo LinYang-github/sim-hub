@@ -119,6 +119,40 @@ func (w *ResourceWriter) UpdateResourceScope(ctx context.Context, id string, sco
 	})
 }
 
+// UpdateResourceDependencies 更新资源版本的依赖关联
+func (w *ResourceWriter) UpdateResourceDependencies(ctx context.Context, versionID string, deps []DependencyDTO) error {
+	return w.data.DB.Transaction(func(tx *gorm.DB) error {
+		// 1. 删除旧依赖
+		if err := tx.Delete(&model.ResourceDependency{}, "source_version_id = ?", versionID).Error; err != nil {
+			return err
+		}
+
+		// 2. 写入新依赖
+		for _, d := range deps {
+			dependency := model.ResourceDependency{
+				SourceVersionID:  versionID,
+				TargetResourceID: d.TargetResourceID,
+				Constraint:       d.Constraint,
+			}
+			if err := tx.Create(&dependency).Error; err != nil {
+				return err
+			}
+		}
+
+		// 3. 触发异步刷新 Sidecar (以便下游感知依赖变化)
+		var v model.ResourceVersion
+		if err := tx.First(&v, "id = ?", versionID).Error; err == nil {
+			w.dispatcher.Dispatch(ctx, ProcessJob{
+				Action:    ActionRefresh,
+				ObjectKey: v.FilePath,
+				VersionID: v.ID,
+			})
+		}
+
+		return nil
+	})
+}
+
 // UpdateResource 更新资源基本信息 (更名、移动分类)
 func (w *ResourceWriter) UpdateResource(ctx context.Context, id string, req UpdateResourceRequest) error {
 	updates := make(map[string]any)

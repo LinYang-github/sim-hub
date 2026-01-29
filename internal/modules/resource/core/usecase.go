@@ -93,8 +93,8 @@ func (uc *UseCase) GetResource(ctx context.Context, id string) (*ResourceDTO, er
 	return uc.reader.GetResource(ctx, id)
 }
 
-func (uc *UseCase) ListResources(ctx context.Context, typeKey string, categoryID string, ownerID string, scope string, page, size int) ([]*ResourceDTO, int64, error) {
-	return uc.reader.ListResources(ctx, typeKey, categoryID, ownerID, scope, page, size)
+func (uc *UseCase) ListResources(ctx context.Context, typeKey string, categoryID string, ownerID string, scope string, keyword string, page, size int) ([]*ResourceDTO, int64, error) {
+	return uc.reader.ListResources(ctx, typeKey, categoryID, ownerID, scope, keyword, page, size)
 }
 
 func (uc *UseCase) ListResourceTypes(ctx context.Context) ([]model.ResourceType, error) {
@@ -151,6 +151,10 @@ func (uc *UseCase) GetResourceDependencies(ctx context.Context, vid string) ([]D
 
 func (uc *UseCase) GetDependencyTree(ctx context.Context, vid string) ([]map[string]any, error) {
 	return uc.reader.GetDependencyTree(ctx, vid)
+}
+
+func (uc *UseCase) UpdateResourceDependencies(ctx context.Context, vid string, deps []DependencyDTO) error {
+	return uc.writer.UpdateResourceDependencies(ctx, vid, deps)
 }
 
 func (uc *UseCase) ListResourceVersions(ctx context.Context, id string) ([]*ResourceVersionDTO, error) {

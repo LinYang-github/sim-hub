@@ -41,6 +41,7 @@ export interface ResourceDependency {
   id: string;
   resource_id: string;
   resource_name: string;
+  type_key?: string;
   version_id: string;
   semver?: string;
   constraint?: string;

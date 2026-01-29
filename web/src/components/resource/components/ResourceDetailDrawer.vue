@@ -215,9 +215,17 @@
 
         <el-tab-pane name="steward" label="元数据治理">
           <div class="tab-pane-content">
+            <!-- 1. Metadata JSON Editor -->
             <MetadataEditor 
               :version-id="resource.latest_version?.id"
               :initial-data="resource.latest_version?.meta_data"
+              @success="$emit('refresh')"
+            />
+
+            <!-- 2. Dependency Manager -->
+            <DependencyEditor
+              :version-id="resource.latest_version?.id"
+              :initial-deps="dependencies"
               @success="$emit('refresh')"
             />
           </div>
@@ -249,6 +257,7 @@ import { RESOURCE_STATE } from '../../../core/constants/resource'
 import ResourcePreview from '../previewers/ResourcePreview.vue'
 import DependencyGraph from '../previewers/DependencyGraph.vue'
 import MetadataEditor from './MetadataEditor.vue'
+import DependencyEditor from './DependencyEditor.vue'
 
 const props = defineProps<{
   modelValue: boolean

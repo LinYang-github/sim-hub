@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/liny/sim-hub/internal/conf"
@@ -109,6 +110,7 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 		resources.GET("/:id/versions", m.ListVersions)
 		resources.POST("/:id/latest", m.SetLatestVersion)
 		resources.GET("/versions/:vid/dependencies", m.GetDependencies)
+		resources.PATCH("/versions/:vid/dependencies", m.UpdateResourceDependencies)
 		resources.GET("/versions/:vid/dependency-tree", m.GetDependencyTree)
 		resources.PATCH("/versions/:vid/meta", m.UpdateVersionMetadata) // 新增：更新版本元数据 (PATCH)
 		resources.GET("/versions/:vid/bundle", m.GetBundle)
@@ -233,14 +235,15 @@ func (m *Module) ReportProcessResult(c *gin.Context) {
 
 // ListResources 列出资源
 func (m *Module) ListResources(c *gin.Context) {
-	page := 1
-	size := 20
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
 	typeKey := c.Query("type")
 	categoryID := c.Query("category_id")
 	ownerID := c.Query("owner_id")
 	scope := c.Query("scope")
+	keyword := c.Query("query")
 
-	list, total, err := m.uc.ListResources(c.Request.Context(), typeKey, categoryID, ownerID, scope, page, size)
+	list, total, err := m.uc.ListResources(c.Request.Context(), typeKey, categoryID, ownerID, scope, keyword, page, size)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -432,6 +435,22 @@ func (m *Module) DownloadBundle(c *gin.Context) {
 		// 注意：如果已经开始写入数据，这里再写 JSON 错误可能会破坏响应
 		return
 	}
+}
+
+// UpdateResourceDependencies 更新依赖关联
+func (m *Module) UpdateResourceDependencies(c *gin.Context) {
+	vid := c.Param("vid")
+	var req []core.DependencyDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := m.uc.UpdateResourceDependencies(c.Request.Context(), vid, req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Dependencies updated"})
 }
 
 // UpdateResource 更新资源基本信息

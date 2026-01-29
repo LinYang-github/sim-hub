@@ -240,7 +240,7 @@
       @rollback="rollback"
       @rename="(res) => stewardRef?.openRename(res)"
       @move="(res) => stewardRef?.openMove(res)"
-      @refresh="fetchList"
+      @refresh="refreshDetails"
       :current-category-name="currentCategoryName"
     />
 
@@ -456,6 +456,19 @@ const handleViewDetails = (row: Resource) => {
   detailDrawerVisible.value = true
   viewHistory(row, false) // Fetch versions ONLY, don't open extra drawer
   viewDependencies(row, false) // Fetch deps ONLY, don't open extra drawer
+}
+
+const refreshDetails = async () => {
+  await fetchList()
+  if (currentResource.value) {
+    // Re-fetch current resource details to update drawer
+    const updated = resources.value.find(r => r.id === currentResource.value?.id)
+    if (updated) {
+        currentResource.value = updated
+        await viewHistory(updated, false)
+        await viewDependencies(updated, false)
+    }
+  }
 }
 
 // 8. Online Create

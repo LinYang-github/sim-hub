@@ -59,6 +59,20 @@ export function useDependency(currentResource: Ref<Resource | null>) {
     ElMessage.success('已开始生成离线包并下载')
   }
 
+  const saveDependencies = async (vid: string, deps: { target_resource_id: string, constraint: string }[]) => {
+    try {
+      await request.patch(`/api/v1/resources/versions/${vid}/dependencies`, deps)
+      ElMessage.success('资源依赖关联已成功更新')
+      // Refresh tree
+      if (currentResource.value) {
+        await viewDependencies(currentResource.value, false)
+      }
+      return true
+    } catch (err: any) {
+      return false
+    }
+  }
+
   return {
     depDrawerVisible,
     depLoading,
@@ -67,6 +81,7 @@ export function useDependency(currentResource: Ref<Resource | null>) {
     packLoading,
     viewDependencies,
     downloadBundle,
-    downloadSimPack
+    downloadSimPack,
+    saveDependencies
   }
 }
