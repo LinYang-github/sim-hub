@@ -4,7 +4,8 @@ import { SimHubModule } from './types'
 import IframeContainer from './views/IframeContainer.vue'
 import request from './utils/request'
 // 移除硬编码的视图注册，改为动态注册
-import { SupportedView } from './types'
+// 移除硬编码的视图注册，改为动态注册
+import { SupportedView, CustomAction } from './types'
 
 
 class ModuleManager {
@@ -20,11 +21,21 @@ class ModuleManager {
   // 视图注册表
   private viewRegistry: Map<string, SupportedView> = new Map()
 
+  // 动作注册表
+  private actionRegistry: Map<string, CustomAction> = new Map()
+
   /**
    * 注册视图元数据
    */
   registerView(meta: SupportedView) {
       this.viewRegistry.set(meta.key, meta)
+  }
+
+  /**
+   * 注册自定义动作
+   */
+  registerAction(action: CustomAction) {
+      this.actionRegistry.set(action.key, action)
   }
 
   private handleSupportedViews(views: any) {
@@ -36,6 +47,23 @@ class ModuleManager {
               return { label: v, icon: 'Document', key: v }
           }
           return v
+      })
+  }
+
+  private handleCustomActions(actions: any) {
+      if (!actions || !Array.isArray(actions)) return actions
+      return actions.map(a => {
+          if (typeof a === 'string') {
+               const action = this.actionRegistry.get(a)
+               if (action) return action
+               return { key: a, label: a, icon: 'Promotion', handler: () => console.warn('Action handler not found for', a) }
+          }
+           // If object, try to enrich from registry if handler is missing or string
+          const registered = this.actionRegistry.get(a.key)
+          if (registered) {
+              return { ...registered, ...a } // Allow override
+          }
+          return a
       })
   }
 
@@ -113,7 +141,7 @@ class ModuleManager {
               enableScope: meta.enable_scope,
               viewer: meta.viewer,
               supportedViews: this.handleSupportedViews(meta.supported_views),
-              customActions: meta.custom_actions,
+              customActions: this.handleCustomActions(meta.custom_actions),
               externalUrl: meta.external_url,
               devUrl: meta.dev_url,
               shortName: meta.short_name

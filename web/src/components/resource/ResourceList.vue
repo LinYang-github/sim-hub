@@ -280,57 +280,50 @@
       @success="fetchList"
     />
 
+    <!-- Custom Action Handlers Renderer -->
+    <template v-if="customActions && customActions.length">
+        <div v-for="action in customActions" :key="action.key" style="display:none">
+            <component 
+                v-if="typeof action.handler !== 'function' && typeof action.handler !== 'string'"
+                :is="action.handler"
+                :ref="(el: any) => setActionRef(el, action.key)"
+            />
+        </div>
+    </template>
+
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, toRef, computed, watch, defineAsyncComponent } from 'vue'
 // Custom Action Handlers (Loaded dynamically)
-const activeActionHandlers = ref<Record<string, any>>({})
 
-const loadRemoteAction = (handlerName: string) => {
-    return defineAsyncComponent(async () => {
-        const devUrl = import.meta.env.VITE_EXT_APP_DEV_URL || 'http://localhost:30031'
-        const scriptUrl = `${devUrl}/demo-form/src/main.ts` 
-        
-        // Share HOST context for actions too
-        if (!(window as any).Vue) (window as any).Vue = await import('vue')
-        if (!(window as any).ElementPlus) (window as any).ElementPlus = await import('element-plus')
-
-        try {
-            await import(/* @vite-ignore */ scriptUrl)
-            return (window as any).SimHubCustomComponents[handlerName]
-        } catch (e) {
-            console.error(`Failed to load action handler: ${handlerName}`, e)
-            return { render: () => null }
-        }
-    })
-}
 
 const handleCustomAction = (key: string, row: any) => {
     const actionDef = props.customActions?.find(a => a.key === key)
-    if (!actionDef || !actionDef.handler) return
-
-    // Lazy load handler if not present
-    if (!activeActionHandlers.value[key]) {
-        activeActionHandlers.value[key] = loadRemoteAction(actionDef.handler)
+    if (!actionDef || !actionDef.handler) {
+      console.warn('Action definition or handler missing', key)
+      return
     }
-    
-    // Defer execution to let the component mount (nextTick logic handled by component self-registration or ref access)
-    // Actually, defineAsyncComponent returns a component definition. We need to MOUNT it to use it.
-    // So we render it in the template, and access it via ref.
-    
-    // Instead of complex ref management, we rely on the Action Component exposing an 'execute' method.
-    // We will wait for the ref to be available.
+
+    // 情况 1: 处理器是纯函数 (直接执行)
+    if (typeof actionDef.handler === 'function') {
+        try {
+           (actionDef.handler as Function)(row)
+        } catch (e) { console.error('Error executing action function', e) }
+        return
+    }
+
+    // 情况 2: 处理器是组件 (通过 Ref 调用 execute 方法)
+    // 组件已被模板中的隐藏区域挂载，我们尝试获取其实例并调用 execute
     setTimeout(() => {
         const componentRef = actionComponentsRef.value[key]
         if (componentRef && componentRef.execute) {
             componentRef.execute(row)
         } else {
-             // Try to find in array refs if v-for is used
-             console.warn('Action Handler not ready or invalid', key)
+             console.warn('Action handler component not ready or invalid', key)
         }
-    }, 100)
+    }, 0)
 }
 
 const actionComponentsRef = ref<any>({})
@@ -378,7 +371,7 @@ const props = defineProps<{
   viewer?: string
   icon?: string
   supportedViews?: { key: string, label: string, icon: string, path?: string }[]
-  customActions?: { key: string, label: string, icon: string, handler: string }[]
+  customActions?: { key: string, label: string, icon: string, handler: any }[]
 }>()
 
 // Computed for button text (use shortName if available, fallback to typeName)

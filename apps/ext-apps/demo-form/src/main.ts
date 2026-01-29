@@ -6,10 +6,18 @@ import DemoActionFactory from './components/DemoAction'
 const ScoreRaterRemote = ScoreRaterRemoteFactory()
 const DemoActionRemote = DemoActionFactory()
 
-// 暴露组件给主应用（通过全局注册表）
+// Register Custom Actions
+(window as any).SimHub?.registerAction({
+    key: 'demo-action', // Matches key in config
+    label: '审批流',
+    icon: 'Stamp',
+    handler: DemoActionRemote
+})
+
+// Register Custom Components (for forms etc, keep this if needed by other parts, or migrate if possible)
+// Currently 'ScoreRater' is used as a form widget, not an action.
 ;(window as any).SimHubCustomComponents = (window as any).SimHubCustomComponents || {}
 ;(window as any).SimHubCustomComponents['ScoreRater'] = ScoreRaterRemote
-;(window as any).SimHubCustomComponents['DemoAction'] = DemoActionRemote
 
 // 仅用于本地开发预览的挂载逻辑
 if (import.meta.env.DEV) {

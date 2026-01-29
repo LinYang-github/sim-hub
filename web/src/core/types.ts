@@ -14,6 +14,13 @@ export interface SupportedView {
   path?: string
 }
 
+export interface CustomAction {
+  key: string
+  label: string
+  icon: string | Component
+  handler: Component | Function | string // Allow string for backward compatibility or legacy lookup
+}
+
 export interface SimHubModule {
   key: string
   // Internal Module Props
@@ -35,5 +42,5 @@ export interface SimHubModule {
   integrationMode?: 'iframe' | 'new-tab' | 'internal'
   viewer?: string
   supportedViews?: SupportedView[]
-  customActions?: { key: string, label: string, icon: string, handler: string }[]
+  customActions?: CustomAction[]
 }
