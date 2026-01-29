@@ -47,3 +47,4 @@ export const ROOT_CATEGORY_ID = 'all'
  * 默认管理员 ID
  */
 export const DEFAULT_ADMIN_ID = 'admin'
+

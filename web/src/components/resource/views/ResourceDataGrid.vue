@@ -128,6 +128,14 @@
   </el-table>
 </template>
 
+<script lang="ts">
+export const viewMeta = {
+  key: 'data-grid', 
+  label: '详细列表', 
+  icon: 'List'
+}
+</script>
+
 <script setup lang="ts">
 import { 
   Download, MoreFilled, View as ViewIcon, 

@@ -21,6 +21,7 @@ export interface SimHubModule {
   
   // Generic Resource Props
   typeName?: string
+  shortName?: string
   uploadMode?: 'single' | 'folder-zip' | 'online'
   accept?: string
   enableScope?: boolean

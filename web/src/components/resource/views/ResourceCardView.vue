@@ -127,6 +127,14 @@
   </div>
 </template>
 
+<script lang="ts">
+export const viewMeta = {
+  key: 'card', 
+  label: '卡片视图', 
+  icon: 'Grid'
+}
+</script>
+
 <script setup lang="ts">
 import { 
   Download, Delete, PriceTag, MoreFilled, InfoFilled, Promotion, Lock, Edit

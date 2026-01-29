@@ -158,6 +158,14 @@
   </el-table>
 </template>
 
+<script lang="ts">
+export const viewMeta = {
+  key: 'table', 
+  label: '列表视图', 
+  icon: 'DataLine'
+}
+</script>
+
 <script setup lang="ts">
 import { 
   Download, MoreFilled, InfoFilled, 

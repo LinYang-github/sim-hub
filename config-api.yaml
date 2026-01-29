@@ -41,13 +41,7 @@ resource_types:
       icon: "Box"
       viewer: "GLBPreview"
       short_name: "3D模型"
-      supported_views:
-        - key: "card"
-          label: "网格视图"
-          icon: "Grid"
-        - key: "table"
-          label: "列表视图"
-          icon: "DataLine"
+      supported_views: ["card", "table"]
 
   - type_key: "map_terrain"
     type_name: "地图资源库"
@@ -97,12 +91,6 @@ resource_types:
       icon: "Platform"
       dev_url: "http://localhost:30031"
       short_name: "外部资源"
-      supported_views:
-        - key: "view"
-          label: "外部视图"
-          path: "External:demo-view/index.html"
-        - key: "table"
-          label: "原生列表"
 
   - type_key: "test_db"
     type_name: "测试资源库"
@@ -114,13 +102,7 @@ resource_types:
       icon: "Coin"
       enable_scope: true
       short_name: "测试资源"
-      supported_views:
-        - key: "table"
-          label: "列表视图"
-          icon: "List"
-        - key: "card"
-          label: "卡片视图"
-          icon: "Grid"
+      supported_views: ["demo-view", "data-grid"]
       custom_actions:
         - key: "demo_audit"
           label: "Demo 审批"

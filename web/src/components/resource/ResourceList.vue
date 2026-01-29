@@ -124,9 +124,9 @@
         <!-- 2. 有数据 -> 正常列表/卡片/外部视图 -->
         <template v-else-if="resources.length > 0">
           <!-- External View Mode -->
-          <div v-if="viewMode.startsWith('External:')" class="external-view-wrapper">
+          <div v-if="activeViewConfig?.path?.startsWith('External:')" class="external-view-wrapper">
              <ExternalViewer 
-               :url="viewMode.replace('External:', '')" 
+               :url="activeViewConfig.path.replace('External:', '')" 
                :resource="{ typeKey, resources, searchQuery, activeScope }" 
              />
           </div>
@@ -147,25 +147,26 @@
             @custom-action="(key, row) => handleCustomAction(key, row)"
           />
 
-          <!-- Default Table/DataGrid View Mode -->
-          <template v-else>
-            <ResourceDataGrid
-              v-if="uploadMode === 'online'"
-              :resources="resources"
-              :loading="loading"
-              :icon="icon"
-              :schema="currentSchema"
-              @edit-tags="openTagEditor"
-              @view-details="handleViewDetails"
-              @download="download"
-              @delete="confirmDelete"
-              @rename="(res) => stewardRef?.openRename(res)"
-              @move="(res) => stewardRef?.openMove(res)"
-              :custom-actions="customActions"
-              @custom-action="(key, row) => handleCustomAction(key, row)"
-            />
-            <ResourceTableView
-              v-else
+          <!-- DataGrid View Mode -->
+          <ResourceDataGrid
+            v-else-if="viewMode === 'data-grid'"
+            :resources="resources"
+            :loading="loading"
+            :icon="icon"
+            :schema="currentSchema"
+            @edit-tags="openTagEditor"
+            @view-details="handleViewDetails"
+            @download="download"
+            @delete="confirmDelete"
+            @rename="(res) => stewardRef?.openRename(res)"
+            @move="(res) => stewardRef?.openMove(res)"
+            :custom-actions="customActions"
+            @custom-action="(key, row) => handleCustomAction(key, row)"
+          />
+
+          <!-- Default/Table View Mode -->
+          <ResourceTableView
+            v-else
               :resources="resources"
               :loading="loading"
               :enable-scope="!!enableScope"
@@ -180,7 +181,6 @@
               :custom-actions="customActions"
               @custom-action="(key, row) => handleCustomAction(key, row)"
             />
-          </template>
         </template>
 
         <!-- 3. 加载结束且无数据 -> 优质空状态 -->
@@ -377,12 +377,17 @@ const props = defineProps<{
   enableScope?: boolean
   viewer?: string
   icon?: string
-  supportedViews?: { key: string, label: string, icon: string }[]
+  supportedViews?: { key: string, label: string, icon: string, path?: string }[]
   customActions?: { key: string, label: string, icon: string, handler: string }[]
 }>()
 
 // Computed for button text (use shortName if available, fallback to typeName)
 const actionLabel = computed(() => props.shortName || props.typeName)
+
+// Resolve current view config (especially for path)
+const activeViewConfig = computed(() => {
+  return props.supportedViews?.find(v => v.key === viewMode.value)
+})
 
 const statusMap = RESOURCE_STATUS_TEXT
 

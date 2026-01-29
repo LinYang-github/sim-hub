@@ -34,9 +34,16 @@ const iframeRef = ref<HTMLIFrameElement | null>(null)
 const iframeUrl = computed(() => {
     let base = window.location.origin
     
-    // In dev mode, if url is relative, it probably points to the consolidated examples hub
-    if (import.meta.env.DEV && props.url.startsWith('/')) {
+    // In dev mode, if url is relative (no protocol), point to ext-apps dev server
+    if (import.meta.env.DEV && !props.url.startsWith('http')) {
         base = import.meta.env.VITE_EXT_APP_DEV_URL || 'http://localhost:30031'
+        // Ensure url has leading slash if mixing with host
+        if (!props.url.startsWith('/')) {
+             // We can't modify props directly, but the new URL constructor handles 'path' vs '/path' slightly differently relative to base.
+             // Actually, new URL('foo', 'http://base.com') -> 'http://base.com/foo'
+             // new URL('/foo', 'http://base.com') -> 'http://base.com/foo'
+             // So it's fine.
+        }
     }
 
     const u = new URL(props.url, base)

@@ -3,6 +3,28 @@ import { Router } from 'vue-router'
 import { SimHubModule } from './types'
 import IframeContainer from './views/IframeContainer.vue'
 import request from './utils/request'
+import { viewMeta as TableMeta } from '../components/resource/views/ResourceTableView.vue'
+import { viewMeta as CardMeta } from '../components/resource/views/ResourceCardView.vue'
+import { viewMeta as GridMeta } from '../components/resource/views/ResourceDataGrid.vue'
+
+// 动态视图注册表
+const VIEW_REGISTRY: Map<string, { label: string, icon: string, path?: string }> = new Map()
+
+// 注册标准视图
+;[TableMeta, CardMeta, GridMeta].forEach(meta => {
+    VIEW_REGISTRY.set(meta.key, meta)
+})
+
+const handleSupportedViews = (views: any) => {
+    if (!views || !Array.isArray(views)) return views
+    return views.map(v => {
+        if (typeof v === 'string') {
+            const meta = VIEW_REGISTRY.get(v) || { label: v, icon: 'Document' }
+            return { key: v, ...meta }
+        }
+        return v
+    })
+}
 
 class ModuleManager {
   // 已配置（活跃）的模块列表 (使用 shallowRef 确保 UI 响应式同步)
@@ -87,7 +109,7 @@ class ModuleManager {
               uploadMode: item.upload_mode || 'online',
               enableScope: meta.enable_scope,
               viewer: meta.viewer,
-              supportedViews: meta.supported_views,
+              supportedViews: handleSupportedViews(meta.supported_views),
               customActions: meta.custom_actions,
               externalUrl: meta.external_url,
               devUrl: meta.dev_url,
