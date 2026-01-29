@@ -46,6 +46,7 @@ const AsyncDocPreview = defineAsyncComponent(() => import('./DocPreview.vue'))
 const AsyncGeoPreview = defineAsyncComponent(() => import('./GeoPreview.vue'))
 const AsyncFolderPreview = defineAsyncComponent(() => import('./FolderPreview.vue'))
 const AsyncExternalViewer = defineAsyncComponent(() => import('./ExternalViewer.vue'))
+const AsyncJsonPreview = defineAsyncComponent(() => import('./JsonPreview.vue'))
 
 // 2. 映射表，支持按需返回组件
 const getViewerComponent = (name?: string) => {
@@ -60,12 +61,11 @@ const getViewerComponent = (name?: string) => {
     'GeoPreview': AsyncGeoPreview,
     'FolderPreview': AsyncFolderPreview,
     'ExternalViewer': AsyncExternalViewer,
+    'JsonPreview': AsyncJsonPreview,
+    'JsonTreeViewer': AsyncJsonPreview,
     'DefaultIconPreview': DefaultIconPreview
   }
   
-  // If downloadUrl is a full link and we don't have a specific viewer, might want to try External
-  if (props.downloadUrl?.startsWith('http') && !name) return AsyncExternalViewer
-
   return (name && viewerMap[name]) ? markRaw(viewerMap[name]) : DefaultIconPreview
 }
 

@@ -7,7 +7,11 @@
     "typeName": "想定",
     "uploadMode": "folder-zip",
     "enableScope": true,
-    "viewer": "FolderPreview"
+    "viewer": "FolderPreview",
+    "supportedViews": [
+      { "key": "table", "label": "表格视图", "icon": "DataLine" },
+      { "key": "card", "label": "卡片视图", "icon": "Grid" }
+    ]
   },
   {
     "key": "model_glb",
@@ -18,7 +22,11 @@
     "uploadMode": "single",
     "accept": ".glb",
     "enableScope": false,
-    "viewer": "GLBPreview"
+    "viewer": "GLBPreview",
+    "supportedViews": [
+      { "key": "card", "label": "卡片预览", "icon": "Grid" },
+      { "key": "table", "label": "标准列表", "icon": "DataLine" }
+    ]
   },
   {
     "key": "map_terrain",
@@ -39,7 +47,11 @@
     "uploadMode": "single",
     "accept": ".md,.pdf,.txt",
     "enableScope": true,
-    "viewer": "DocPreview"
+    "viewer": "DocPreview",
+    "supportedViews": [
+      { "key": "table", "label": "详细列表", "icon": "DataLine" },
+      { "key": "card", "label": "缩略卡片", "icon": "Grid" }
+    ]
   },
   {
     "key": "spectrum_rule",
@@ -50,22 +62,30 @@
     "uploadMode": "online",
     "accept": ".json",
     "enableScope": false,
-    "viewer": "JsonPreview"
+    "viewer": "JsonPreview",
+    "supportedViews": [
+      { "key": "table", "label": "标准列表", "icon": "DataLine" }
+    ]
   },
   {
     "key": "test-repo",
-    "label": "外部演示 (完整库模式)",
+    "label": "外部资源库",
     "integrationMode": "iframe",
     "icon": "Monitor",
     "externalUrl": "/demo-repo/index.html",
     "devUrl": "http://localhost:30031/demo-repo/index.html"
   },
   {
-    "key": "scattered-demo",
-    "label": "外部演示 (分散页面模式)",
-    "integrationMode": "iframe",
+    "key": "test_db",
+    "label": "测试资源库",
+    "integrationMode": "internal",
     "icon": "Grid",
-    "externalUrl": "/demo-preview/index.html",
-    "devUrl": "http://localhost:30031/demo-preview/index.html"
+    "typeName": "记录",
+    "uploadMode": "online",
+    "viewer": "External:/demo-preview/index.html",
+    "supportedViews": [
+      { "key": "External:/demo-preview/index.html", "label": "图表视图", "icon": "DataLine" },
+      { "key": "table", "label": "数据视图", "icon": "Grid" }
+    ]
   }
 ]

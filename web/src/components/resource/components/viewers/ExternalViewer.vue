@@ -52,13 +52,19 @@ const handleLoad = () => {
 
 const syncData = () => {
     if (iframeRef.value && iframeRef.value.contentWindow && props.resource) {
-        // Send data to guest app
-        iframeRef.value.contentWindow.postMessage({
-            type: 'PREVIEW_DATA',
-            payload: {
-                resource: props.resource
-            }
-        }, '*')
+        try {
+            // Use JSON.parse(JSON.stringify()) to ensure it's serializable and not a complex proxy
+            const serializableResource = JSON.parse(JSON.stringify(props.resource))
+            // Send data to guest app
+            iframeRef.value.contentWindow.postMessage({
+                type: 'PREVIEW_DATA',
+                payload: {
+                    resource: serializableResource
+                }
+            }, '*')
+        } catch (e) {
+            console.warn('Failed to serialize resource for external viewer:', e)
+        }
     }
 }
 

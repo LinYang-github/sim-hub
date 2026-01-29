@@ -128,8 +128,13 @@
     <!-- 兼容原来的预览逻辑（如果有资源传进来） -->
     <div id="preview-section" style="margin-top: 30px; display: none;">
         <div class="demo-card" style="border: 2px dashed #409eff;">
-            <div class="card-title">🖼️ 兼容预览模式</div>
-            <div id="preview-content" style="font-size: 13px;"></div>
+            <div class="card-title">🖼️ 动态数据看板</div>
+            <div id="preview-content" style="font-size: 13px;">
+                <div id="res-info">正在从宿主获取数据...</div>
+                <div id="res-list" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+                    <!-- 这里将展示资源列表 -->
+                </div>
+            </div>
         </div>
     </div>
 
@@ -142,7 +147,7 @@
                         this.handleTheme(data.payload.theme);
                     }
                     if (data.type === 'PREVIEW_DATA') {
-                        this.handlePreview(data.payload.resource);
+                        this.handleData(data.payload.resource);
                     }
                 });
             },
@@ -155,10 +160,22 @@
                     document.getElementById('theme-status').innerText = '当前侦测到: 浅色模式';
                 }
             },
-            handlePreview(resource) {
-                if (resource) {
-                    document.getElementById('preview-section').style.display = 'block';
-                    document.getElementById('preview-content').innerText = '正在预览资源: ' + resource.name;
+            handleData(data) {
+                if (!data) return;
+                document.getElementById('preview-section').style.display = 'block';
+                
+                // 情况 1: 单个资源预览 (Resource)
+                if (data.name) {
+                    document.getElementById('res-info').innerHTML = `<b>当前资源:</b> ${data.name}`;
+                    document.getElementById('res-list').innerHTML = ''; 
+                } 
+                // 情况 2: 资源列表视图 (Resources Collection)
+                else if (data.resources) {
+                    document.getElementById('res-info').innerHTML = `<b>资源库:</b> ${data.typeKey} (共 ${data.resources.length} 项)`;
+                    const listHtml = data.resources.slice(0, 5).map(r => `
+                        <div style="margin-bottom: 5px; color: #666;">• ${r.name} <small>[${r.status}]</small></div>
+                    `).join('');
+                    document.getElementById('res-list').innerHTML = listHtml + (data.resources.length > 5 ? '<div style="color: #999;">...等更多</div>' : '');
                 }
             },
             callHost(type, payload) {

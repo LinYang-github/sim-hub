@@ -86,8 +86,20 @@
               </el-button>
             </el-tooltip>
             
-            <div class="view-toggle-group">
-               <div class="toggle-item" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">
+            <!-- View Toggles (Only show if multiple views are supported) -->
+            <div class="view-toggle-group" v-if="supportedViews && supportedViews.length > 1">
+               <div 
+                 v-for="v in supportedViews" 
+                 :key="v.key"
+                 class="toggle-item" 
+                 :class="{ active: viewMode === v.key }" 
+                 @click="viewMode = v.key"
+               >
+                 <el-icon><component :is="v.icon" /></el-icon>
+               </div>
+            </div>
+            <div class="view-toggle-group" v-else-if="!supportedViews">
+               <div class="toggle-item" :class="{ active: viewMode === 'table' }" @click="viewMode = 'table'">
                  <el-icon><DataLine /></el-icon>
                </div>
                <div class="toggle-item" :class="{ active: viewMode === 'card' }" @click="viewMode = 'card'">
@@ -109,9 +121,32 @@
         <!-- 1. 加载中且无数据 -> 骨架屏 -->
         <ResourceSkeleton v-if="loading && !resources.length" :view-mode="viewMode" />
 
-        <!-- 2. 有数据 -> 正常列表/卡片 -->
+        <!-- 2. 有数据 -> 正常列表/卡片/外部视图 -->
         <template v-else-if="resources.length > 0">
-          <template v-if="viewMode === 'list'">
+          <!-- External View Mode -->
+          <div v-if="viewMode.startsWith('External:')" class="external-view-wrapper">
+             <ExternalViewer 
+               :url="viewMode.replace('External:', '')" 
+               :resource="{ typeKey, resources, searchQuery, activeScope }" 
+             />
+          </div>
+
+          <!-- Card View Mode -->
+          <ResourceCardView 
+            v-else-if="viewMode === 'card'"
+            :resources="resources"
+            :type-key="typeKey"
+            :enable-scope="!!enableScope"
+            :status-map="statusMap"
+            :viewer="viewer"
+            :icon="icon"
+            @view-details="handleViewDetails"
+            @download="download"
+            @delete="confirmDelete"
+          />
+
+          <!-- Default Table/DataGrid View Mode -->
+          <template v-else>
             <ResourceDataGrid
               v-if="uploadMode === 'online'"
               :resources="resources"
@@ -140,22 +175,6 @@
               @move="(res) => stewardRef?.openMove(res)"
             />
           </template>
-          <ResourceCardView 
-            v-else
-            :resources="resources"
-            :type-key="typeKey"
-            :enable-scope="!!enableScope"
-            :status-map="statusMap"
-            :viewer="viewer"
-            :icon="icon"
-            @edit-tags="openTagEditor"
-            @view-details="handleViewDetails"
-            @download="download"
-            @delete="confirmDelete"
-            @change-scope="handleScopeChange"
-            @rename="(res) => stewardRef?.openRename(res)"
-            @move="(res) => stewardRef?.openMove(res)"
-          />
         </template>
 
         <!-- 3. 加载结束且无数据 -> 优质空状态 -->
@@ -276,6 +295,7 @@ import UploadDialog from './components/UploadDialog.vue'
 import ResourceStewardDialogs from './components/ResourceStewardDialogs.vue'
 import OnlineCreateDialog from './components/OnlineCreateDialog.vue'
 import ResourceDataGrid from './components/ResourceDataGrid.vue'
+import ExternalViewer from './components/viewers/ExternalViewer.vue'
 
 // Composables
 import { useCategory } from './composables/useCategory'
@@ -296,11 +316,22 @@ const props = defineProps<{
   enableScope?: boolean
   viewer?: string
   icon?: string
+  supportedViews?: { key: string, label: string, icon: string }[]
 }>()
 
 const statusMap = RESOURCE_STATUS_TEXT
 
-const viewMode = ref('list')
+const viewMode = ref('table')
+
+// Sync viewMode with supportedViews
+watch(() => props.typeKey, () => {
+  if (props.supportedViews && props.supportedViews.length > 0) {
+    viewMode.value = props.supportedViews[0].key
+  } else {
+    // Legacy fallback
+    viewMode.value = props.uploadMode === 'online' ? 'table' : 'table'
+  }
+}, { immediate: true })
 const searchFocused = ref(false)
 const detailDrawerVisible = ref(false)
 const stewardRef = ref<InstanceType<typeof ResourceStewardDialogs>>()
@@ -393,7 +424,7 @@ const openOnlineCreate = () => {
 
 // Init Schema
 const initSchema = () => {
-    if (Object.keys(allSchemas.value).length === 0) {
+    if (!allSchemas.value[props.typeKey]) {
         fetchSchemas()
     }
 }
@@ -699,6 +730,13 @@ onUnmounted(() => {
   &.is-loading {
     border-color: transparent;
     box-shadow: none;
+  }
+
+  .external-view-wrapper {
+    width: 100%;
+    height: 100%;
+    min-height: 500px;
+    background: transparent;
   }
 }
 

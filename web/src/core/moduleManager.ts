@@ -105,7 +105,8 @@ class ModuleManager {
                           accept: item.accept,
                           enableScope: item.enableScope,
                           viewer: item.viewer,
-                          icon: item.icon
+                          icon: item.icon,
+                          supportedViews: item.supportedViews
                         }
                       }
                     ]

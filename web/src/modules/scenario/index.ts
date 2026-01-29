@@ -19,7 +19,8 @@ const scenarioModule: SimHubModule = {
         typeKey: 'scenario', 
         typeName: '想定',
         uploadMode: 'folder-zip',
-        enableScope: true
+        enableScope: true,
+        viewer: 'FolderPreview'
       }
     }
   ]

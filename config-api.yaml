@@ -62,6 +62,16 @@ resource_types:
     viewer_conf:
       component: "JsonTreeViewer"
     category_mode: "tree"
+  - type_key: "test_db"
+    type_name: "测试资源库 (DEMO)"
+    schema_def:
+      type: "object"
+      properties:
+        test_name:
+          type: "string"
+        score:
+          type: "integer"
+    category_mode: "tree"
 
 log:
   level: "info"

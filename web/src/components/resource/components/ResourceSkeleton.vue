@@ -1,6 +1,6 @@
 <template>
   <div class="skeleton-wrapper">
-    <div v-if="viewMode === 'list'" class="list-skeleton">
+    <div v-if="viewMode === 'list' || viewMode === 'table'" class="list-skeleton">
       <el-skeleton :rows="10" animated />
     </div>
     
