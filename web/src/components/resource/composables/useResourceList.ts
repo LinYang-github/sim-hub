@@ -70,7 +70,11 @@ export function useResourceList(
   }
 
   // 监听所有可能触发列表刷新的响应式变量，并立即执行一次首屏加载
-  watch([typeKey, selectedCategoryId, activeScope, searchQuery], () => {
+  watch([typeKey, selectedCategoryId, activeScope, searchQuery], ([newType, newCat, newScope, newQuery], [oldType]) => {
+    // 如果是切换类型，立即清空列表，防止渲染残留数据
+    if (newType !== oldType) {
+        resources.value = []
+    }
     fetchList()
   }, { immediate: true })
 

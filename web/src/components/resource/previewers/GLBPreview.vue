@@ -117,6 +117,15 @@ const animate = () => {
 
 const loadModel = () => {
   if (!props.url) return
+  
+  // Basic validation to prevent loading obvious non-GLB files (like ZIPs or error messages)
+  // This is a heuristic check; unexpected server responses might still slip through but cleaner than nothing.
+  if (props.url.includes('.zip') || props.url.includes('.rar')) {
+      console.warn('GLBPreview: received non-model URL:', props.url)
+      loading.value = false
+      error.value = true
+      return
+  }
 
   loading.value = true
   error.value = false
@@ -154,8 +163,15 @@ const loadModel = () => {
       loading.value = false
     },
     undefined,
-    (err) => {
-      console.error('Error loading GLB:', err)
+    (err: any) => {
+      // Suppress specific JSON parse errors which usually mean "Not a GLB file"
+      // e.g. "Unexpected token 'P', "PK"..."
+      const msg = err.toString()
+      if (msg.includes('SyntaxError') || msg.includes('Unexpected token')) {
+          console.warn('GLBPreview: Failed to parse content. Likely not a valid binary GLB.', props.url)
+      } else {
+          console.error('Error loading GLB:', err)
+      }
       loading.value = false
       error.value = true
     }

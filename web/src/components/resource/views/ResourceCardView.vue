@@ -119,7 +119,7 @@ import {
 import { formatSize } from '../../../core/utils/format'
 import type { Resource, ResourceScope } from '../../../core/types/resource'
 import { RESOURCE_STATE, RESOURCE_SCOPE, DEFAULT_ADMIN_ID } from '../../../core/constants/resource'
-import ResourcePreview from './viewers/ResourcePreview.vue'
+import ResourcePreview from '../previewers/ResourcePreview.vue'
 
 defineProps<{
   resources: Resource[]

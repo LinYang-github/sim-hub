@@ -79,8 +79,22 @@ class ModuleManager {
             const impl = this.implementations.get(item.key)
             if (impl) {
                 // 将配置项（如 label）合并到代码实现中
-                const merged = { ...impl, ...item } 
-                // 注意：保留实现中的 routes/menu，但覆盖 label 等顶层属性
+                const merged = { ...impl, ...item }
+                // Use supportedViews from config if available, otherwise from impl
+                if (item.supportedViews) {
+                    merged.supportedViews = item.supportedViews
+                }
+                
+                // If the module uses the generic ResourceList component internally (e.g. via routes),
+                // we need to make sure the props in that route definition are updated.
+                if (merged.routes) {
+                    merged.routes.forEach(r => {
+                        if (r.props && typeof r.props === 'object') {
+                            // Inject supportedViews into the route props
+                            (r.props as any).supportedViews = merged.supportedViews
+                        }
+                    })
+                }
                 newActiveModules.push(merged)
             } else {
                 // 兜底逻辑：如果没有特定实现，自动使用通用的 ResourceList

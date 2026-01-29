@@ -24,7 +24,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, markRaw } from 'vue'
 import DefaultIconPreview from './DefaultIconPreview.vue'
-import { RESOURCE_STATE } from '../../../../core/constants/resource'
+import { RESOURCE_STATE } from '../../../core/constants/resource'
 
 const props = defineProps<{
   typeKey: string
@@ -35,7 +35,8 @@ const props = defineProps<{
   viewer?: string
   icon?: string
   metaData?: Record<string, any>
-  fullResource?: any // Pass full resource for external viewers
+  metaData?: Record<string, any>
+  fullResource?: any
 }>()
 
 // 1. 定义异步组件 - 只有在使用时才会请求网络下载对应的 JS 包

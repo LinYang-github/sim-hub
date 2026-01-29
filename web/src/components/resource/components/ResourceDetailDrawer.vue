@@ -246,8 +246,8 @@ import { InfoFilled, Edit, Download, Share, Rank, FullScreen, Close } from '@ele
 import { formatDate, formatSize } from '../../../core/utils/format'
 import type { Resource, ResourceVersion, ResourceDependency } from '../../../core/types/resource'
 import { RESOURCE_STATE } from '../../../core/constants/resource'
-import ResourcePreview from './viewers/ResourcePreview.vue'
-import DependencyGraph from './viewers/DependencyGraph.vue'
+import ResourcePreview from '../previewers/ResourcePreview.vue'
+import DependencyGraph from '../previewers/DependencyGraph.vue'
 import MetadataEditor from './MetadataEditor.vue'
 
 const props = defineProps<{
