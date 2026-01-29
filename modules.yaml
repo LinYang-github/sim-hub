@@ -1,0 +1,142 @@
+resource_types:
+  
+  - type_key: "scenario"
+    type_name: "想定资源库"
+    sort_order: 10
+    schema_def:
+      type: "object"
+      properties:
+        engine:
+          type: "string"
+          description: "想定引擎"
+    category_mode: "flat"
+    meta_data:
+      icon: "Files"
+      short_name: "想定"
+  
+  - type_key: "model_glb"
+    type_name: "3D模型库"
+    sort_order: 20
+    schema_def:
+      type: "object"
+      properties:
+        poly_count:
+          type: "integer"
+          description: "面数 (Polygons)"
+    process_conf:
+      pipeline: ["model_optimizer"]
+    category_mode: "tree"
+    upload_mode: "file"
+    meta_data:
+      icon: "Box"
+      viewer: "GLBPreview"
+      short_name: "3D模型"
+      supported_views: ["card", "table"]
+  
+  - type_key: "map_terrain"
+    type_name: "地图资源库"
+    sort_order: 30
+    schema_def:
+      type: "object"
+      properties:
+        resolution:
+          type: "string"
+          description: "分辨率"
+    process_conf:
+      pipeline: ["gdal_retile"]
+    category_mode: "tree"
+    meta_data:
+      icon: "MapLocation"
+      viewer: "CesiumViewer"
+      short_name: "地图"
+  
+  - type_key: "spectrum_rule"
+    type_name: "电磁频谱资源库"
+    sort_order: 40
+    schema_def:
+      type: "object"
+      required: ["center_freq", "bandwidth", "modulation"]
+      properties:
+        center_freq:
+          type: "number"
+          description: "中心频率 (MHz)"
+        bandwidth:
+          type: "number"
+          description: "带宽 (MHz)"
+        modulation:
+          type: "string"
+          enum: ["FM", "AM", "QPSK", "BPSK"]
+          description: "调制方式"
+    category_mode: "tree"
+    meta_data:
+      icon: "Connection"
+      viewer: "JsonTreeViewer"
+      short_name: "电磁频谱"
+  
+  - type_key: "ext_app"
+    type_name: "外部资源库"
+    sort_order: 50
+    integration_mode: "iframe"
+    meta_data:
+      icon: "Platform"
+      dev_url: "http://localhost:30031"
+      short_name: "外部资源"
+  
+  - type_key: "test_db"
+    type_name: "测试资源库"
+    sort_order: 60
+    integration_mode: "internal"
+    upload_mode: "online"
+    category_mode: "tree"
+    meta_data:
+      icon: "Coin"
+      enable_scope: true
+      short_name: "测试资源"
+      supported_views: ["demo-view", "data-grid"]
+      custom_actions: ["demo-action"]
+    schema_def:
+      type: "object"
+      required: ["test_name", "category_select"]
+      properties:
+        test_name:
+          type: "string"
+          description: "标准文本输入"
+        test_desc:
+          type: "string"
+          format: "textarea"
+          description: "长文本描述 (Textarea)"
+        score:
+          type: "integer"
+          description: "评分 (自定义组件)"
+          x-component: "ScoreRater"
+        item_count:
+          type: "number"
+          description: "计数器 (Number)"
+        is_enabled:
+          type: "boolean"
+          description: "状态开关 (Switch)"
+        category_select:
+          type: "string"
+          description: "单选下拉 (Enum Select)"
+          enum: ["选项一", "选项二", "选项三", "其他"]
+        importance:
+          type: "integer"
+          description: "重要性 (数字枚举)"
+          enum: [1, 5, 10]
+        constrained_num:
+          type: "number"
+          description: "带约束的数字 (0-100,精度2)"
+          minimum: 0
+          maximum: 100
+          step: 0.5
+          precision: 2
+        status:
+          type: "integer"
+          description: "数据状态 (数值映射演示)"
+          x-enum-options:
+            - label: "草稿 (0)"
+              value: 0
+            - label: "已发布 (1)"
+              value: 1
+            - label: "已归档 (2)"
+              value: 2

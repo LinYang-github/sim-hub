@@ -35,6 +35,30 @@ func main() {
 		os.Exit(1)
 	}
 
+	// 1.2 加载独立的资源类型定义 (modules.yaml)
+	// 这允许将业务层面频繁变动的资源定义与已有的系统配置分离
+	vModules := viper.New()
+	vModules.SetConfigName("modules")
+	vModules.SetConfigType("yaml")
+	vModules.AddConfigPath(".")
+	if err := vModules.ReadInConfig(); err != nil {
+		// 如果 modules.yaml 不存在，可能配置仍在主 config-api.yaml 中，仅报警告而非错误
+		slog.Warn("未找到独立模块配置 (modules.yaml), 将仅使用主配置中的定义", "error", err)
+	} else {
+		var extraTypes []conf.ResourceType
+		if err := vModules.UnmarshalKey("resource_types", &extraTypes); err != nil {
+			slog.Error("模块配置解码失败 (modules.yaml)", "error", err)
+			os.Exit(1)
+		}
+		// Merge module definitions
+		// Note: This appends. Duplicate keys might need handling if overriding was intended,
+		// but for now we assume they are additive or the user manages them.
+		if len(extraTypes) > 0 {
+			cfg.ResourceTypes = append(cfg.ResourceTypes, extraTypes...)
+			slog.Info("已加载独立模块定义", "count", len(extraTypes))
+		}
+	}
+
 	// 1.5 初始化日志系统
 	logger.InitLogger(&cfg.Log)
 
