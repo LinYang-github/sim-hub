@@ -82,6 +82,21 @@
                     </div>
                   </el-dropdown-item>
                   
+                  <template v-if="customActions && customActions.length">
+                    <el-dropdown-item 
+                      v-for="action in customActions" 
+                      :key="action.key" 
+                      :command="{ key: action.key, custom: true }"
+                    >
+                      <div class="menu-item-content">
+                        <el-icon>
+                            <component :is="action.icon" />
+                        </el-icon>
+                        <span>{{ action.label }}</span>
+                      </div>
+                    </el-dropdown-item>
+                  </template>
+                  
                   <el-dropdown-item command="tags">
                     <div class="menu-item-content">
                       <el-icon><PriceTag /></el-icon>
@@ -158,13 +173,20 @@ const props = defineProps<{
   loading: boolean
   enableScope?: boolean
   icon?: string
+  customActions?: { key: string, label: string, icon: string }[]
 }>()
+
+console.log('ResourceTableView mounted. customActions:', props.customActions, 'Resource count:', props.resources?.length)
 
 const statusMap = RESOURCE_STATUS_TEXT
 
-const emit = defineEmits(['view-details', 'download', 'delete', 'rename', 'move', 'change-scope', 'edit-tags'])
+const emit = defineEmits(['view-details', 'download', 'delete', 'rename', 'move', 'change-scope', 'edit-tags', 'custom-action'])
 
-const handleCommand = (command: string | number | object, row: any) => {
+const handleCommand = (command: string | number | any, row: any) => {
+  if (typeof command === 'object' && command.custom) {
+      emit('custom-action', command.key, row)
+      return
+  }
   switch(command) {
     case 'details': emit('view-details', row); break;
     case 'tags': emit('edit-tags', row); break;

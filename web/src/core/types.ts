@@ -33,4 +33,5 @@ export interface SimHubModule {
   integrationMode?: 'iframe' | 'new-tab' | 'internal'
   viewer?: string
   supportedViews?: SupportedView[]
+  customActions?: { key: string, label: string, icon: string, handler: string }[]
 }

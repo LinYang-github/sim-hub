@@ -68,7 +68,9 @@ class ModuleManager {
 
   async loadConfig(url: string) {
     try {
-      const configItems = await request.get<SimHubModule[]>(url) as unknown as SimHubModule[]
+      // Add timestamp to bypass cache during dev
+      const finalUrl = url + (url.includes('?') ? '&' : '?') + 't=' + new Date().getTime()
+      const configItems = await request.get<SimHubModule[]>(finalUrl) as unknown as SimHubModule[]
       if (!configItems) return
       
       const newActiveModules: SimHubModule[] = []
@@ -91,7 +93,13 @@ class ModuleManager {
                     merged.routes.forEach(r => {
                         if (r.props && typeof r.props === 'object') {
                             // Inject supportedViews into the route props
-                            (r.props as any).supportedViews = merged.supportedViews
+                            if (merged.supportedViews) {
+                                (r.props as any).supportedViews = merged.supportedViews
+                            }
+                            // Inject customActions into the route props
+                             if (merged.customActions) {
+                                (r.props as any).customActions = merged.customActions
+                             }
                         }
                     })
                 }
@@ -120,7 +128,9 @@ class ModuleManager {
                           enableScope: item.enableScope,
                           viewer: item.viewer,
                           icon: item.icon,
-                          supportedViews: item.supportedViews
+                          supportedViews: item.supportedViews,
+                          // Pass customActions from config
+                          customActions: item.customActions
                         }
                       }
                     ]

@@ -50,6 +50,21 @@
                       </div>
                     </el-dropdown-item>
                     
+                    <template v-if="customActions && customActions.length">
+                      <el-dropdown-item 
+                        v-for="action in customActions" 
+                        :key="action.key" 
+                        :command="{ key: action.key, custom: true }"
+                      >
+                        <div class="menu-item-content">
+                          <el-icon>
+                              <component :is="action.icon" />
+                          </el-icon>
+                          <span>{{ action.label }}</span>
+                        </div>
+                      </el-dropdown-item>
+                    </template>
+                    
                     <el-dropdown-item command="tags">
                       <div class="menu-item-content">
                         <el-icon><PriceTag /></el-icon>
@@ -128,6 +143,7 @@ defineProps<{
   statusMap: Record<string, string>
   viewer?: string
   icon?: string
+  customActions?: { key: string, label: string, icon: string }[]
 }>()
 
 const emit = defineEmits<{
@@ -138,9 +154,14 @@ const emit = defineEmits<{
   (e: 'change-scope', row: Resource, scope: ResourceScope): void
   (e: 'rename', row: Resource): void
   (e: 'move', row: Resource): void
+  (e: 'custom-action', key: string, row: Resource): void
 }>()
 
-const handleCommand = (cmd: string, row: Resource) => {
+const handleCommand = (cmd: string | any, row: Resource) => {
+  if (typeof cmd === 'object' && cmd.custom) {
+      emit('custom-action', cmd.key, row)
+      return
+  }
   switch(cmd) {
     case 'details': emit('view-details', row); break;
     case 'tags': emit('edit-tags', row); break;

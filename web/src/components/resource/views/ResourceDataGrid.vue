@@ -76,6 +76,21 @@
                       <span>下载 JSON</span>
                     </div>
                   </el-dropdown-item>
+
+                  <template v-if="customActions && customActions.length">
+                    <el-dropdown-item 
+                      v-for="action in customActions" 
+                      :key="action.key" 
+                      :command="{ key: action.key, custom: true }"
+                    >
+                      <div class="menu-item-content">
+                        <el-icon>
+                            <component :is="action.icon" />
+                        </el-icon>
+                        <span>{{ action.label }}</span>
+                      </div>
+                    </el-dropdown-item>
+                  </template>
                   
                   <el-dropdown-item command="tags">
                     <div class="menu-item-content">
@@ -125,11 +140,16 @@ const props = defineProps<{
   loading: boolean
   icon?: string
   schema?: any
+  customActions?: { key: string, label: string, icon: string }[]
 }>()
 
-const emit = defineEmits(['view-details', 'download', 'delete', 'rename', 'move', 'edit-tags'])
+const emit = defineEmits(['view-details', 'download', 'delete', 'rename', 'move', 'edit-tags', 'custom-action'])
 
-const handleCommand = (command: string, row: any) => {
+const handleCommand = (command: string | any, row: any) => {
+  if (typeof command === 'object' && command.custom) {
+      emit('custom-action', command.key, row)
+      return
+  }
   switch(command) {
     case 'download': emit('download', row); break;
     case 'tags': emit('edit-tags', row); break;

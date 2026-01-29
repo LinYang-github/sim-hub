@@ -143,6 +143,8 @@
             @view-details="handleViewDetails"
             @download="download"
             @delete="confirmDelete"
+            :custom-actions="customActions"
+            @custom-action="(key, row) => handleCustomAction(key, row)"
           />
 
           <!-- Default Table/DataGrid View Mode -->
@@ -159,6 +161,8 @@
               @delete="confirmDelete"
               @rename="(res) => stewardRef?.openRename(res)"
               @move="(res) => stewardRef?.openMove(res)"
+              :custom-actions="customActions"
+              @custom-action="(key, row) => handleCustomAction(key, row)"
             />
             <ResourceTableView
               v-else
@@ -173,6 +177,8 @@
               @change-scope="handleScopeChange"
               @rename="(res) => stewardRef?.openRename(res)"
               @move="(res) => stewardRef?.openMove(res)"
+              :custom-actions="customActions"
+              @custom-action="(key, row) => handleCustomAction(key, row)"
             />
           </template>
         </template>
@@ -278,7 +284,60 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, toRef, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, toRef, computed, watch, defineAsyncComponent } from 'vue'
+// Custom Action Handlers (Loaded dynamically)
+const activeActionHandlers = ref<Record<string, any>>({})
+
+const loadRemoteAction = (handlerName: string) => {
+    return defineAsyncComponent(async () => {
+        const devUrl = import.meta.env.VITE_EXT_APP_DEV_URL || 'http://localhost:30031'
+        const scriptUrl = `${devUrl}/demo-form/src/main.ts` 
+        
+        // Share HOST context for actions too
+        if (!(window as any).Vue) (window as any).Vue = await import('vue')
+        if (!(window as any).ElementPlus) (window as any).ElementPlus = await import('element-plus')
+
+        try {
+            await import(/* @vite-ignore */ scriptUrl)
+            return (window as any).SimHubCustomComponents[handlerName]
+        } catch (e) {
+            console.error(`Failed to load action handler: ${handlerName}`, e)
+            return { render: () => null }
+        }
+    })
+}
+
+const handleCustomAction = (key: string, row: any) => {
+    const actionDef = props.customActions?.find(a => a.key === key)
+    if (!actionDef || !actionDef.handler) return
+
+    // Lazy load handler if not present
+    if (!activeActionHandlers.value[key]) {
+        activeActionHandlers.value[key] = loadRemoteAction(actionDef.handler)
+    }
+    
+    // Defer execution to let the component mount (nextTick logic handled by component self-registration or ref access)
+    // Actually, defineAsyncComponent returns a component definition. We need to MOUNT it to use it.
+    // So we render it in the template, and access it via ref.
+    
+    // Instead of complex ref management, we rely on the Action Component exposing an 'execute' method.
+    // We will wait for the ref to be available.
+    setTimeout(() => {
+        const componentRef = actionComponentsRef.value[key]
+        if (componentRef && componentRef.execute) {
+            componentRef.execute(row)
+        } else {
+             // Try to find in array refs if v-for is used
+             console.warn('Action Handler not ready or invalid', key)
+        }
+    }, 100)
+}
+
+const actionComponentsRef = ref<any>({})
+const setActionRef = (el: any, key: string) => {
+    if (el) actionComponentsRef.value[key] = el
+}
+
 import { 
   Upload as UploadIcon, Connection, DataLine, Grid, Refresh,
   Search, FolderDelete, Delete, Plus
@@ -318,11 +377,15 @@ const props = defineProps<{
   viewer?: string
   icon?: string
   supportedViews?: { key: string, label: string, icon: string }[]
+  customActions?: { key: string, label: string, icon: string, handler: string }[]
 }>()
 
 const statusMap = RESOURCE_STATUS_TEXT
 
 const viewMode = ref('table')
+
+// Debug Log
+console.log('ResourceList Mounted. TypeKey:', props.typeKey, 'CustomActions:', props.customActions)
 
 // Sync viewMode with supportedViews
 watch(() => props.typeKey, () => {
