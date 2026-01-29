@@ -7,6 +7,12 @@ export interface MenuOption {
   icon?: string | Component
 }
 
+export interface SupportedView {
+  key: string
+  label: string
+  icon: string | Component
+}
+
 export interface SimHubModule {
   key: string
   // Internal Module Props
@@ -15,7 +21,7 @@ export interface SimHubModule {
   
   // Generic Resource Props
   typeName?: string
-  uploadMode?: 'single' | 'folder-zip'
+  uploadMode?: 'single' | 'folder-zip' | 'online'
   accept?: string
   enableScope?: boolean
 
@@ -26,4 +32,5 @@ export interface SimHubModule {
   devUrl?: string      
   integrationMode?: 'iframe' | 'new-tab' | 'internal'
   viewer?: string
+  supportedViews?: SupportedView[]
 }

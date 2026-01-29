@@ -40,7 +40,7 @@
   },
   {
     "key": "documents",
-    "label": "技术文档库",
+    "label": "文档资源库",
     "integrationMode": "internal",
     "icon": "Document",
     "typeName": "文档",
