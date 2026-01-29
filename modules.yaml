@@ -2,7 +2,6 @@ resource_types:
   
   - type_key: "scenario"
     type_name: "想定资源库"
-    sort_order: 10
     schema_def:
       type: "object"
       properties:
@@ -16,7 +15,6 @@ resource_types:
   
   - type_key: "model_glb"
     type_name: "3D模型库"
-    sort_order: 20
     schema_def:
       type: "object"
       properties:
@@ -35,7 +33,6 @@ resource_types:
   
   - type_key: "map_terrain"
     type_name: "地图资源库"
-    sort_order: 30
     schema_def:
       type: "object"
       properties:
@@ -52,7 +49,6 @@ resource_types:
   
   - type_key: "spectrum_rule"
     type_name: "电磁频谱资源库"
-    sort_order: 40
     schema_def:
       type: "object"
       required: ["center_freq", "bandwidth", "modulation"]
@@ -75,7 +71,6 @@ resource_types:
   
   - type_key: "ext_app"
     type_name: "外部资源库"
-    sort_order: 50
     integration_mode: "iframe"
     meta_data:
       icon: "Platform"
@@ -84,7 +79,6 @@ resource_types:
   
   - type_key: "test_db"
     type_name: "测试资源库"
-    sort_order: 60
     integration_mode: "internal"
     upload_mode: "online"
     category_mode: "tree"

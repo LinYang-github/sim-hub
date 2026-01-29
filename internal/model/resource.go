@@ -17,7 +17,6 @@ type ResourceType struct {
 	UploadMode      string         `gorm:"type:varchar(50)" json:"upload_mode"`
 	ProcessConf     map[string]any `gorm:"serializer:json" json:"process_conf"`
 	MetaData        map[string]any `gorm:"serializer:json" json:"meta_data"`
-	SortOrder       int            `gorm:"type:int;default:0" json:"sort_order"`
 	CreatedAt       time.Time      `json:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at"`
 }

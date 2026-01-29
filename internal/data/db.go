@@ -85,7 +85,6 @@ func seedBasicTypes(db *gorm.DB, configTypes []conf.ResourceType) {
 				UploadMode:      ct.UploadMode,
 				ProcessConf:     ct.ProcessConf,
 				MetaData:        ct.MetaData,
-				SortOrder:       ct.SortOrder,
 			})
 		}
 		if len(types) > 0 {

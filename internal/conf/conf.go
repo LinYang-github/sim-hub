@@ -52,5 +52,4 @@ type ResourceType struct {
 	UploadMode      string         `mapstructure:"upload_mode" json:"upload_mode"`
 	ProcessConf     map[string]any `mapstructure:"process_conf" json:"process_conf"`
 	MetaData        map[string]any `mapstructure:"meta_data" json:"meta_data"`
-	SortOrder       int            `mapstructure:"sort_order" json:"sort_order"`
 }

@@ -17,7 +17,8 @@ import (
 
 // Module 实现了 module.Module 接口
 type Module struct {
-	uc *core.UseCase
+	uc          *core.UseCase
+	orderedKeys []string
 }
 
 func NewModule(d *data.Data, store storage.MultipartBlobStore, stsProvider storage.SecurityTokenProvider, bucket string, natsClient *data.NATSClient, role string, apiBaseURL string, handlers map[string]string, resourceTypes []conf.ResourceType) module.Module {
@@ -34,7 +35,6 @@ func NewModule(d *data.Data, store storage.MultipartBlobStore, stsProvider stora
 				UploadMode:      rt.UploadMode,
 				ProcessConf:     rt.ProcessConf,
 				MetaData:        rt.MetaData,
-				SortOrder:       rt.SortOrder,
 			})
 		}
 		// 1. Get all existing keys in DB
@@ -68,8 +68,14 @@ func NewModule(d *data.Data, store storage.MultipartBlobStore, stsProvider stora
 		}
 	}
 
+	orderedKeys := make([]string, 0, len(resourceTypes))
+	for _, rt := range resourceTypes {
+		orderedKeys = append(orderedKeys, rt.TypeKey)
+	}
+
 	return &Module{
-		uc: core.NewUseCase(d, store, stsProvider, bucket, natsClient, role, apiBaseURL, handlers),
+		uc:          core.NewUseCase(d, store, stsProvider, bucket, natsClient, role, apiBaseURL, handlers),
+		orderedKeys: orderedKeys,
 	}
 }
 
@@ -492,6 +498,40 @@ func (m *Module) ListResourceTypes(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Sort based on orderedKeys
+	if len(m.orderedKeys) > 0 {
+		orderMap := make(map[string]int)
+		for i, k := range m.orderedKeys {
+			orderMap[k] = i
+		}
+
+		// Simple bubble sort or slice stable sort (using insertion logic here for clarity or just sort.Slice)
+		// Let's use specific sort logic
+		sorted := make([]model.ResourceType, 0, len(types))
+
+		// 1. Add types present in config in order
+		typeMap := make(map[string]model.ResourceType)
+		for _, t := range types {
+			typeMap[t.TypeKey] = t
+		}
+
+		for _, k := range m.orderedKeys {
+			if t, ok := typeMap[k]; ok {
+				sorted = append(sorted, t)
+				delete(typeMap, k)
+			}
+		}
+
+		// 2. Add remaining types (not in config or new)
+		for _, t := range types {
+			if _, ok := typeMap[t.TypeKey]; ok { // if still in map
+				sorted = append(sorted, t)
+			}
+		}
+		types = sorted
+	}
+
 	c.JSON(http.StatusOK, types)
 }
 
