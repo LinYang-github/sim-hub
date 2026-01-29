@@ -18,8 +18,8 @@ var webFS embed.FS
 //go:embed all:dist_terrain
 var terrainFS embed.FS
 
-//go:embed all:dist_demo
-var demoFS embed.FS
+//go:embed all:dist_ext_apps
+var extAppsFS embed.FS
 
 // RegisterUIHandlers registers all embedded frontend routes
 func RegisterUIHandlers(r *gin.Engine) {
@@ -27,9 +27,12 @@ func RegisterUIHandlers(r *gin.Engine) {
 	terrainSub, _ := fs.Sub(terrainFS, "dist_terrain")
 	r.StaticFS("/terrain", http.FS(terrainSub))
 
-	// 2. Demo Repo (Prefix: /demo)
-	demoSub, _ := fs.Sub(demoFS, "dist_demo")
-	r.StaticFS("/demo", http.FS(demoSub))
+	// 2. Consolidated External Apps (MPA)
+	extSub, _ := fs.Sub(extAppsFS, "dist_ext_apps")
+
+	r.StaticFS("/demo-repo", http.FS(extSub))
+	r.StaticFS("/demo-preview", http.FS(extSub))
+	r.StaticFS("/ext", http.FS(extSub)) // New unified prefix
 
 	// 3. Main Web (Prefix: /) - SPA Support
 	webSub, _ := fs.Sub(webFS, "dist_web")

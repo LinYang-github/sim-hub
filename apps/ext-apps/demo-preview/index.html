@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分散页面功能演示</title>
+    <style>
+        :root {
+            --bg-color: #f5f7fa;
+            --card-bg: #fff;
+            --text-primary: #303133;
+            --text-secondary: #909399;
+            --border-color: #ebeef5;
+            --primary-color: #67c23a;
+        }
+
+        html.dark {
+            --bg-color: #0a0a0a;
+            --card-bg: #1d1d1d;
+            --text-primary: #e5eaf3;
+            --text-secondary: #a8abb2;
+            --border-color: #363637;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 24px;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            transition: all 0.3s;
+        }
+
+        .header {
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .demo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .demo-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .action-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: opacity 0.2s;
+        }
+
+        .action-btn:hover {
+            opacity: 0.8;
+        }
+
+        .badge {
+            background: #e1f3d8;
+            color: #67c23a;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0;">分散页面功能演示 (Scattered Functions)</h2>
+            <span class="badge">外部页集成模式</span>
+        </div>
+        <p style="color: var(--text-secondary); font-size: 14px; margin-top: 8px;">
+            此页面演示了如何将特定的零碎业务功能（非完整资源库）以 iframe 方式挂载到主系统。
+        </p>
+    </div>
+
+    <div class="demo-grid">
+        <!-- 功能 1：通知同步 -->
+        <div class="demo-card">
+            <div class="card-title">📡 跨应用通知订阅</div>
+            <div class="card-desc">演示如何监听主应用的全局事件，并在此页面更新状态。</div>
+            <button class="action-btn" onclick="subscribe()">模拟监听并反馈</button>
+        </div>
+
+        <!-- 功能 2：资源选择器 -->
+        <div class="demo-card">
+            <div class="card-title">🔍 外部数据检索</div>
+            <div class="card-desc">这个卡片可以作为独立的搜索工具，将选中的结果返回给宿主应用。</div>
+            <button class="action-btn" style="background: #e6a23c;" onclick="pickData()">模拟选中数据返回</button>
+        </div>
+
+        <!-- 功能 3：主题感知 -->
+        <div class="demo-card">
+            <div class="card-title">🌓 自动主题适配</div>
+            <div class="card-desc">此页面正在实时响应宿主系统的深色/浅色模式切换。</div>
+            <div id="theme-status" style="font-size: 12px; margin-top: 10px; color: #409eff;">当前侦测到: 浅色模式</div>
+        </div>
+    </div>
+
+    <!-- 兼容原来的预览逻辑（如果有资源传进来） -->
+    <div id="preview-section" style="margin-top: 30px; display: none;">
+        <div class="demo-card" style="border: 2px dashed #409eff;">
+            <div class="card-title">🖼️ 兼容预览模式</div>
+            <div id="preview-content" style="font-size: 13px;"></div>
+        </div>
+    </div>
+
+    <script>
+        const SimHubBridge = {
+            init() {
+                window.addEventListener('message', (e) => {
+                    const data = e.data;
+                    if (data.type === 'THEME_UPDATE') {
+                        this.handleTheme(data.payload.theme);
+                    }
+                    if (data.type === 'PREVIEW_DATA') {
+                        this.handlePreview(data.payload.resource);
+                    }
+                });
+            },
+            handleTheme(theme) {
+                if (theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                    document.getElementById('theme-status').innerText = '当前侦测到: 深色模式';
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    document.getElementById('theme-status').innerText = '当前侦测到: 浅色模式';
+                }
+            },
+            handlePreview(resource) {
+                if (resource) {
+                    document.getElementById('preview-section').style.display = 'block';
+                    document.getElementById('preview-content').innerText = '正在预览资源: ' + resource.name;
+                }
+            },
+            callHost(type, payload) {
+                window.parent.postMessage({ type, payload, timestamp: Date.now() }, '*');
+            }
+        };
+
+        SimHubBridge.init();
+
+        function pickData() {
+            SimHubBridge.callHost('NOTIFY', {
+                type: 'success',
+                title: '数据拾取成功',
+                message: '外部页面已将结果 "ITEM_#001" 传递给宿主'
+            });
+        }
+
+        function subscribe() {
+             SimHubBridge.callHost('NOTIFY', {
+                type: 'info',
+                title: '订阅状态',
+                message: '正在实时监测主应用总线事件...'
+            });
+        }
+    </script>
+</body>
+</html>

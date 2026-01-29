@@ -29,6 +29,7 @@
           :state="resource.latest_version?.state"
           :status-text="resource.latest_version?.state ? (statusMap[resource.latest_version!.state] || resource.latest_version!.state) : '-'"
           :meta-data="resource.latest_version?.meta_data"
+          :full-resource="resource"
           force
         />
         <el-button 
@@ -52,6 +53,7 @@
                 :state="resource.latest_version?.state"
                 :status-text="resource.latest_version?.state ? (statusMap[resource.latest_version!.state] || resource.latest_version!.state) : '-'"
                 :meta-data="resource.latest_version?.meta_data"
+                :full-resource="resource"
                 force
               />
               <el-button class="close-fs-btn" circle @click="isPreviewFullScreen = false">

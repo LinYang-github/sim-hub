@@ -31,14 +31,6 @@
     "viewer": "DefaultIconPreview"
   },
   {
-    "key": "test-repo",
-    "label": "外部演示系统",
-    "integrationMode": "iframe",
-    "icon": "Monitor",
-    "externalUrl": "/demo/",
-    "devUrl": "http://localhost:30031"
-  },
-  {
     "key": "documents",
     "label": "技术文档库",
     "integrationMode": "internal",
@@ -59,5 +51,21 @@
     "accept": ".json",
     "enableScope": false,
     "viewer": "JsonPreview"
+  },
+  {
+    "key": "test-repo",
+    "label": "外部演示 (完整库模式)",
+    "integrationMode": "iframe",
+    "icon": "Monitor",
+    "externalUrl": "/demo-repo/index.html",
+    "devUrl": "http://localhost:30031/demo-repo/index.html"
+  },
+  {
+    "key": "scattered-demo",
+    "label": "外部演示 (分散页面模式)",
+    "integrationMode": "iframe",
+    "icon": "Grid",
+    "externalUrl": "/demo-preview/index.html",
+    "devUrl": "http://localhost:30031/demo-preview/index.html"
   }
 ]

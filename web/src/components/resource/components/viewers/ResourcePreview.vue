@@ -1,14 +1,15 @@
 <template>
   <div class="resource-preview">
-    <template v-if="isActive && downloadUrl">
+    <template v-if="isActive && (downloadUrl || viewer?.startsWith('External:'))">
       <component 
         :is="getViewerComponent(viewer)" 
-        :url="downloadUrl" 
+        :url="finalUrl" 
         :force="force"
         :type-key="typeKey"
         :icon="icon"
         :icon-size="48"
         :meta-data="metaData"
+        :resource="fullResource"
       />
     </template>
     <div v-else class="preview-fallback">
@@ -34,6 +35,7 @@ const props = defineProps<{
   viewer?: string
   icon?: string
   metaData?: Record<string, any>
+  fullResource?: any // Pass full resource for external viewers
 }>()
 
 // 1. 定义异步组件 - 只有在使用时才会请求网络下载对应的 JS 包
@@ -43,9 +45,13 @@ const AsyncVideoPreview = defineAsyncComponent(() => import('./VideoPreview.vue'
 const AsyncDocPreview = defineAsyncComponent(() => import('./DocPreview.vue'))
 const AsyncGeoPreview = defineAsyncComponent(() => import('./GeoPreview.vue'))
 const AsyncFolderPreview = defineAsyncComponent(() => import('./FolderPreview.vue'))
+const AsyncExternalViewer = defineAsyncComponent(() => import('./ExternalViewer.vue'))
 
 // 2. 映射表，支持按需返回组件
 const getViewerComponent = (name?: string) => {
+  // If explicitly requested External or starts with External:
+  if (name?.startsWith('External:')) return AsyncExternalViewer
+
   const viewerMap: Record<string, any> = {
     'GLBPreview': AsyncGLBPreview,
     'ImagePreview': AsyncImagePreview,
@@ -53,10 +59,23 @@ const getViewerComponent = (name?: string) => {
     'DocPreview': AsyncDocPreview,
     'GeoPreview': AsyncGeoPreview,
     'FolderPreview': AsyncFolderPreview,
+    'ExternalViewer': AsyncExternalViewer,
     'DefaultIconPreview': DefaultIconPreview
   }
+  
+  // If downloadUrl is a full link and we don't have a specific viewer, might want to try External
+  if (props.downloadUrl?.startsWith('http') && !name) return AsyncExternalViewer
+
   return (name && viewerMap[name]) ? markRaw(viewerMap[name]) : DefaultIconPreview
 }
+
+// Special logic for ExternalViewer URL
+const finalUrl = computed(() => {
+    if (props.viewer?.startsWith('External:')) {
+        return props.viewer.replace('External:', '')
+    }
+    return props.downloadUrl
+})
 
 const isActive = computed(() => props.state === RESOURCE_STATE.ACTIVE)
 
