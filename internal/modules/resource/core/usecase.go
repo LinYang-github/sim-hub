@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/liny/sim-hub/internal/data"
+	"github.com/liny/sim-hub/internal/model"
 	"github.com/liny/sim-hub/pkg/storage"
 )
 
@@ -96,6 +97,10 @@ func (uc *UseCase) ListResources(ctx context.Context, typeKey string, categoryID
 	return uc.reader.ListResources(ctx, typeKey, categoryID, ownerID, scope, page, size)
 }
 
+func (uc *UseCase) ListResourceTypes(ctx context.Context) ([]model.ResourceType, error) {
+	return uc.reader.GetResourceTypes(ctx)
+}
+
 func (uc *UseCase) CreateCategory(ctx context.Context, req CreateCategoryRequest) (*CategoryDTO, error) {
 	return uc.writer.CreateCategory(ctx, req)
 }
@@ -106,6 +111,10 @@ func (uc *UseCase) ListCategories(ctx context.Context, typeKey string) ([]*Categ
 
 func (uc *UseCase) DeleteCategory(ctx context.Context, id string) error {
 	return uc.writer.DeleteCategory(ctx, id)
+}
+
+func (uc *UseCase) CreateResourceFromData(ctx context.Context, req CreateResourceFromDataRequest) (*ResourceDTO, error) {
+	return uc.writer.CreateResourceFromData(ctx, req)
 }
 
 func (uc *UseCase) UpdateResourceTags(ctx context.Context, id string, tags []string) error {

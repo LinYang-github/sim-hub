@@ -1,5 +1,10 @@
 <template>
-  <el-table :data="resources" style="width: 100%" v-loading="loading" class="premium-table">
+  <el-table 
+    :data="resources" 
+    style="width: 100%" 
+    v-loading="loading" 
+    class="premium-table"
+  >
     <!-- 1. Name -->
     <el-table-column label="资源名称" min-width="200">
       <template #default="scope">
@@ -140,35 +145,27 @@
 
 <script setup lang="ts">
 import { 
-  Box, Location, Files, Clock, DataLine, 
-  Download, Delete, Promotion, PriceTag, MoreFilled, InfoFilled, Lock, Edit
+  Download, MoreFilled, InfoFilled, 
+  PriceTag, Edit, Promotion, Lock, Delete
 } from '@element-plus/icons-vue'
-import { formatDate, formatSize } from '../../../core/utils/format'
-import type { Resource, ResourceScope } from '../../../core/types/resource'
-import { RESOURCE_STATE, RESOURCE_SCOPE, DEFAULT_ADMIN_ID } from '../../../core/constants/resource'
+import { RESOURCE_STATUS_TEXT, RESOURCE_STATE, RESOURCE_SCOPE } from '../../../core/constants/resource'
+import { formatSize, formatDate } from '../../../core/utils/format'
 
-defineProps<{
-  resources: Resource[]
+const DEFAULT_ADMIN_ID = "admin" // TODO: get from user store
+
+const props = defineProps<{
+  resources: any[]
   loading: boolean
-  typeKey: string
-  enableScope: boolean
-  statusMap: Record<string, string>
-  viewer?: string
+  enableScope?: boolean
   icon?: string
 }>()
 
-const emit = defineEmits<{
-  (e: 'edit-tags', row: Resource): void
-  (e: 'view-details', row: Resource): void
-  (e: 'download', row: Resource): void
-  (e: 'delete', row: Resource): void
-  (e: 'change-scope', row: Resource, scope: ResourceScope): void
-  (e: 'rename', row: Resource): void
-  (e: 'move', row: Resource): void
-}>()
+const statusMap = RESOURCE_STATUS_TEXT
 
-const handleCommand = (cmd: string, row: Resource) => {
-  switch(cmd) {
+const emit = defineEmits(['view-details', 'download', 'delete', 'rename', 'move', 'change-scope', 'edit-tags'])
+
+const handleCommand = (command: string | number | object, row: any) => {
+  switch(command) {
     case 'details': emit('view-details', row); break;
     case 'tags': emit('edit-tags', row); break;
     case 'rename': emit('rename', row); break;
@@ -223,7 +220,6 @@ const handleCommand = (cmd: string, row: Resource) => {
       }
     }
 
-    // 严谨的红色危险项处理
     &.danger-item .menu-item-content {
       color: var(--el-color-danger) !important;
       .el-icon { color: var(--el-color-danger) !important; }
@@ -231,12 +227,6 @@ const handleCommand = (cmd: string, row: Resource) => {
       &:hover {
         background-color: var(--el-color-danger-light-9);
       }
-    }
-
-    // 处理分界线背景
-    &.el-dropdown-menu__item--divided {
-      margin-top: 6px;
-      &::before { margin: 0; background-color: var(--el-border-color-lighter); }
     }
   }
 }
@@ -250,10 +240,6 @@ const handleCommand = (cmd: string, row: Resource) => {
     font-weight: 600;
     color: var(--el-text-color-primary);
     font-size: 13px;
-    padding: 12px 0;
-  }
-  
-  :deep(td.el-table__cell) {
     padding: 12px 0;
   }
 }

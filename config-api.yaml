@@ -43,6 +43,25 @@ resource_types:
         engine:
           type: "string"
     category_mode: "flat"
+  - type_key: "spectrum_rule"
+    type_name: "电磁频谱资源库 (JSON)"
+    schema_def:
+      type: "object"
+      required: ["center_freq", "bandwidth", "modulation"]
+      properties:
+        center_freq:
+          type: "number"
+          description: "中心频率 (MHz)"
+        bandwidth:
+          type: "number"
+          description: "带宽 (MHz)"
+        modulation:
+          type: "string"
+          enum: ["FM", "AM", "QPSK", "BPSK"]
+          description: "调制方式"
+    viewer_conf:
+      component: "JsonTreeViewer"
+    category_mode: "tree"
 
 log:
   level: "info"

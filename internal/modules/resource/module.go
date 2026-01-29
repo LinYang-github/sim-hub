@@ -6,8 +6,10 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/liny/sim-hub/internal/conf"
 	"github.com/liny/sim-hub/internal/core/module"
 	"github.com/liny/sim-hub/internal/data"
+	"github.com/liny/sim-hub/internal/model"
 	"github.com/liny/sim-hub/internal/modules/resource/core"
 	"github.com/liny/sim-hub/pkg/storage"
 )
@@ -17,7 +19,28 @@ type Module struct {
 	uc *core.UseCase
 }
 
-func NewModule(d *data.Data, store storage.MultipartBlobStore, stsProvider storage.SecurityTokenProvider, bucket string, natsClient *data.NATSClient, role string, apiBaseURL string, handlers map[string]string) module.Module {
+func NewModule(d *data.Data, store storage.MultipartBlobStore, stsProvider storage.SecurityTokenProvider, bucket string, natsClient *data.NATSClient, role string, apiBaseURL string, handlers map[string]string, resourceTypes []conf.ResourceType) module.Module {
+	// 启动时同步资源类型定义到数据库
+	if len(resourceTypes) > 0 {
+		var types []model.ResourceType
+		for _, rt := range resourceTypes {
+			types = append(types, model.ResourceType{
+				TypeKey:      rt.TypeKey,
+				TypeName:     rt.TypeName,
+				SchemaDef:    rt.SchemaDef,
+				ViewerConf:   rt.ViewerConf,
+				ProcessConf:  rt.ProcessConf,
+				CategoryMode: rt.CategoryMode,
+			})
+		}
+		// Upsert
+		if err := d.DB.Save(&types).Error; err != nil {
+			slog.Error("Sync resource types failed", "error", err)
+		} else {
+			slog.Info("Synced resource types to DB", "count", len(types))
+		}
+	}
+
 	return &Module{
 		uc: core.NewUseCase(d, store, stsProvider, bucket, natsClient, role, apiBaseURL, handlers),
 	}
@@ -36,12 +59,19 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 		integration.POST("/upload/multipart/complete", m.CompleteMultipartUpload)
 	}
 
+	// /api/v1/resource-types
+	rTypes := g.Group("/resource-types")
+	{
+		rTypes.GET("", m.ListResourceTypes)
+	}
+
 	// /api/v1/resources 路径组
 	resources := g.Group("/resources")
 	{
 		resources.GET("", m.ListResources)
-		resources.POST("/sync", m.SyncFromStorage) // 新增：同步存储
-		resources.POST("/clear", m.ClearResources) // 新增：清空资源库
+		resources.POST("/sync", m.SyncFromStorage)          // 新增：同步存储
+		resources.POST("/clear", m.ClearResources)          // 新增：清空资源库
+		resources.POST("/create", m.CreateResourceFromData) // 新增：在线创建接口
 		resources.GET("/:id", m.GetResource)
 		resources.PATCH("/:id", m.UpdateResource) // 新增：更新基本信息 (更名/移动)
 		resources.DELETE("/:id", m.DeleteResource)
@@ -408,4 +438,35 @@ func (m *Module) UpdateVersionMetadata(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Metadata updated"})
+}
+
+// ListResourceTypes 获取所有资源类型定义 (包含 Schema)
+func (m *Module) ListResourceTypes(c *gin.Context) {
+	types, err := m.uc.ListResourceTypes(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, types)
+}
+
+// CreateResourceFromData 在线创建资源
+func (m *Module) CreateResourceFromData(c *gin.Context) {
+	var req core.CreateResourceFromDataRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 默认 owner
+	if req.OwnerID == "" {
+		req.OwnerID = "admin" // 暂定
+	}
+
+	resource, err := m.uc.CreateResourceFromData(c.Request.Context(), req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resource)
 }

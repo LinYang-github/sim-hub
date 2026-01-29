@@ -29,7 +29,7 @@
             </div>
           </div>
 
-          <div class="divider-vertical"></div>
+          <div v-if="enableScope" class="divider-vertical"></div>
 
           <div class="search-box">
             <el-input
@@ -53,6 +53,10 @@
             <!-- Folder Upload -->
             <el-button v-if="uploadMode === 'folder-zip'" type="primary" class="upload-btn" @click="triggerFolderUpload">
               <el-icon><UploadIcon /></el-icon> 导入{{ typeName }}包
+            </el-button>
+            <!-- Online Create -->
+            <el-button v-else-if="uploadMode === 'online'" type="primary" class="upload-btn" @click="openOnlineCreate">
+              <el-icon><Plus /></el-icon> 新建{{ typeName }}
             </el-button>
             <!-- Single File Upload -->
             <el-button v-else type="primary" class="upload-btn" @click="triggerFileUpload">
@@ -107,23 +111,35 @@
 
         <!-- 2. 有数据 -> 正常列表/卡片 -->
         <template v-else-if="resources.length > 0">
-          <ResourceTableView
-            v-if="viewMode === 'list'"
-            :resources="resources"
-            :loading="loading"
-            :type-key="typeKey"
-            :enable-scope="!!enableScope"
-            :status-map="statusMap"
-            :viewer="viewer"
-            :icon="icon"
-            @edit-tags="openTagEditor"
-            @view-details="handleViewDetails"
-            @download="download"
-            @delete="confirmDelete"
-            @change-scope="handleScopeChange"
-            @rename="(res) => stewardRef?.openRename(res)"
-            @move="(res) => stewardRef?.openMove(res)"
-          />
+          <template v-if="viewMode === 'list'">
+            <ResourceDataGrid
+              v-if="uploadMode === 'online'"
+              :resources="resources"
+              :loading="loading"
+              :icon="icon"
+              :schema="currentSchema"
+              @edit-tags="openTagEditor"
+              @view-details="handleViewDetails"
+              @download="download"
+              @delete="confirmDelete"
+              @rename="(res) => stewardRef?.openRename(res)"
+              @move="(res) => stewardRef?.openMove(res)"
+            />
+            <ResourceTableView
+              v-else
+              :resources="resources"
+              :loading="loading"
+              :enable-scope="!!enableScope"
+              :icon="icon"
+              @edit-tags="openTagEditor"
+              @view-details="handleViewDetails"
+              @download="download"
+              @delete="confirmDelete"
+              @change-scope="handleScopeChange"
+              @rename="(res) => stewardRef?.openRename(res)"
+              @move="(res) => stewardRef?.openMove(res)"
+            />
+          </template>
           <ResourceCardView 
             v-else
             :resources="resources"
@@ -229,14 +245,23 @@
       @confirm="confirmAndDoUpload"
     />
 
+    <OnlineCreateDialog
+      v-model="onlineCreateVisible"
+      :type-key="typeKey"
+      :type-name="typeName"
+      :category-nodes="categoryTree"
+      :schema="currentSchema"
+      @success="fetchList"
+    />
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, toRef, computed } from 'vue'
+import { ref, onMounted, onUnmounted, toRef, computed, watch } from 'vue'
 import { 
   Upload as UploadIcon, Connection, DataLine, Grid, Refresh,
-  Search, FolderDelete, Delete
+  Search, FolderDelete, Delete, Plus
 } from '@element-plus/icons-vue'
 import request from '../../core/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -249,6 +274,8 @@ import ResourceDetailDrawer from './components/ResourceDetailDrawer.vue'
 import TagEditDialog from './components/TagEditDialog.vue'
 import UploadDialog from './components/UploadDialog.vue'
 import ResourceStewardDialogs from './components/ResourceStewardDialogs.vue'
+import OnlineCreateDialog from './components/OnlineCreateDialog.vue'
+import ResourceDataGrid from './components/ResourceDataGrid.vue'
 
 // Composables
 import { useCategory } from './composables/useCategory'
@@ -264,7 +291,7 @@ import { RESOURCE_STATUS_TEXT, SCOPE_OPTIONS, RESOURCE_STATE } from '../../core/
 const props = defineProps<{
   typeKey: string
   typeName: string
-  uploadMode?: 'single' | 'folder-zip'
+  uploadMode?: 'single' | 'folder-zip' | 'online'
   accept?: string
   enableScope?: boolean
   viewer?: string
@@ -331,6 +358,53 @@ const handleViewDetails = (row: Resource) => {
   viewHistory(row, false) // Fetch versions ONLY, don't open extra drawer
   viewDependencies(row, false) // Fetch deps ONLY, don't open extra drawer
 }
+
+// 8. Online Create
+const onlineCreateVisible = ref(false)
+const allSchemas = ref<Record<string, any>>({})
+const currentSchema = computed(() => {
+    const t = allSchemas.value[props.typeKey]
+    return t ? t.schema_def : null
+})
+
+const fetchSchemas = async () => {
+    try {
+        const types = await request.get<any[]>('/api/v1/resource-types')
+        if (types && Array.isArray(types)) {
+            // Map types by key
+            const map: any = {}
+            types.forEach(t => map[t.type_key] = t)
+            allSchemas.value = map
+        }
+    } catch (e) {}
+}
+
+const openOnlineCreate = () => {
+    if (!currentSchema.value) {
+        // Try fetch if missing
+        fetchSchemas().then(() => {
+             if (currentSchema.value) onlineCreateVisible.value = true
+             else ElMessage.warning('未能获取该资源类型的配置模版')
+        })
+    } else {
+        onlineCreateVisible.value = true
+    }
+}
+
+// Init Schema
+const initSchema = () => {
+    if (Object.keys(allSchemas.value).length === 0) {
+        fetchSchemas()
+    }
+}
+
+watch(() => props.typeKey, () => {
+    initSchema()
+}, { immediate: true })
+
+onMounted(() => {
+    initSchema()
+})
 
 // Clear Repository
 const handleClear = async () => {

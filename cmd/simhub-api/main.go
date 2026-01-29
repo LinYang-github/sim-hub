@@ -84,7 +84,7 @@ func main() {
 	}
 
 	registry := module.NewRegistry()
-	registry.Register(resource.NewModule(dbConn, blobStore, stsProvider, cfg.MinIO.Bucket, natsClient, "combined", "", handlers))
+	registry.Register(resource.NewModule(dbConn, blobStore, stsProvider, cfg.MinIO.Bucket, natsClient, "combined", "", handlers, cfg.ResourceTypes))
 
 	// 6. 配置 HTTP 路由
 	r := gin.New()

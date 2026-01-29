@@ -10,10 +10,10 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
-	gorm.io/driver/mysql v1.6.0
-	gorm.io/driver/postgres v1.6.0
-	gorm.io/driver/sqlite v1.6.0
-	gorm.io/gorm v1.31.1
+	gorm.io/driver/mysql v1.5.7
+	gorm.io/driver/postgres v1.5.7
+	gorm.io/driver/sqlite v1.5.7
+	gorm.io/gorm v1.25.7
 )
 
 require (

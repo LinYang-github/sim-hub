@@ -48,5 +48,16 @@
     "accept": ".md,.pdf,.txt",
     "enableScope": true,
     "viewer": "DocPreview"
+  },
+  {
+    "key": "spectrum_rule",
+    "label": "电磁频谱资源库",
+    "integrationMode": "internal",
+    "icon": "Connection",
+    "typeName": "资源",
+    "uploadMode": "online",
+    "accept": ".json",
+    "enableScope": false,
+    "viewer": "JsonPreview"
   }
 ]
