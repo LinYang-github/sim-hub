@@ -52,15 +52,15 @@
           <div class="primary-actions">
             <!-- Folder Upload -->
             <el-button v-if="uploadMode === 'folder-zip'" type="primary" class="upload-btn" @click="triggerFolderUpload">
-              <el-icon><UploadIcon /></el-icon> 导入{{ typeName }}包
+              <el-icon><UploadIcon /></el-icon> 导入{{ actionLabel }}包
             </el-button>
             <!-- Online Create -->
             <el-button v-else-if="uploadMode === 'online'" type="primary" class="upload-btn" @click="openOnlineCreate">
-              <el-icon><Plus /></el-icon> 新建{{ typeName }}
+              <el-icon><Plus /></el-icon> 新建{{ actionLabel }}
             </el-button>
             <!-- Single File Upload -->
             <el-button v-else type="primary" class="upload-btn" @click="triggerFileUpload">
-              <el-icon><UploadIcon /></el-icon> 上传{{ typeName }}
+              <el-icon><UploadIcon /></el-icon> 上传{{ actionLabel }}
             </el-button>
           </div>
 
@@ -371,6 +371,7 @@ import { RESOURCE_STATUS_TEXT, SCOPE_OPTIONS, RESOURCE_STATE } from '../../core/
 const props = defineProps<{
   typeKey: string
   typeName: string
+  shortName?: string
   uploadMode?: 'single' | 'folder-zip' | 'online'
   accept?: string
   enableScope?: boolean
@@ -379,6 +380,9 @@ const props = defineProps<{
   supportedViews?: { key: string, label: string, icon: string }[]
   customActions?: { key: string, label: string, icon: string, handler: string }[]
 }>()
+
+// Computed for button text (use shortName if available, fallback to typeName)
+const actionLabel = computed(() => props.shortName || props.typeName)
 
 const statusMap = RESOURCE_STATUS_TEXT
 

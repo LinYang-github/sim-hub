@@ -77,12 +77,15 @@ func seedBasicTypes(db *gorm.DB, configTypes []conf.ResourceType) {
 		var types []model.ResourceType
 		for _, ct := range configTypes {
 			types = append(types, model.ResourceType{
-				TypeKey:      ct.TypeKey,
-				TypeName:     ct.TypeName,
-				SchemaDef:    ct.SchemaDef,
-				ViewerConf:   ct.ViewerConf,
-				ProcessConf:  ct.ProcessConf,
-				CategoryMode: ct.CategoryMode,
+				TypeKey:         ct.TypeKey,
+				TypeName:        ct.TypeName,
+				SchemaDef:       ct.SchemaDef,
+				CategoryMode:    ct.CategoryMode,
+				IntegrationMode: ct.IntegrationMode,
+				UploadMode:      ct.UploadMode,
+				ProcessConf:     ct.ProcessConf,
+				MetaData:        ct.MetaData,
+				SortOrder:       ct.SortOrder,
 			})
 		}
 		if len(types) > 0 {

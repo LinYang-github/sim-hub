@@ -44,10 +44,13 @@ type MinIO struct {
 }
 
 type ResourceType struct {
-	TypeKey      string         `mapstructure:"type_key" json:"type_key"`
-	TypeName     string         `mapstructure:"type_name" json:"type_name"`
-	SchemaDef    map[string]any `mapstructure:"schema_def" json:"schema_def"`
-	ViewerConf   map[string]any `mapstructure:"viewer_conf" json:"viewer_conf"`
-	ProcessConf  map[string]any `mapstructure:"process_conf" json:"process_conf"`
-	CategoryMode string         `mapstructure:"category_mode" json:"category_mode"` // "flat" or "tree"
+	TypeKey         string         `mapstructure:"type_key" json:"type_key"`
+	TypeName        string         `mapstructure:"type_name" json:"type_name"`
+	SchemaDef       map[string]any `mapstructure:"schema_def" json:"schema_def"`
+	CategoryMode    string         `mapstructure:"category_mode" json:"category_mode"` // "flat" or "tree"
+	IntegrationMode string         `mapstructure:"integration_mode" json:"integration_mode"`
+	UploadMode      string         `mapstructure:"upload_mode" json:"upload_mode"`
+	ProcessConf     map[string]any `mapstructure:"process_conf" json:"process_conf"`
+	MetaData        map[string]any `mapstructure:"meta_data" json:"meta_data"`
+	SortOrder       int            `mapstructure:"sort_order" json:"sort_order"`
 }

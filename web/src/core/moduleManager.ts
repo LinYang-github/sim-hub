@@ -11,6 +11,9 @@ class ModuleManager {
   // 可用的代码实现（内部模块映射表）
   private implementations: Map<string, SimHubModule> = new Map()
 
+  // 统一存储从后端拉取的原始配置项
+  private configItems: SimHubModule[] = []
+
   /**
    * 注册代码模块实现（内部）
    * 使该模块可以被 modules.json 中的配置激活
@@ -66,16 +69,35 @@ class ModuleManager {
     })
   }
 
-  async loadConfig(url: string) {
+  async loadConfig(url: string = '/api/v1/resource-types') {
     try {
       // Add timestamp to bypass cache during dev
       const finalUrl = url + (url.includes('?') ? '&' : '?') + 't=' + new Date().getTime()
-      const configItems = await request.get<SimHubModule[]>(finalUrl) as unknown as SimHubModule[]
-      if (!configItems) return
+      const rawItems = await request.get<any[]>(finalUrl) as any[]
+      
+      // Map backend snake_case to frontend camelCase
+      this.configItems = rawItems.map(item => {
+          const meta = item.meta_data || {}
+          return {
+              key: item.type_key,
+              label: item.type_name,
+              typeName: item.type_name,
+              icon: meta.icon,
+              integrationMode: item.integration_mode || 'internal',
+              uploadMode: item.upload_mode || 'online',
+              enableScope: meta.enable_scope,
+              viewer: meta.viewer,
+              supportedViews: meta.supported_views,
+              customActions: meta.custom_actions,
+              externalUrl: meta.external_url,
+              devUrl: meta.dev_url,
+              shortName: meta.short_name
+          }
+      })
       
       const newActiveModules: SimHubModule[] = []
 
-      configItems.forEach(item => {
+      this.configItems.forEach(item => {
         if (item.integrationMode === 'internal') {
             // 激活内部模块实现
             const impl = this.implementations.get(item.key)
@@ -123,6 +145,7 @@ class ModuleManager {
                         props: {
                           typeKey: item.key,
                           typeName: item.typeName || item.label || '资源',
+                          shortName: item.shortName,
                           uploadMode: item.uploadMode || 'single',
                           accept: item.accept,
                           enableScope: item.enableScope,

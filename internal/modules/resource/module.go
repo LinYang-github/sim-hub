@@ -25,15 +25,41 @@ func NewModule(d *data.Data, store storage.MultipartBlobStore, stsProvider stora
 		var types []model.ResourceType
 		for _, rt := range resourceTypes {
 			types = append(types, model.ResourceType{
-				TypeKey:      rt.TypeKey,
-				TypeName:     rt.TypeName,
-				SchemaDef:    rt.SchemaDef,
-				ViewerConf:   rt.ViewerConf,
-				ProcessConf:  rt.ProcessConf,
-				CategoryMode: rt.CategoryMode,
+				TypeKey:         rt.TypeKey,
+				TypeName:        rt.TypeName,
+				SchemaDef:       rt.SchemaDef,
+				CategoryMode:    rt.CategoryMode,
+				IntegrationMode: rt.IntegrationMode,
+				UploadMode:      rt.UploadMode,
+				ProcessConf:     rt.ProcessConf,
+				MetaData:        rt.MetaData,
+				SortOrder:       rt.SortOrder,
 			})
 		}
-		// Upsert
+		// 1. Get all existing keys in DB
+		var existingKeys []string
+		d.DB.Model(&model.ResourceType{}).Pluck("type_key", &existingKeys)
+
+		// 2. Identify keys to delete (present in DB but not in config)
+		configKeys := make(map[string]bool)
+		for _, t := range types {
+			configKeys[t.TypeKey] = true
+		}
+
+		var keysToDelete []string
+		for _, k := range existingKeys {
+			if !configKeys[k] {
+				keysToDelete = append(keysToDelete, k)
+			}
+		}
+
+		// 3. Delete orphans
+		if len(keysToDelete) > 0 {
+			d.DB.Where("type_key IN ?", keysToDelete).Delete(&model.ResourceType{})
+			slog.Info("Deleted orphaned resource types", "count", len(keysToDelete), "keys", keysToDelete)
+		}
+
+		// 4. Upsert config types
 		if err := d.DB.Save(&types).Error; err != nil {
 			slog.Error("Sync resource types failed", "error", err)
 		} else {

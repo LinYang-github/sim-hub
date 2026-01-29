@@ -10,41 +10,65 @@ minio:
   bucket: "simhub-raw"
 
 resource_types:
-  - type_key: "map_terrain"
-    type_name: "地形图 (TIF)"
-    schema_def:
-      type: "object"
-      properties:
-        resolution:
-          type: "string"
-    viewer_conf:
-      component: "CesiumViewer"
-      mode: "2D"
-    process_conf:
-      pipeline: ["gdal_retile"]
-    category_mode: "tree"
-  - type_key: "model_glb"
-    type_name: "3D 模型 (GLB)"
-    schema_def:
-      type: "object"
-      properties:
-        poly_count:
-          type: "integer"
-    viewer_conf:
-      component: "ThreeViewer"
-    process_conf:
-      pipeline: ["model_optimizer"]
-    category_mode: "tree"
   - type_key: "scenario"
-    type_name: "仿真想定 (ZIP)"
+    type_name: "想定资源库"
+    sort_order: 10
     schema_def:
       type: "object"
       properties:
         engine:
           type: "string"
+          description: "想定引擎"
     category_mode: "flat"
+    meta_data:
+      icon: "Files"
+      short_name: "想定"
+
+  - type_key: "model_glb"
+    type_name: "3D模型库"
+    sort_order: 20
+    schema_def:
+      type: "object"
+      properties:
+        poly_count:
+          type: "integer"
+          description: "面数 (Polygons)"
+    process_conf:
+      pipeline: ["model_optimizer"]
+    category_mode: "tree"
+    upload_mode: "file"
+    meta_data:
+      icon: "Box"
+      viewer: "GLBPreview"
+      short_name: "3D模型"
+      supported_views:
+        - key: "card"
+          label: "网格视图"
+          icon: "Grid"
+        - key: "table"
+          label: "列表视图"
+          icon: "DataLine"
+
+  - type_key: "map_terrain"
+    type_name: "地图资源库"
+    sort_order: 30
+    schema_def:
+      type: "object"
+      properties:
+        resolution:
+          type: "string"
+          description: "分辨率"
+    process_conf:
+      pipeline: ["gdal_retile"]
+    category_mode: "tree"
+    meta_data:
+      icon: "MapLocation"
+      viewer: "CesiumViewer"
+      short_name: "地图"
+
   - type_key: "spectrum_rule"
-    type_name: "电磁频谱资源库 (JSON)"
+    type_name: "电磁频谱资源库"
+    sort_order: 40
     schema_def:
       type: "object"
       required: ["center_freq", "bandwidth", "modulation"]
@@ -59,11 +83,49 @@ resource_types:
           type: "string"
           enum: ["FM", "AM", "QPSK", "BPSK"]
           description: "调制方式"
-    viewer_conf:
-      component: "JsonTreeViewer"
     category_mode: "tree"
+    meta_data:
+      icon: "Connection"
+      viewer: "JsonTreeViewer"
+      short_name: "电磁频谱"
+
+  - type_key: "ext_app"
+    type_name: "外部资源库"
+    sort_order: 50
+    integration_mode: "iframe"
+    meta_data:
+      icon: "Platform"
+      dev_url: "http://localhost:30031"
+      short_name: "外部资源"
+      supported_views:
+        - key: "view"
+          label: "外部视图"
+          path: "External:demo-view/index.html"
+        - key: "table"
+          label: "原生列表"
+
   - type_key: "test_db"
-    type_name: "测试资源库 (DEMO)"
+    type_name: "测试资源库"
+    sort_order: 60
+    integration_mode: "internal"
+    upload_mode: "online"
+    category_mode: "tree"
+    meta_data:
+      icon: "Coin"
+      enable_scope: true
+      short_name: "测试资源"
+      supported_views:
+        - key: "table"
+          label: "列表视图"
+          icon: "List"
+        - key: "card"
+          label: "卡片视图"
+          icon: "Grid"
+      custom_actions:
+        - key: "demo_audit"
+          label: "Demo 审批"
+          icon: "Check"
+          handler: "DemoAction"
     schema_def:
       type: "object"
       required: ["test_name", "category_select"]
@@ -95,7 +157,7 @@ resource_types:
           enum: [1, 5, 10]
         constrained_num:
           type: "number"
-          description: "带约束的数字 (0-100, 精度2)"
+          description: "带约束的数字 (0-100,精度2)"
           minimum: 0
           maximum: 100
           step: 0.5
@@ -110,7 +172,6 @@ resource_types:
               value: 1
             - label: "已归档 (2)"
               value: 2
-    category_mode: "tree"
 
 log:
   level: "info"

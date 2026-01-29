@@ -33,7 +33,7 @@ const initApp = async () => {
   }
 
   // 1. 加载模块配置（异步）
-  await moduleManager.loadConfig('/modules.json')
+  await moduleManager.loadConfig()
   
   // 2. 初始化 Router
   const router = createRouter({

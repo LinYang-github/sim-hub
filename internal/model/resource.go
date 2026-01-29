@@ -9,14 +9,17 @@ import (
 
 // ResourceType 资源类型定义
 type ResourceType struct {
-	TypeKey      string         `gorm:"primaryKey;type:varchar(50)" json:"type_key"`
-	TypeName     string         `gorm:"type:varchar(100);not null" json:"type_name"`
-	SchemaDef    map[string]any `gorm:"serializer:json" json:"schema_def"`                    // 前端表单定义的 JSON Schema
-	ViewerConf   map[string]any `gorm:"serializer:json" json:"viewer_conf"`                   // 前端预览组件配置
-	ProcessConf  map[string]any `gorm:"serializer:json" json:"process_conf"`                  // 后端处理管线配置 (JSON)
-	CategoryMode string         `gorm:"type:varchar(20);default:'flat'" json:"category_mode"` // "flat" 或 "tree"
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
+	TypeKey         string         `gorm:"primaryKey;type:varchar(50)" json:"type_key"`
+	TypeName        string         `gorm:"type:varchar(100);not null" json:"type_name"`
+	SchemaDef       map[string]any `gorm:"serializer:json" json:"schema_def"`                    // 前端表单定义的 JSON Schema
+	CategoryMode    string         `gorm:"type:varchar(20);default:'flat'" json:"category_mode"` // "flat" 或 "tree"
+	IntegrationMode string         `gorm:"type:varchar(20);default:'internal'" json:"integration_mode"`
+	UploadMode      string         `gorm:"type:varchar(50)" json:"upload_mode"`
+	ProcessConf     map[string]any `gorm:"serializer:json" json:"process_conf"`
+	MetaData        map[string]any `gorm:"serializer:json" json:"meta_data"`
+	SortOrder       int            `gorm:"type:int;default:0" json:"sort_order"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
 }
 
 // Category 资源分类（虚拟文件夹）
