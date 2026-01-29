@@ -6,23 +6,27 @@
     <title>可视化资源画廊 - Demo View</title>
     <style>
         :root {
-            --bg: #f5f7fa;
+            --bg: #f8fafc;
             --surface: #ffffff;
-            --primary: #409eff;
-            --text-primary: #303133;
-            --text-secondary: #909399;
-            --border: #e4e7ed;
-            --accent: #67c23a;
+            --primary: #4f46e5;
+            --primary-soft: #eef2ff;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --accent: #10b981;
+            --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
         }
 
         html.dark {
-            --bg: #121212;
-            --surface: #1e1e1e;
-            --primary: #66b1ff;
-            --text-primary: #e5eaf3;
-            --text-secondary: #a8abb2;
-            --border: #333333;
-            --accent: #85ce61;
+            --bg: #020617;
+            --surface: #0f172a;
+            --primary: #818cf8;
+            --primary-soft: #1e1b4b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border: #1e293b;
+            --accent: #34d399;
+            --card-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3);
         }
 
         body {
@@ -235,6 +239,8 @@
                         this.render(data.payload.resource);
                     }
                 });
+                // Notify host we are ready
+                window.parent.postMessage({ type: 'GUEST_READY' }, '*');
             },
             render(data) {
                 const list = data.resources || [];

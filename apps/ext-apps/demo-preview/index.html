@@ -8,19 +8,23 @@
         :root {
             --bg: #ffffff;
             --surface: #f8fafc;
-            --primary: #020617;
+            --primary: #4f46e5;
             --text: #0f172a;
             --border: #e2e8f0;
             --meta: #64748b;
+            --accent-bg: #dcfce7;
+            --accent-text: #166534;
         }
 
         html.dark {
             --bg: #020617;
             --surface: #0f172a;
-            --primary: #f8fafc;
+            --primary: #818cf8;
             --text: #f1f5f9;
             --border: #1e293b;
             --meta: #94a3b8;
+            --accent-bg: #064e3b;
+            --accent-text: #34d399;
         }
 
         body {
@@ -228,6 +232,8 @@
                         this.render(data.payload.resource);
                     }
                 });
+                // Notify host we are ready
+                window.parent.postMessage({ type: 'GUEST_READY' }, '*');
             },
             render(res) {
                 if (!res) return;

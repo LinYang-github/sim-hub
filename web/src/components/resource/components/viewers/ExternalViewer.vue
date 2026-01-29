@@ -18,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 
 const props = defineProps<{
   url: string              // Base URL of the external app
@@ -34,9 +34,9 @@ const iframeRef = ref<HTMLIFrameElement | null>(null)
 const iframeUrl = computed(() => {
     let base = window.location.origin
     
-    // In dev mode, if url is relative, it probably points to the consolidated examples hub (30031)
+    // In dev mode, if url is relative, it probably points to the consolidated examples hub
     if (import.meta.env.DEV && props.url.startsWith('/')) {
-        base = 'http://localhost:30031'
+        base = import.meta.env.VITE_EXT_APP_DEV_URL || 'http://localhost:30031'
     }
 
     const u = new URL(props.url, base)
@@ -45,9 +45,33 @@ const iframeUrl = computed(() => {
     return u.toString()
 })
 
+// Theme sync
+import { useDark } from '@vueuse/core'
+const isDark = useDark()
+
+const sendTheme = () => {
+    if (iframeRef.value && iframeRef.value.contentWindow) {
+        iframeRef.value.contentWindow.postMessage({
+            type: 'THEME_UPDATE',
+            payload: {
+                theme: isDark.value ? 'dark' : 'light'
+            }
+        }, '*')
+    }
+}
+
 const handleLoad = () => {
     loading.value = false
+    sendTheme()
     syncData()
+}
+
+// Global message handler for guest handshake
+const handleMessage = (e: MessageEvent) => {
+    if (e.data && e.data.type === 'GUEST_READY') {
+        sendTheme()
+        syncData()
+    }
 }
 
 const syncData = () => {
@@ -73,10 +97,23 @@ const retry = () => {
     error.value = false
 }
 
+onMounted(() => {
+    window.addEventListener('message', handleMessage)
+})
+
+onUnmounted(() => {
+    window.removeEventListener('message', handleMessage)
+})
+
 // Re-sync if resource changes while open
 watch(() => props.resource, () => {
     syncData()
 }, { deep: true })
+
+// Sync if theme changes
+watch(isDark, () => {
+    sendTheme()
+})
 
 </script>
 
