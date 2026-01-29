@@ -27,20 +27,31 @@
 
                 <!-- 3. Fallback: Standard Types -->
                 
-                <!-- Enum Select -->
+                <!-- Enum Select (Supported standard enum and x-enum-options for labels) -->
                 <el-select 
-                  v-else-if="propDef.enum" 
+                  v-else-if="propDef.enum || propDef['x-enum-options']" 
                   v-model="formData[key]" 
                   placeholder="请选择"
                   style="width: 100%"
                   clearable
+                  v-bind="propDef['x-props']"
                 >
-                  <el-option 
-                    v-for="opt in propDef.enum" 
-                    :key="opt" 
-                    :label="opt" 
-                    :value="opt" 
-                  />
+                  <template v-if="propDef['x-enum-options']">
+                    <el-option 
+                      v-for="opt in propDef['x-enum-options']" 
+                      :key="opt.value" 
+                      :label="opt.label" 
+                      :value="opt.value" 
+                    />
+                  </template>
+                  <template v-else>
+                    <el-option 
+                      v-for="opt in propDef.enum" 
+                      :key="opt" 
+                      :label="opt" 
+                      :value="opt" 
+                    />
+                  </template>
                 </el-select>
 
                 <!-- Number Input -->
@@ -50,12 +61,18 @@
                   :placeholder="`请输入 ${propDef.description || key}`"
                   style="width: 100%"
                   controls-position="right"
+                  :min="propDef.minimum"
+                  :max="propDef.maximum"
+                  :step="propDef.step"
+                  :precision="propDef.precision !== undefined ? propDef.precision : (propDef.type === 'integer' ? 0 : undefined)"
+                  v-bind="propDef['x-props']"
                 />
 
                 <!-- Boolean Switch -->
                 <el-switch 
                   v-else-if="propDef.type === 'boolean'"
                   v-model="formData[key]"
+                  v-bind="propDef['x-props']"
                 />
 
                 <!-- String Input (Default) -->
@@ -65,6 +82,7 @@
                   :type="propDef.format === 'textarea' ? 'textarea' : 'text'"
                   :rows="3"
                   :placeholder="`请输入 ${propDef.description || key}`"
+                  v-bind="propDef['x-props']"
                 />
             </slot>
 

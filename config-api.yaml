@@ -66,12 +66,50 @@ resource_types:
     type_name: "测试资源库 (DEMO)"
     schema_def:
       type: "object"
+      required: ["test_name", "category_select"]
       properties:
         test_name:
           type: "string"
+          description: "标准文本输入"
+        test_desc:
+          type: "string"
+          format: "textarea"
+          description: "长文本描述 (Textarea)"
         score:
           type: "integer"
+          description: "评分 (自定义组件)"
           x-component: "ScoreRater"
+        item_count:
+          type: "number"
+          description: "计数器 (Number)"
+        is_enabled:
+          type: "boolean"
+          description: "状态开关 (Switch)"
+        category_select:
+          type: "string"
+          description: "单选下拉 (Enum Select)"
+          enum: ["选项一", "选项二", "选项三", "其他"]
+        importance:
+          type: "integer"
+          description: "重要性 (数字枚举)"
+          enum: [1, 5, 10]
+        constrained_num:
+          type: "number"
+          description: "带约束的数字 (0-100, 精度2)"
+          minimum: 0
+          maximum: 100
+          step: 0.5
+          precision: 2
+        status:
+          type: "integer"
+          description: "数据状态 (数值映射演示)"
+          x-enum-options:
+            - label: "草稿 (0)"
+              value: 0
+            - label: "已发布 (1)"
+              value: 1
+            - label: "已归档 (2)"
+              value: 2
     category_mode: "tree"
 
 log:
