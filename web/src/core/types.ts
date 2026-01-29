@@ -11,6 +11,7 @@ export interface SupportedView {
   key: string
   label: string
   icon: string | Component
+  path?: string
 }
 
 export interface SimHubModule {

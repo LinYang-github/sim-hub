@@ -12,6 +12,16 @@ import scenarioModule from './modules/scenario'
 import VNetworkGraph from "v-network-graph"
 import "v-network-graph/lib/style.css"
 
+import { registerStandardViews } from './core/registerStandardViews'
+
+// 注册标准视图
+registerStandardViews()
+
+// 暴露全局 API 给外部应用 (demo-view 等)
+;(window as any).SimHub = {
+    registerView: (meta: any) => moduleManager.registerView(meta)
+}
+
 // 注册内部模块实现 (此处仅注册有特殊定制需求的模块)
 moduleManager.registerImplementation(scenarioModule)
 // model_glb 将通过 modules.json 中的元数据自动使用 ResourceList 兜底

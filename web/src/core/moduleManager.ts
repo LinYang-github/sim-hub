@@ -3,28 +3,9 @@ import { Router } from 'vue-router'
 import { SimHubModule } from './types'
 import IframeContainer from './views/IframeContainer.vue'
 import request from './utils/request'
-import { viewMeta as TableMeta } from '../components/resource/views/ResourceTableView.vue'
-import { viewMeta as CardMeta } from '../components/resource/views/ResourceCardView.vue'
-import { viewMeta as GridMeta } from '../components/resource/views/ResourceDataGrid.vue'
+// 移除硬编码的视图注册，改为动态注册
+import { SupportedView } from './types'
 
-// 动态视图注册表
-const VIEW_REGISTRY: Map<string, { label: string, icon: string, path?: string }> = new Map()
-
-// 注册标准视图
-;[TableMeta, CardMeta, GridMeta].forEach(meta => {
-    VIEW_REGISTRY.set(meta.key, meta)
-})
-
-const handleSupportedViews = (views: any) => {
-    if (!views || !Array.isArray(views)) return views
-    return views.map(v => {
-        if (typeof v === 'string') {
-            const meta = VIEW_REGISTRY.get(v) || { label: v, icon: 'Document' }
-            return { key: v, ...meta }
-        }
-        return v
-    })
-}
 
 class ModuleManager {
   // 已配置（活跃）的模块列表 (使用 shallowRef 确保 UI 响应式同步)
@@ -35,6 +16,28 @@ class ModuleManager {
 
   // 统一存储从后端拉取的原始配置项
   private configItems: SimHubModule[] = []
+  
+  // 视图注册表
+  private viewRegistry: Map<string, SupportedView> = new Map()
+
+  /**
+   * 注册视图元数据
+   */
+  registerView(meta: SupportedView) {
+      this.viewRegistry.set(meta.key, meta)
+  }
+
+  private handleSupportedViews(views: any) {
+      if (!views || !Array.isArray(views)) return views
+      return views.map(v => {
+          if (typeof v === 'string') {
+              const meta = this.viewRegistry.get(v)
+              if (meta) return meta
+              return { label: v, icon: 'Document', key: v }
+          }
+          return v
+      })
+  }
 
   /**
    * 注册代码模块实现（内部）
@@ -109,7 +112,7 @@ class ModuleManager {
               uploadMode: item.upload_mode || 'online',
               enableScope: meta.enable_scope,
               viewer: meta.viewer,
-              supportedViews: handleSupportedViews(meta.supported_views),
+              supportedViews: this.handleSupportedViews(meta.supported_views),
               customActions: meta.custom_actions,
               externalUrl: meta.external_url,
               devUrl: meta.dev_url,
