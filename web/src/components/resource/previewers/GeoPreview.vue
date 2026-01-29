@@ -1,6 +1,6 @@
 <template>
   <div class="geo-preview-container">
-    <div id="map" class="leaflet-map" ref="mapElement"></div>
+    <div class="leaflet-map" ref="mapElement"></div>
     <div class="geo-info-overlay" v-if="hasGeoInfo">
       <div class="info-item">
         <span class="label">坐标系:</span>
@@ -24,6 +24,7 @@ import { MapLocation } from '@element-plus/icons-vue'
 const props = defineProps<{
   url: string
   metaData?: Record<string, any>
+  interactive?: boolean // Added interactive prop
 }>()
 
 const mapElement = ref<HTMLElement | null>(null)
@@ -41,7 +42,13 @@ const initMap = () => {
 
   // 1. 初始化地图
   map = L.map(mapElement.value, {
-    zoomControl: false,
+    zoomControl: props.interactive !== false,
+    dragging: props.interactive !== false,
+    scrollWheelZoom: props.interactive !== false,
+    doubleClickZoom: props.interactive !== false,
+    boxZoom: props.interactive !== false,
+    keyboard: props.interactive !== false,
+    touchZoom: props.interactive !== false,
     attributionControl: false
   }).setView([0, 0], 2)
 

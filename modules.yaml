@@ -41,6 +41,8 @@ resource_types:
       icon: "MapLocation"
       viewer: "CesiumViewer"
       short_name: "地图服务"
+      supported_views: ["gallery", "table"]
+      example: "全球 30m 高程 WMS 服务"
     schema_def:
       type: "object"
       required: ["url", "service_type", "layers"]

@@ -150,6 +150,24 @@
             @custom-action="(key, row) => handleCustomAction(key, row)"
           />
 
+          <!-- Gallery View Mode -->
+          <ResourceGalleryView
+            v-else-if="viewMode === 'gallery'"
+            :resources="resources"
+            :loading="loading"
+            :icon="icon"
+            :status-map="statusMap"
+            :custom-actions="customActions"
+            @view-details="handleViewDetails"
+            @download="download"
+            @edit-tags="openTagEditor"
+            @delete="confirmDelete"
+            @rename="(res) => stewardRef?.openRename(res)"
+            @move="(res) => stewardRef?.openMove(res)"
+            @view-history="viewHistory"
+            @custom-action="(key, row) => handleCustomAction(key, row)"
+          />
+
           <!-- DataGrid View Mode -->
           <ResourceDataGrid
             v-else-if="viewMode === 'data-grid'"
@@ -352,6 +370,7 @@ import UploadDialog from './components/UploadDialog.vue'
 import ResourceStewardDialogs from './components/ResourceStewardDialogs.vue'
 import OnlineCreateDialog from './components/OnlineCreateDialog.vue'
 import ResourceDataGrid from './views/ResourceDataGrid.vue'
+import ResourceGalleryView from './views/ResourceGalleryView.vue'
 import ExternalViewer from './previewers/ExternalViewer.vue'
 
 // Composables
