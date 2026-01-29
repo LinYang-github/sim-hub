@@ -27,40 +27,20 @@
 
                 <!-- 3. Fallback: Standard Types -->
                 
-                <!-- Enum Select (Supported standard enum and x-enum-options for labels) -->
-                <el-select 
+                <!-- Enum Select -->
+                <SelectEditor 
                   v-else-if="propDef.enum || propDef['x-enum-options']" 
                   v-model="formData[key]" 
-                  placeholder="请选择"
-                  style="width: 100%"
-                  clearable
+                  :enums="propDef.enum"
+                  :options="propDef['x-enum-options']"
                   v-bind="propDef['x-props']"
-                >
-                  <template v-if="propDef['x-enum-options']">
-                    <el-option 
-                      v-for="opt in propDef['x-enum-options']" 
-                      :key="opt.value" 
-                      :label="opt.label" 
-                      :value="opt.value" 
-                    />
-                  </template>
-                  <template v-else>
-                    <el-option 
-                      v-for="opt in propDef.enum" 
-                      :key="opt" 
-                      :label="opt" 
-                      :value="opt" 
-                    />
-                  </template>
-                </el-select>
+                />
 
                 <!-- Number Input -->
-                <el-input-number 
+                <NumberEditor 
                   v-else-if="propDef.type === 'number' || propDef.type === 'integer'"
                   v-model="formData[key]"
                   :placeholder="`请输入 ${propDef.description || key}`"
-                  style="width: 100%"
-                  controls-position="right"
                   :min="propDef.minimum"
                   :max="propDef.maximum"
                   :step="propDef.step"
@@ -69,18 +49,17 @@
                 />
 
                 <!-- Boolean Switch -->
-                <el-switch 
+                <SwitchEditor 
                   v-else-if="propDef.type === 'boolean'"
                   v-model="formData[key]"
                   v-bind="propDef['x-props']"
                 />
 
                 <!-- String Input (Default) -->
-                <el-input 
+                <TextEditor 
                   v-else 
                   v-model="formData[key]" 
                   :type="propDef.format === 'textarea' ? 'textarea' : 'text'"
-                  :rows="3"
                   :placeholder="`请输入 ${propDef.description || key}`"
                   v-bind="propDef['x-props']"
                 />
@@ -98,8 +77,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, defineAsyncComponent, markRaw } from 'vue'
+import { ref, watch, computed } from 'vue'
 import type { FormInstance } from 'element-plus'
+import SelectEditor from './editors/SelectEditor.vue'
+import NumberEditor from './editors/NumberEditor.vue'
+import SwitchEditor from './editors/SwitchEditor.vue'
+import TextEditor from './editors/TextEditor.vue'
 
 const props = defineProps<{
   schema: any
