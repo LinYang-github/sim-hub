@@ -69,27 +69,25 @@ func NewData(c *conf.Data) (*Data, func(), error) {
 	return &Data{DB: db}, cleanup, nil
 }
 
-// seedBasicTypes 从配置中注入基础资源类型定义
+// seedBasicTypes 从配置中同步资源类型定义到数据库 (存在则更新，不存在则插入)
 func seedBasicTypes(db *gorm.DB, configTypes []conf.ResourceType) {
-	var count int64
-	db.Model(&model.ResourceType{}).Count(&count)
-	if count == 0 {
-		var types []model.ResourceType
-		for _, ct := range configTypes {
-			types = append(types, model.ResourceType{
-				TypeKey:         ct.TypeKey,
-				TypeName:        ct.TypeName,
-				SchemaDef:       ct.SchemaDef,
-				CategoryMode:    ct.CategoryMode,
-				IntegrationMode: ct.IntegrationMode,
-				UploadMode:      ct.UploadMode,
-				ProcessConf:     ct.ProcessConf,
-				MetaData:        ct.MetaData,
-			})
+	for _, ct := range configTypes {
+		rt := model.ResourceType{
+			TypeKey:         ct.TypeKey,
+			TypeName:        ct.TypeName,
+			SchemaDef:       ct.SchemaDef,
+			CategoryMode:    ct.CategoryMode,
+			IntegrationMode: ct.IntegrationMode,
+			UploadMode:      ct.UploadMode,
+			ProcessConf:     ct.ProcessConf,
+			MetaData:        ct.MetaData,
 		}
-		if len(types) > 0 {
-			db.Create(&types)
-			slog.Info("已从配置注入资源类型定义", "count", len(types))
+
+		// 使用 GORM 的 Save 方法或者先查找再处理
+		// Save 默认根据主键 (TypeKey) 更新或插入
+		if err := db.Save(&rt).Error; err != nil {
+			slog.Error("同步资源类型失败", "type_key", ct.TypeKey, "error", err)
 		}
 	}
+	slog.Info("已完成资源类型配置同步", "count", len(configTypes))
 }

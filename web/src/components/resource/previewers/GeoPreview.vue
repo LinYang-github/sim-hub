@@ -30,7 +30,10 @@ const mapElement = ref<HTMLElement | null>(null)
 let map: L.Map | null = null
 
 const hasGeoInfo = computed(() => {
-  return props.metaData && (props.metaData.center || props.metaData.bounds || props.metaData.geometry)
+  // Either HAS specific geometry info (center/bounds) OR is a map service link
+  const hasSpecificInfo = props.metaData && (props.metaData.center || props.metaData.bounds || props.metaData.geometry)
+  const isMapService = props.metaData && props.metaData.url && props.metaData.service_type
+  return hasSpecificInfo || isMapService
 })
 
 const initMap = () => {
@@ -45,9 +48,29 @@ const initMap = () => {
   // 2. 添加底图 (使用无需 Key 的灰度风格地图)
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
   }).addTo(map)
 
-  // 3. 处理元数据中的地理信息
+  // 3. 处理地图服务 (WMS/XYZ/etc.)
+  if (props.metaData && props.metaData.url) {
+    const { url, service_type, layers, format, proxy_enabled } = props.metaData
+    
+    if (service_type === 'WMS') {
+      L.tileLayer.wms(url, {
+        layers: layers || '',
+        format: format || 'image/png',
+        transparent: true,
+        version: '1.1.1'
+      }).addTo(map)
+    } else if (service_type === 'XYZ' || service_type === 'TMS') {
+      // TMS usually needs tms: true option
+      L.tileLayer(url, {
+        tms: service_type === 'TMS'
+      }).addTo(map)
+    }
+  }
+
+  // 4. 处理元数据中的地理信息 (标注、边界等)
   if (props.metaData) {
     const { center, bounds, geometry } = props.metaData
 

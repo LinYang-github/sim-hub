@@ -12,6 +12,7 @@ resource_types:
     meta_data:
       icon: "Files"
       short_name: "想定"
+      example: "红方西北演习想定A-01"
   
   - type_key: "model_glb"
     type_name: "3D模型库"
@@ -30,22 +31,41 @@ resource_types:
       viewer: "GLBPreview"
       short_name: "3D模型"
       supported_views: ["card", "table"]
+      example: "J-20战斗机隐藏挂架型"
   
-  - type_key: "map_terrain"
-    type_name: "地图资源库"
-    schema_def:
-      type: "object"
-      properties:
-        resolution:
-          type: "string"
-          description: "分辨率"
-    process_conf:
-      pipeline: ["gdal_retile"]
+  - type_key: "map_service"
+    type_name: "地理信息服务"
+    upload_mode: "online"
     category_mode: "tree"
     meta_data:
       icon: "MapLocation"
       viewer: "CesiumViewer"
-      short_name: "地图"
+      short_name: "地图服务"
+    schema_def:
+      type: "object"
+      required: ["url", "service_type", "layers"]
+      properties:
+        service_type:
+          type: "string"
+          title: "服务类型"
+          enum: ["WMS", "WMTS", "TMS", "XYZ", "ArcGISRest"]
+          default: "WMS"
+        url:
+          type: "string"
+          title: "服务地址"
+          description: "GeoServer 或其它 GIS 服务的 Base URL"
+        layers:
+          type: "string"
+          title: "图层名称"
+          description: "多个图层请用逗号分隔"
+        format:
+          type: "string"
+          title: "图片格式"
+          default: "image/png"
+        proxy_enabled:
+          type: "boolean"
+          title: "启用跨域代理"
+          default: false
   
   - type_key: "spectrum_rule"
     type_name: "电磁频谱资源库"
@@ -68,6 +88,7 @@ resource_types:
       icon: "Connection"
       viewer: "JsonTreeViewer"
       short_name: "电磁频谱"
+      example: "复杂环境下的通信干扰对抗策略 V1"
   
   - type_key: "ext_app"
     type_name: "外部资源库"
@@ -76,6 +97,7 @@ resource_types:
       icon: "Platform"
       dev_url: "http://localhost:30031"
       short_name: "外部资源"
+      example: "外部扩展应用示例"
   
   - type_key: "test_db"
     type_name: "测试资源库"
@@ -88,6 +110,7 @@ resource_types:
       short_name: "测试资源"
       supported_views: ["demo-view", "data-grid"]
       custom_actions: ["demo-action"]
+      example: "单元测试数据集-202401"
     schema_def:
       type: "object"
       required: ["test_name", "category_select"]

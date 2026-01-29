@@ -74,7 +74,7 @@ interface QuickAction {
 const quickActions: QuickAction[] = [
   { name: '想定库', path: '/scenarios', icon: Folder },
   { name: '模型库', path: '/res/model_glb', icon: Box },
-  { name: '地形库', path: '/res/map_terrain', icon: Location },
+  { name: '地图服务', path: '/res/map_service', icon: Location },
   { name: '帮助文档', path: '/', icon: Document }
 ]
 </script>

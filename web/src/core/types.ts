@@ -34,6 +34,7 @@ export interface SimHubModule {
   accept?: string
   enableScope?: boolean
   categoryMode?: 'flat' | 'tree'
+  example?: string
 
   // Integration & UI Props
   label?: string

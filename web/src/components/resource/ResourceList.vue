@@ -280,6 +280,7 @@
       :type-name="typeName || '资源'"
       :category-nodes="categoryTree || []"
       :schema="currentSchema"
+      :example="example"
       @success="fetchList"
     />
 
@@ -374,6 +375,7 @@ const props = defineProps<{
   categoryMode?: 'flat' | 'tree'
   viewer?: string
   icon?: string
+  example?: string
   supportedViews?: { key: string, label: string, icon: string, path?: string }[]
   customActions?: { key: string, label: string, icon: string, handler: any }[]
 }>()

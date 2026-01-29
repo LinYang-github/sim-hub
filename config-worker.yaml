@@ -23,5 +23,4 @@ worker:
   api_base_url: "http://localhost:30030"
   handlers:
     scenario: "./drivers/scenario-processor"
-    map_terrain: "" 
     model_glb: "./drivers/scenario-processor"

@@ -1,6 +1,6 @@
 <template>
   <div class="resource-preview">
-    <template v-if="isActive && (downloadUrl || viewer?.startsWith('External:'))">
+    <template v-if="isActive && (downloadUrl || viewer?.startsWith('External:') || isOnlineService)">
       <component 
         :is="getViewerComponent(viewer)" 
         :url="finalUrl" 
@@ -35,7 +35,6 @@ const props = defineProps<{
   viewer?: string
   icon?: string
   metaData?: Record<string, any>
-  metaData?: Record<string, any>
   fullResource?: any
 }>()
 
@@ -60,6 +59,7 @@ const getViewerComponent = (name?: string) => {
     'VideoPreview': AsyncVideoPreview,
     'DocPreview': AsyncDocPreview,
     'GeoPreview': AsyncGeoPreview,
+    'CesiumViewer': AsyncGeoPreview,
     'FolderPreview': AsyncFolderPreview,
     'ExternalViewer': AsyncExternalViewer,
     'JsonPreview': AsyncJsonPreview,
@@ -79,6 +79,9 @@ const finalUrl = computed(() => {
 })
 
 const isActive = computed(() => props.state === RESOURCE_STATE.ACTIVE)
+
+// For online services (like map_service), they might not have a downloadUrl but are still previewable via metaData
+const isOnlineService = computed(() => props.viewer === 'CesiumViewer' || props.viewer === 'JsonTreeViewer')
 
 const statusType = computed(() => {
   if (props.state === RESOURCE_STATE.PROCESSING) return 'primary'

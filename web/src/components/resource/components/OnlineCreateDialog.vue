@@ -18,7 +18,7 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="资源名称" prop="name">
-              <el-input v-model="baseForm.name" placeholder="例如：红方通信干扰策略V1" />
+              <el-input v-model="baseForm.name" :placeholder="example ? `例如：${example}` : '请输入名称'" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -113,6 +113,7 @@ const props = defineProps<{
   categoryNodes: any[]
   typeName: string
   schema?: any // Current type resource schema def
+  example?: string // Added example prop
 }>()
 
 const emit = defineEmits(['success'])

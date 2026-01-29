@@ -145,7 +145,8 @@ class ModuleManager {
               customActions: this.handleCustomActions(meta.custom_actions),
               externalUrl: meta.external_url,
               devUrl: meta.dev_url,
-              shortName: meta.short_name
+              shortName: meta.short_name,
+              example: meta.example
           }
       })
       
@@ -175,6 +176,10 @@ class ModuleManager {
                             // Inject customActions into the route props
                              if (merged.customActions) {
                                 (r.props as any).customActions = merged.customActions
+                             }
+                             // Inject example into the route props
+                             if (merged.example) {
+                                (r.props as any).example = merged.example
                              }
                         }
                     })
@@ -207,6 +212,7 @@ class ModuleManager {
                           viewer: item.viewer,
                           icon: item.icon,
                           supportedViews: item.supportedViews,
+                          example: item.example,
                           // Pass customActions from config
                           customActions: item.customActions
                         }
