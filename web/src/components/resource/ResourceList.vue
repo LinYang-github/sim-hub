@@ -264,11 +264,12 @@
       @confirm="confirmAndDoUpload"
     />
 
-    <OnlineCreateDialog
-      v-model="onlineCreateVisible"
-      :type-key="typeKey"
-      :type-name="typeName"
-      :category-nodes="categoryTree"
+    <OnlineCreateDialog 
+      v-if="onlineCreateVisible"
+      v-model="onlineCreateVisible" 
+      :type-key="typeKey" 
+      :type-name="typeName || '资源'"
+      :category-nodes="categoryTree || []"
       :schema="currentSchema"
       @success="fetchList"
     />

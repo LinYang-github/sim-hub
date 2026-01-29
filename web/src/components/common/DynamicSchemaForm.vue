@@ -13,44 +13,61 @@
             :label="propDef.description || key" 
             :prop="String(key)"
           >
-            <!-- Enum Select -->
-            <el-select 
-              v-if="propDef.enum" 
-              v-model="formData[key]" 
-              placeholder="请选择"
-              style="width: 100%"
-              clearable
-            >
-              <el-option 
-                v-for="opt in propDef.enum" 
-                :key="opt" 
-                :label="opt" 
-                :value="opt" 
-              />
-            </el-select>
+            <!-- 1. Priority: Named Slot (key) -->
+            <slot :name="key" :model="formData" :prop="propDef">
+                
+                <!-- 2. Priority: Custom Component via x-component -->
+                <component 
+                  v-if="propDef['x-component'] && getCustomComponent(propDef['x-component'])"
+                  :is="getCustomComponent(propDef['x-component'])"
+                  v-model="formData[key]"
+                  v-bind="propDef['x-props'] || {}"
+                  :prop-def="propDef"
+                />
 
-            <!-- Number Input -->
-            <el-input-number 
-              v-else-if="propDef.type === 'number' || propDef.type === 'integer'"
-              v-model="formData[key]"
-              :placeholder="`请输入 ${propDef.description || key}`"
-              style="width: 100%"
-              controls-position="right"
-            />
+                <!-- 3. Fallback: Standard Types -->
+                
+                <!-- Enum Select -->
+                <el-select 
+                  v-else-if="propDef.enum" 
+                  v-model="formData[key]" 
+                  placeholder="请选择"
+                  style="width: 100%"
+                  clearable
+                >
+                  <el-option 
+                    v-for="opt in propDef.enum" 
+                    :key="opt" 
+                    :label="opt" 
+                    :value="opt" 
+                  />
+                </el-select>
 
-            <!-- Boolean Switch -->
-            <el-switch 
-              v-else-if="propDef.type === 'boolean'"
-              v-model="formData[key]"
-            />
+                <!-- Number Input -->
+                <el-input-number 
+                  v-else-if="propDef.type === 'number' || propDef.type === 'integer'"
+                  v-model="formData[key]"
+                  :placeholder="`请输入 ${propDef.description || key}`"
+                  style="width: 100%"
+                  controls-position="right"
+                />
 
-            <!-- String Input (Default) -->
-            <el-input 
-              v-else 
-              v-model="formData[key]" 
-              :placeholder="`请输入 ${propDef.description || key}`"
-            />
-            
+                <!-- Boolean Switch -->
+                <el-switch 
+                  v-else-if="propDef.type === 'boolean'"
+                  v-model="formData[key]"
+                />
+
+                <!-- String Input (Default) -->
+                <el-input 
+                  v-else 
+                  v-model="formData[key]" 
+                  :type="propDef.format === 'textarea' ? 'textarea' : 'text'"
+                  :rows="3"
+                  :placeholder="`请输入 ${propDef.description || key}`"
+                />
+            </slot>
+
             <!-- Contextual Help (Only if different from label) -->
             <div v-if="propDef.description && propDef.description !== (propDef.description || key)" class="form-help-text">
               {{ propDef.description }}
@@ -63,13 +80,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, defineAsyncComponent, markRaw } from 'vue'
 import type { FormInstance } from 'element-plus'
 
 const props = defineProps<{
   schema: any
   modelValue: any
+  customComponentsMap?: Record<string, any>
 }>()
+
+// Internal map of supported custom components
+const builtinCustomComponents: Record<string, any> = {
+    // Add built-in custom editors here if needed, e.g. ColorPicker, MarkdownEditor
+}
+
+const getCustomComponent = (name: string) => {
+    if (props.customComponentsMap && props.customComponentsMap[name]) {
+        return props.customComponentsMap[name]
+    }
+    return builtinCustomComponents[name]
+}
 
 const emit = defineEmits(['update:modelValue'])
 

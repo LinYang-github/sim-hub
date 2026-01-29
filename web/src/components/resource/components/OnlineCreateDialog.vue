@@ -32,6 +32,8 @@
                 v-if="categoryNodes.length > 0"
                 v-model="baseForm.category_id"
                 :data="categoryNodes"
+                :props="{ label: 'name' }"
+                node-key="id"
                 check-strictly
                 placeholder="选择分类（可选）"
                 style="width: 100%"
@@ -50,6 +52,7 @@
           ref="dynamicFormRef"
           v-model="payloadData"
           :schema="schema"
+          :custom-components-map="customComponents"
         />
       </div>
       <el-empty v-else description="无法加载配置模版" :image-size="60" />
@@ -68,10 +71,42 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, defineAsyncComponent, h } from 'vue'
 import DynamicSchemaForm from '../../common/DynamicSchemaForm.vue'
 import request from '../../../core/utils/request'
 import { ElMessage } from 'element-plus'
+
+// Dynamic Remote Loading Implementation
+// In a real scenario, this URL would come from a plugin registry or configuration
+const loadRemoteComponent = (name: string) => {
+    return defineAsyncComponent(async () => {
+        // For demo purposes, we assume the component is exposed on window by the external app
+        // We load the module script
+        const devUrl = import.meta.env.VITE_EXT_APP_DEV_URL || 'http://localhost:30031'
+        const scriptUrl = `${devUrl}/demo-form/src/main.ts` 
+        
+        // Share HOST Vue with Guest
+        // (Primitive Module Federation)
+        if (!(window as any).Vue) {
+             (window as any).Vue = await import('vue')
+        }
+        if (!(window as any).ElementPlus) {
+             (window as any).ElementPlus = await import('element-plus')
+        }
+        
+        try {
+            await import(/* @vite-ignore */ scriptUrl)
+            return (window as any).SimHubCustomComponents[name]
+        } catch (e) {
+            console.error(`Failed to load remote component: ${name}`, e)
+            return { render: () => h('div', { style: 'color:red' }, '扩展组件加载失败') }
+        }
+    })
+}
+
+const customComponents = {
+  'ScoreRater': loadRemoteComponent('ScoreRater')
+}
 
 const props = defineProps<{
   typeKey: string
@@ -87,10 +122,14 @@ const submitting = ref(false)
 const baseFormRef = ref()
 const dynamicFormRef = ref()
 
-const baseForm = ref({
+const baseForm = ref<{
+  name: string
+  semver: string
+  category_id?: string
+}>({
   name: '',
   semver: 'v1.0.0',
-  category_id: ''
+  category_id: undefined
 })
 
 const payloadData = ref<any>({})
@@ -131,7 +170,7 @@ const handleSubmit = async () => {
     emit('success')
     
     // Reset
-    baseForm.value = { name: '', semver: 'v1.0.0', category_id: '' }
+    baseForm.value = { name: '', semver: 'v1.0.0', category_id: undefined }
     payloadData.value = {}
     
   } catch (e: any) {

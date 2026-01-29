@@ -71,6 +71,7 @@ resource_types:
           type: "string"
         score:
           type: "integer"
+          x-component: "ScoreRater"
     category_mode: "tree"
 
 log:
