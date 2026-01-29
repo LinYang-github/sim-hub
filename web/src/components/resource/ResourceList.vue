@@ -6,8 +6,10 @@
     <CategorySidebar
       :category-tree="categoryTree"
       :default-props="{ children: 'children', label: 'name' }"
+      :category-mode="categoryMode"
       v-model="selectedCategoryId"
-      @add-category="promptAddCategory"
+      @add-category="() => promptAddCategory()"
+      @add-subcategory="(pid) => promptAddCategory(pid)"
       @select-category="handleCategorySelect"
       @delete-category="(id) => confirmDeleteCategory(id, fetchList)"
     />
@@ -368,6 +370,7 @@ const props = defineProps<{
   uploadMode?: 'single' | 'folder-zip' | 'online'
   accept?: string
   enableScope?: boolean
+  categoryMode?: 'flat' | 'tree'
   viewer?: string
   icon?: string
   supportedViews?: { key: string, label: string, icon: string, path?: string }[]

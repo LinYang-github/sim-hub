@@ -33,6 +33,7 @@ export interface SimHubModule {
   uploadMode?: 'single' | 'folder-zip' | 'online'
   accept?: string
   enableScope?: boolean
+  categoryMode?: 'flat' | 'tree'
 
   // Integration & UI Props
   label?: string

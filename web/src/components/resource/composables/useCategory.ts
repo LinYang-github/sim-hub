@@ -37,7 +37,7 @@ export function useCategory(typeKey: Ref<string>) {
     return cat ? cat.name : ''
   })
 
-  const promptAddCategory = () => {
+  const promptAddCategory = (parentId: string = '') => {
     return ElMessageBox.prompt('请输入分类名称', '新建分类', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
@@ -46,11 +46,11 @@ export function useCategory(typeKey: Ref<string>) {
       await request.post('/api/v1/categories', {
         type_key: typeKey.value,
         name: value,
-        parent_id: ''
+        parent_id: parentId
       })
       ElMessage.success('创建成功')
       fetchCategories()
-    })
+    }).catch(() => {})
   }
 
   const confirmDeleteCategory = (id: string, onSuccess: () => void) => {
@@ -67,7 +67,7 @@ export function useCategory(typeKey: Ref<string>) {
         onSuccess() // callback to refresh list
       }
       fetchCategories()
-    })
+    }).catch(() => {})
   }
 
   return {

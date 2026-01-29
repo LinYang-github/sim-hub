@@ -44,7 +44,13 @@
               <el-icon v-else class="node-icon folder-icon"><Folder /></el-icon>
               <span class="node-label">{{ node.label }}</span>
               <div class="node-actions" v-if="data.id !== ROOT_CATEGORY_ID">
-                <el-icon class="delete-icon" @click.stop="$emit('delete-category', data.id)"><Delete /></el-icon>
+                <el-icon 
+                  v-if="categoryMode === 'tree'" 
+                  class="action-icon add-icon" 
+                  @click.stop="$emit('add-subcategory', data.id)"
+                  title="新建子分类"
+                ><Plus /></el-icon>
+                <el-icon class="action-icon delete-icon" @click.stop="$emit('delete-category', data.id)"><Delete /></el-icon>
               </div>
             </div>
           </template>
@@ -65,10 +71,13 @@ const props = defineProps<{
   categoryTree: CategoryNode[]
   defaultProps: { label: string; children: string }
   modelValue?: string
+  categoryMode?: 'flat' | 'tree'
 }>()
 
 const emit = defineEmits<{
   (e: 'add-category'): void
+  (e: 'add-subcategory', parentId: string): void
+  (e: 'select-category', data: CategoryNode): void
   (e: 'select-category', data: CategoryNode): void
   (e: 'delete-category', id: string): void
   (e: 'update:modelValue', id: string): void
@@ -229,13 +238,21 @@ const handleNodeClick = (data: CategoryNode) => {
     opacity: 0;
     padding: 0 8px;
     transition: opacity 0.2s;
-    display: flex;
     align-items: center;
+    gap: 6px;
 
-    .delete-icon {
+    .action-icon {
       font-size: 14px;
       color: var(--el-text-color-placeholder);
-      &:hover { color: var(--el-color-danger); }
+      padding: 2px;
+      border-radius: 4px;
+      
+      &:hover { 
+        background-color: var(--el-fill-color-darker);
+      }
+      
+      &.delete-icon:hover { color: var(--el-color-danger); }
+      &.add-icon:hover { color: var(--el-color-primary); }
     }
   }
 
