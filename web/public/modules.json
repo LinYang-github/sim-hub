@@ -84,7 +84,7 @@
     "uploadMode": "online",
     "viewer": "External:/demo-preview/index.html",
     "supportedViews": [
-      { "key": "External:/demo-preview/index.html", "label": "图表视图", "icon": "DataLine" },
+      { "key": "External:/demo-view/index.html", "label": "态势看板", "icon": "Odometer" },
       { "key": "table", "label": "数据视图", "icon": "Grid" }
     ]
   }

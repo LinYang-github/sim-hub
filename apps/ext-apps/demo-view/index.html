@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>可视化资源画廊 - Demo View</title>
+    <style>
+        :root {
+            --bg: #f5f7fa;
+            --surface: #ffffff;
+            --primary: #409eff;
+            --text-primary: #303133;
+            --text-secondary: #909399;
+            --border: #e4e7ed;
+            --accent: #67c23a;
+        }
+
+        html.dark {
+            --bg: #121212;
+            --surface: #1e1e1e;
+            --primary: #66b1ff;
+            --text-primary: #e5eaf3;
+            --text-secondary: #a8abb2;
+            --border: #333333;
+            --accent: #85ce61;
+        }
+
+        body {
+            font-family: 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        .view-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .view-title h2 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .view-title p {
+            margin: 4px 0 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .gallery-stats {
+            display: flex;
+            gap: 20px;
+        }
+
+        .stat-item {
+            text-align: right;
+        }
+
+        .stat-val {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-lbl {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        /* GRID LAYOUT */
+        .resource-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .res-card {
+            background: var(--surface);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
+            cursor: pointer;
+        }
+
+        .res-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 20px -10px rgba(0,0,0,0.1);
+            border-color: var(--primary);
+        }
+
+        .card-visual {
+            height: 120px;
+            background: linear-gradient(135deg, var(--primary), #a855f7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-visual::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='3'/%3E%3Ccircle cx='13' cy='13' r='3'/%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        .card-body {
+            padding: 16px;
+        }
+
+        .res-name {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .res-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .v-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: var(--bg);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            font-family: monospace;
+        }
+
+        .status-pill {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 99px;
+            font-weight: 600;
+        }
+
+        .status-pill.active { background: #e1f3d8; color: #67c23a; }
+
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-top: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state {
+            grid-column: 1 / -1;
+            padding: 100px 0;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .action-overlay {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 6px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .res-card:hover .action-overlay {
+            opacity: 1;
+        }
+
+        .mini-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            background: white;
+            border: 1px solid #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .mini-btn:hover { background: var(--bg); }
+
+    </style>
+</head>
+<body>
+    <div class="view-header">
+        <div class="view-title">
+            <h2 id="lib-name">资源加载中...</h2>
+            <p id="lib-path">Visual Gallery Integration Service</p>
+        </div>
+        <div class="gallery-stats">
+            <div class="stat-item">
+                <div class="stat-val" id="total-count">0</div>
+                <div class="stat-lbl">Total Items</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-val" id="active-percent">0%</div>
+                <div class="stat-lbl">Active Ratio</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="resource-grid" id="grid">
+        <div class="empty-state">正在等待主应用同步资源列表...</div>
+    </div>
+
+    <script>
+        const SimHubBridge = {
+            init() {
+                window.addEventListener('message', (e) => {
+                    const data = e.data;
+                    if (data.type === 'THEME_UPDATE') {
+                        document.documentElement.classList.toggle('dark', data.payload.theme === 'dark');
+                    }
+                    if (data.type === 'PREVIEW_DATA' && data.payload.resource) {
+                        this.render(data.payload.resource);
+                    }
+                });
+            },
+            render(data) {
+                const list = data.resources || [];
+                const typeKey = data.typeKey || 'Unknown';
+                
+                document.getElementById('lib-name').innerText = typeKey.toUpperCase() + ' 智能资源画廊';
+                document.getElementById('total-count').innerText = list.length;
+                document.getElementById('active-percent').innerText = list.length > 0 ? '100%' : '0%';
+
+                const grid = document.getElementById('grid');
+                if (list.length === 0) {
+                    grid.innerHTML = '<div class="empty-state">当前资源库为空</div>';
+                    return;
+                }
+
+                grid.innerHTML = list.map(r => `
+                    <div class="res-card">
+                        <div class="action-overlay">
+                            <div class="mini-btn">🔍</div>
+                            <div class="mini-btn">💾</div>
+                        </div>
+                        <div class="card-visual">
+                            ${this.getIcon(typeKey)}
+                        </div>
+                        <div class="card-body">
+                            <div class="res-name" title="${r.name}">${r.name}</div>
+                            <div class="res-meta">
+                                <span class="v-badge">${r.latest_version?.semver || 'v1.0.0'}</span>
+                                <span class="status-pill active">${r.latest_version?.state || 'ACTIVE'}</span>
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-secondary);">
+                                ID: ${r.id.substring(0, 8)}...
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <span>📅 ${new Date(r.created_at).toLocaleDateString()}</span>
+                            <span>👤 admin</span>
+                        </div>
+                    </div>
+                `).join('');
+            },
+            getIcon(type) {
+                if (type.includes('scenario')) return '📁';
+                if (type.includes('model')) return '📦';
+                if (type.includes('test')) return '🧪';
+                return '📄';
+            }
+        };
+
+        SimHubBridge.init();
+    </script>
+</body>
+</html>

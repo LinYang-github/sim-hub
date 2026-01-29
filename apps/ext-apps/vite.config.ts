@@ -14,6 +14,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         'demo-repo': resolve(__dirname, 'demo-repo/index.html'),
+        'demo-view': resolve(__dirname, 'demo-view/index.html'),
         'demo-preview': resolve(__dirname, 'demo-preview/index.html'),
       },
     },

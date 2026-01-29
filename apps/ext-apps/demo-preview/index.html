@@ -3,139 +3,217 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>分散页面功能演示</title>
+    <title>资源深度质检 - Demo Preview</title>
     <style>
         :root {
-            --bg-color: #f5f7fa;
-            --card-bg: #fff;
-            --text-primary: #303133;
-            --text-secondary: #909399;
-            --border-color: #ebeef5;
-            --primary-color: #67c23a;
+            --bg: #ffffff;
+            --surface: #f8fafc;
+            --primary: #020617;
+            --text: #0f172a;
+            --border: #e2e8f0;
+            --meta: #64748b;
         }
 
         html.dark {
-            --bg-color: #0a0a0a;
-            --card-bg: #1d1d1d;
-            --text-primary: #e5eaf3;
-            --text-secondary: #a8abb2;
-            --border-color: #363637;
+            --bg: #020617;
+            --surface: #0f172a;
+            --primary: #f8fafc;
+            --text: #f1f5f9;
+            --border: #1e293b;
+            --meta: #94a3b8;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: 'SF Pro Display', -apple-system, system-ui, sans-serif;
             margin: 0;
-            padding: 24px;
-            background-color: var(--bg-color);
-            color: var(--text-primary);
-            transition: all 0.3s;
+            padding: 20px;
+            background-color: var(--bg);
+            color: var(--text);
+            transition: background 0.4s ease;
+        }
+
+        .inspector-container {
+            max-width: 600px;
+            margin: 0 auto;
         }
 
         .header {
-            margin-bottom: 24px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .demo-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-        }
-
-        .demo-card {
-            background: var(--card-bg);
-            border-radius: 12px;
-            padding: 20px;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        }
-
-        .card-title {
-            font-size: 16px;
-            font-weight: bold;
-            margin-bottom: 12px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 16px;
+            margin-bottom: 24px;
         }
 
-        .card-desc {
+        .icon-box {
+            width: 56px;
+            height: 56px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .title-group h2 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .title-group p {
+            margin: 2px 0 0;
+            font-size: 12px;
+            color: var(--meta);
+        }
+
+        .spec-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .spec-item {
+            background: var(--surface);
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .spec-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--meta);
+            margin-bottom: 4px;
+        }
+
+        .spec-value {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .analysis-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+        }
+
+        .analysis-title {
             font-size: 13px;
-            color: var(--text-secondary);
+            font-weight: 700;
             margin-bottom: 16px;
-            line-height: 1.5;
+            display: flex;
+            justify-content: space-between;
         }
 
-        .action-btn {
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-            transition: opacity 0.2s;
-        }
-
-        .action-btn:hover {
-            opacity: 0.8;
-        }
-
-        .badge {
-            background: #e1f3d8;
-            color: #67c23a;
+        .tag {
+            background: #dcfce7;
+            color: #166534;
             padding: 2px 8px;
             border-radius: 4px;
             font-size: 11px;
         }
+
+        .progress-row {
+            margin-bottom: 16px;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-inner {
+            height: 100%;
+            background: var(--primary);
+            transition: width 1s ease-in-out;
+        }
+
+        .raw-data {
+            margin-top: 24px;
+            font-family: monospace;
+            font-size: 11px;
+            background: #000;
+            color: #af0;
+            padding: 12px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            max-height: 150px;
+            overflow: auto;
+            border: 1px solid #333;
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2 style="margin: 0;">分散页面功能演示 (Scattered Functions)</h2>
-            <span class="badge">外部页集成模式</span>
-        </div>
-        <p style="color: var(--text-secondary); font-size: 14px; margin-top: 8px;">
-            此页面演示了如何将特定的零碎业务功能（非完整资源库）以 iframe 方式挂载到主系统。
-        </p>
-    </div>
-
-    <div class="demo-grid">
-        <!-- 功能 1：通知同步 -->
-        <div class="demo-card">
-            <div class="card-title">📡 跨应用通知订阅</div>
-            <div class="card-desc">演示如何监听主应用的全局事件，并在此页面更新状态。</div>
-            <button class="action-btn" onclick="subscribe()">模拟监听并反馈</button>
-        </div>
-
-        <!-- 功能 2：资源选择器 -->
-        <div class="demo-card">
-            <div class="card-title">🔍 外部数据检索</div>
-            <div class="card-desc">这个卡片可以作为独立的搜索工具，将选中的结果返回给宿主应用。</div>
-            <button class="action-btn" style="background: #e6a23c;" onclick="pickData()">模拟选中数据返回</button>
-        </div>
-
-        <!-- 功能 3：主题感知 -->
-        <div class="demo-card">
-            <div class="card-title">🌓 自动主题适配</div>
-            <div class="card-desc">此页面正在实时响应宿主系统的深色/浅色模式切换。</div>
-            <div id="theme-status" style="font-size: 12px; margin-top: 10px; color: #409eff;">当前侦测到: 浅色模式</div>
-        </div>
-    </div>
-
-    <!-- 兼容原来的预览逻辑（如果有资源传进来） -->
-    <div id="preview-section" style="margin-top: 30px; display: none;">
-        <div class="demo-card" style="border: 2px dashed #409eff;">
-            <div class="card-title">🖼️ 动态数据看板</div>
-            <div id="preview-content" style="font-size: 13px;">
-                <div id="res-info">正在从宿主获取数据...</div>
-                <div id="res-list" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
-                    <!-- 这里将展示资源列表 -->
-                </div>
+    <div class="inspector-container">
+        <div class="header">
+            <div class="icon-box" id="icon">📦</div>
+            <div class="title-group">
+                <h2 id="name">未选择资源</h2>
+                <p id="id">Waiting for data synchronization...</p>
             </div>
         </div>
+
+        <div class="spec-grid">
+            <div class="spec-item">
+                <div class="spec-label">版本编号</div>
+                <div class="spec-value" id="version">-</div>
+            </div>
+            <div class="spec-item">
+                <div class="spec-label">资源状态</div>
+                <div class="spec-value" id="status">-</div>
+            </div>
+            <div class="spec-item">
+                <div class="spec-label">可见范围</div>
+                <div class="spec-value" id="scope">-</div>
+            </div>
+            <div class="spec-item">
+                <div class="spec-label">生命周期</div>
+                <div class="spec-value" id="lifecycle">Normal</div>
+            </div>
+        </div>
+
+        <div class="analysis-card">
+            <div class="analysis-title">
+                <span>自动化分析报告 (AI Audit)</span>
+                <span class="tag">PASS</span>
+            </div>
+            
+            <div class="progress-row">
+                <div class="progress-header">
+                    <span>元数据完整度</span>
+                    <span id="score1">0%</span>
+                </div>
+                <div class="progress-bar"><div class="progress-inner" style="width: 0%" id="bar1"></div></div>
+            </div>
+
+            <div class="progress-row">
+                <div class="progress-header">
+                    <span>拓扑关联强度</span>
+                    <span id="score2">0%</span>
+                </div>
+                <div class="progress-bar"><div class="progress-inner" style="width: 0%" id="bar2"></div></div>
+            </div>
+
+            <p style="font-size: 11px; color: var(--meta); line-height: 1.6; margin: 0;">
+                基于当前快照的深度启发式审计，未发现关键性偏移。该资源符合系统定义的 V2 级部署标准。
+            </p>
+        </div>
+
+        <div class="raw-data" id="json-dump">// RAW DATA DUMP</div>
     </div>
 
     <script>
@@ -144,62 +222,42 @@
                 window.addEventListener('message', (e) => {
                     const data = e.data;
                     if (data.type === 'THEME_UPDATE') {
-                        this.handleTheme(data.payload.theme);
+                        document.documentElement.classList.toggle('dark', data.payload.theme === 'dark');
                     }
-                    if (data.type === 'PREVIEW_DATA') {
-                        this.handleData(data.payload.resource);
+                    if (data.type === 'PREVIEW_DATA' && data.payload.resource) {
+                        this.render(data.payload.resource);
                     }
                 });
             },
-            handleTheme(theme) {
-                if (theme === 'dark') {
-                    document.documentElement.classList.add('dark');
-                    document.getElementById('theme-status').innerText = '当前侦测到: 深色模式';
-                } else {
-                    document.documentElement.classList.remove('dark');
-                    document.getElementById('theme-status').innerText = '当前侦测到: 浅色模式';
-                }
-            },
-            handleData(data) {
-                if (!data) return;
-                document.getElementById('preview-section').style.display = 'block';
+            render(res) {
+                if (!res) return;
                 
-                // 情况 1: 单个资源预览 (Resource)
-                if (data.name) {
-                    document.getElementById('res-info').innerHTML = `<b>当前资源:</b> ${data.name}`;
-                    document.getElementById('res-list').innerHTML = ''; 
-                } 
-                // 情况 2: 资源列表视图 (Resources Collection)
-                else if (data.resources) {
-                    document.getElementById('res-info').innerHTML = `<b>资源库:</b> ${data.typeKey} (共 ${data.resources.length} 项)`;
-                    const listHtml = data.resources.slice(0, 5).map(r => `
-                        <div style="margin-bottom: 5px; color: #666;">• ${r.name} <small>[${r.status}]</small></div>
-                    `).join('');
-                    document.getElementById('res-list').innerHTML = listHtml + (data.resources.length > 5 ? '<div style="color: #999;">...等更多</div>' : '');
-                }
-            },
-            callHost(type, payload) {
-                window.parent.postMessage({ type, payload, timestamp: Date.now() }, '*');
+                // Handle different incoming data structures (Single resource or Collection)
+                const item = res.name ? res : (res.resources ? res.resources[0] : null);
+                if (!item) return;
+
+                document.getElementById('name').innerText = item.name;
+                document.getElementById('id').innerText = 'UID: ' + item.id;
+                document.getElementById('version').innerText = item.latest_version?.semver || 'v1.0.0';
+                document.getElementById('status').innerText = item.latest_version?.state || 'ACTIVE';
+                document.getElementById('scope').innerText = item.scope || 'PUBLIC';
+                
+                // Set fake scores
+                const s1 = 85 + Math.floor(Math.random() * 15);
+                const s2 = 40 + Math.floor(Math.random() * 40);
+                
+                setTimeout(() => {
+                    document.getElementById('score1').innerText = s1 + '%';
+                    document.getElementById('bar1').style.width = s1 + '%';
+                    document.getElementById('score2').innerText = s2 + '%';
+                    document.getElementById('bar2').style.width = s2 + '%';
+                }, 100);
+
+                document.getElementById('json-dump').innerText = JSON.stringify(item, null, 2);
             }
         };
 
         SimHubBridge.init();
-
-        function pickData() {
-            SimHubBridge.callHost('NOTIFY', {
-                type: 'success',
-                title: '数据拾取成功',
-                message: '外部页面已将结果 "ITEM_#001" 传递给宿主'
-            });
-        }
-
-        function subscribe() {
-             SimHubBridge.callHost('NOTIFY', {
-                type: 'info',
-                title: '订阅状态',
-                message: '正在实时监测主应用总线事件...'
-            });
-        }
     </script>
 </body>
 </html>
