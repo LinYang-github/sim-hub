@@ -4,6 +4,7 @@
     
     <!-- 侧边栏 -->
     <CategorySidebar
+      v-if="categoryMode !== 'none'"
       :category-tree="categoryTree"
       :default-props="{ children: 'children', label: 'name' }"
       :category-mode="categoryMode"
@@ -391,7 +392,7 @@ const props = defineProps<{
   uploadMode?: 'single' | 'folder-zip' | 'online'
   accept?: string
   enableScope?: boolean
-  categoryMode?: 'flat' | 'tree'
+  categoryMode?: 'flat' | 'tree' | 'none'
   viewer?: string
   icon?: string
   example?: string

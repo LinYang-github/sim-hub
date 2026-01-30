@@ -36,7 +36,7 @@ resource_types:
   - type_key: "map_service"
     type_name: "地理信息服务"
     upload_mode: "online"
-    category_mode: "tree"
+    category_mode: "none"
     meta_data:
       icon: "MapLocation"
       viewer: "CesiumViewer"
