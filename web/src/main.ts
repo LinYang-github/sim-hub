@@ -11,6 +11,7 @@ import { moduleManager } from './core/moduleManager'
 import scenarioModule from './modules/scenario'
 import VNetworkGraph from "v-network-graph"
 import "v-network-graph/lib/style.css"
+import axios from 'axios'
 
 import { registerStandardViews } from './core/registerStandardViews'
 
@@ -35,8 +36,8 @@ const loadExternalPlugins = () => {
 }
 
 const routes = [
+  { path: '/login', component: () => import('./views/Login.vue'), meta: { isPublic: true } },
   { path: '/', component: Workstation },
-  // Generic Resource List Route (Fallback)
   { 
     path: '/res/:typeKey', 
     component: () => import('./components/resource/ResourceList.vue'),
@@ -53,6 +54,11 @@ const routes = [
       }
     }
   },
+  {
+    path: '/settings/tokens',
+    component: () => import('./components/settings/TokenSettings.vue'),
+    name: 'TokenSettings'
+  }
 ]
 
 const initApp = async () => {
@@ -75,6 +81,41 @@ const initApp = async () => {
     history: createWebHistory(),
     routes,
   })
+
+  // 路由守卫
+  router.beforeEach((to, from, next) => {
+    const token = localStorage.getItem('simhub_token')
+    if (to.path === '/login') {
+      if (token) return next('/')
+      return next()
+    }
+    
+    if (!token && !to.meta.isPublic) {
+      return next('/login')
+    }
+    next()
+  })
+
+  // Axios 拦截器
+  axios.interceptors.request.use(config => {
+    const token = localStorage.getItem('simhub_token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  })
+
+  axios.interceptors.response.use(
+    response => response,
+    error => {
+      if (error.response?.status === 401) {
+        localStorage.removeItem('simhub_token')
+        router.push('/login')
+      }
+      return Promise.reject(error)
+    }
+  )
+
 
   // 3. 安装已加载模块的路由
   moduleManager.install(app, router)

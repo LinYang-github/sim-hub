@@ -110,6 +110,8 @@ class ClientImpl;
 class Client {
 public:
     explicit Client(const std::string& baseUrl);
+    void setToken(const std::string& token);
+    const std::string& getBaseUrl() const;
     ~Client();
 
     Client(const Client&) = delete;
@@ -247,22 +249,34 @@ static Resource parseResource(const json& j) {
 class ClientImpl {
 public:
     std::string baseUrl;
+    std::string token;
+    CURL* curl; // Keep a single CURL handle for reuse
 
-    struct HttpResponse {
-        long code;
-        std::string body;
-        std::string error;
-        ErrorCode errorCode;
-    };
+    ClientImpl() : curl(nullptr) {
+        curl = curl_easy_init();
+    }
 
-    HttpResponse request(const std::string& method, const std::string& endpoint, const std::string& bodyData = "") {
-        CURL* curl = curl_easy_init();
-        if(!curl) return {0, "", "Curl init failed", ErrorCode::Unknown};
-        
-        std::string url = baseUrl + endpoint;
+    ~ClientImpl() {
+        if (curl) {
+            curl_easy_cleanup(curl);
+        }
+    }
+
+    void setToken(const std::string& t) { token = t; }
+
+    Result<std::string> request(const std::string& path, const std::string& method = "GET", const std::string& body = "") {
+        if (!curl) return Result<std::string>::Fail(ErrorCode::NetworkError, "Curl not initialized");
+
         std::string readBuffer;
         struct curl_slist* headers = NULL;
         headers = curl_slist_append(headers, "Content-Type: application/json");
+        
+        if (!token.empty()) {
+            std::string authHeader = "Authorization: Bearer " + token;
+            headers = curl_slist_append(headers, authHeader.c_str());
+        }
+
+        std::string url = baseUrl + path;
 
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
@@ -271,30 +285,30 @@ public:
         
         if (method == "POST") {
             curl_easy_setopt(curl, CURLOPT_POST, 1L);
-            if (!bodyData.empty()) {
-                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, bodyData.c_str());
+            if (!body.empty()) {
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
             }
         } else if (method == "PUT") {
             curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
-            if (!bodyData.empty()) {
-                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, bodyData.c_str());
+            if (!body.empty()) {
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
             }
         }
 
         CURLcode res = curl_easy_perform(curl);
         long http_code = 0;
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-        
-        std::string err;
-        if (res != CURLE_OK) {
-             err = curl_easy_strerror(res);
-        }
-
-        curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
 
-        if (res != CURLE_OK) return {0, "", err, ErrorCode::NetworkError};
-        return {http_code, readBuffer, "", ErrorCode::Success};
+        if (res != CURLE_OK) {
+            return Result<std::string>::Fail(ErrorCode::NetworkError, curl_easy_strerror(res));
+        }
+
+        if (http_code >= 400) {
+            return Result<std::string>::Fail(ErrorCode::ServerError, "HTTP Error: " + std::to_string(http_code) + " - " + readBuffer);
+        }
+
+        return Result<std::string>::Success(readBuffer);
     }
 };
 
@@ -326,26 +340,22 @@ Client::~Client() = default;
 // --- Discovery Implementations ---
 
 Result<Resource> Client::getResource(const std::string& id) {
-    auto res = impl_->request("GET", "/api/v1/resources/" + id);
-    if (res.code >= 400 || res.errorCode != ErrorCode::Success) 
-        return Result<Resource>::Fail(res.errorCode != ErrorCode::Success ? res.errorCode : ErrorCode::ServerError, res.error.empty() ? res.body : res.error);
+    auto res = impl_->request("/api/v1/resources/" + id);
+    if (!res.ok()) return Result<Resource>::Fail(res.code, res.message);
     try {
-        return Result<Resource>::Success(parseResource(json::parse(res.body)));
+        return Result<Resource>::Success(parseResource(json::parse(res.value)));
     } catch (const std::exception& e) {
         return Result<Resource>::Fail(ErrorCode::ServerError, e.what());
     }
 }
 
-Result<std::vector<Resource>> Client::listResources(const std::string& typeKey, const std::string& categoryId, const std::string& query) {
-    std::string endpoint = "/api/v1/resources?page=1&size=100";
-    if (!typeKey.empty()) endpoint += "&type=" + typeKey;
-    if (!categoryId.empty()) endpoint += "&category_id=" + categoryId;
-    if (!query.empty()) endpoint += "&query=" + query;
-
-    auto res = impl_->request("GET", endpoint);
-    if (res.code >= 400) return Result<std::vector<Resource>>::Fail(ErrorCode::ServerError, res.body);
+Result<std::vector<Resource>> Client::listResources(const std::string& t, const std::string& c, const std::string& q) {
+    std::string path = "/api/v1/resources?type=" + t + "&category_id=" + c + "&query=" + q;
+    auto res = impl_->request(path);
+    if (!res.ok()) return Result<std::vector<Resource>>::Fail(res.code, res.message);
+    
     try {
-        json j = json::parse(res.body);
+        auto j = json::parse(res.value);
         std::vector<Resource> list;
         if (j.contains("items") && j["items"].is_array()) {
             for (auto& item : j["items"]) list.push_back(parseResource(item));
@@ -357,10 +367,10 @@ Result<std::vector<Resource>> Client::listResources(const std::string& typeKey, 
 }
 
 Result<std::vector<Category>> Client::listCategories(const std::string& typeKey) {
-    auto res = impl_->request("GET", "/api/v1/resources/categories?type=" + typeKey);
-    if (res.code >= 400) return Result<std::vector<Category>>::Fail(ErrorCode::ServerError, res.body);
+    auto res = impl_->request("/api/v1/categories?type=" + typeKey);
+    if (!res.ok()) return Result<std::vector<Category>>::Fail(res.code, res.message);
     try {
-        json items = json::parse(res.body);
+        json items = json::parse(res.value);
         std::vector<Category> list;
         if (items.is_array()) {
             for (auto& item : items) {
@@ -379,10 +389,10 @@ Result<std::vector<Category>> Client::listCategories(const std::string& typeKey)
 }
 
 Result<std::vector<ResourceVersion>> Client::listResourceVersions(const std::string& resourceId) {
-    auto res = impl_->request("GET", "/api/v1/resources/" + resourceId + "/versions");
-    if (res.code >= 400) return Result<std::vector<ResourceVersion>>::Fail(ErrorCode::ServerError, res.body);
+    auto res = impl_->request("/api/v1/resources/" + resourceId + "/versions");
+    if (!res.ok()) return Result<std::vector<ResourceVersion>>::Fail(res.code, res.message);
     try {
-        json items = json::parse(res.body);
+        json items = json::parse(res.value);
         std::vector<ResourceVersion> list;
         if (items.is_array()) {
             for (auto& item : items) list.push_back(parseVersion(item));
@@ -394,10 +404,10 @@ Result<std::vector<ResourceVersion>> Client::listResourceVersions(const std::str
 }
 
 Result<std::vector<Dependency>> Client::getResourceDependencies(const std::string& versionId) {
-    auto res = impl_->request("GET", "/api/v1/resources/versions/" + versionId + "/dependencies");
-    if (res.code >= 400) return Result<std::vector<Dependency>>::Fail(ErrorCode::ServerError, res.body);
+    auto res = impl_->request("/api/v1/resources/versions/" + versionId + "/dependencies");
+    if (!res.ok()) return Result<std::vector<Dependency>>::Fail(res.code, res.message);
     try {
-        json items = json::parse(res.body);
+        json items = json::parse(res.value);
         std::vector<Dependency> list;
         if (items.is_array()) {
             for (auto& item : items) {
@@ -452,14 +462,13 @@ Result<UploadTicket> Client::requestUploadToken(const UploadTokenRequest& req) {
     j["resource_type"] = req.resource_type;
     j["filename"] = req.filename;
     j["size"] = req.size;
-    j["checksum"] = req.checksum;
     j["mode"] = req.mode.empty() ? "presigned" : req.mode;
 
-    auto res = impl_->request("POST", "/api/v1/resources/upload-token", j.dump());
-    if (res.code >= 400) return Result<UploadTicket>::Fail(ErrorCode::ServerError, res.body);
+    auto res = impl_->request("/api/v1/integration/upload/token", "POST", j.dump());
+    if (!res.ok()) return Result<UploadTicket>::Fail(res.code, res.message);
     
     try {
-        json r = json::parse(res.body);
+        json r = json::parse(res.value);
         UploadTicket ticket;
         ticket.ticket_id = r.value("ticket_id", "");
         ticket.presigned_url = r.value("presigned_url", "");
@@ -528,8 +537,8 @@ Status Client::uploadFileSimple(const std::string& typeKey, const std::string& f
     j["name"] = name;
     j["size"] = st.st_size;
 
-    auto confRes = impl_->request("POST", "/api/v1/resources/confirm-upload", j.dump());
-    if (confRes.code >= 400) return Status::Fail(ErrorCode::ServerError, confRes.body);
+    auto confRes = impl_->request("/api/v1/integration/upload/confirm", "POST", j.dump());
+    if (!confRes.ok()) return Status::Fail(confRes.code, confRes.message);
 
     return Status::Success(true);
 }

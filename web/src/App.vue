@@ -1,5 +1,6 @@
 <template>
-  <el-container class="app-wrapper">
+  <!-- Main Layout for Authenticated Pages -->
+  <el-container class="app-wrapper" v-if="showLayout">
     <!-- Sidebar -->
     <el-aside width="210px" class="sidebar">
       <div class="logo-area">
@@ -62,9 +63,10 @@
             </div>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item>个人中心</el-dropdown-item>
-                <el-dropdown-item>修改密码</el-dropdown-item>
-                <el-dropdown-item divided>退出登录</el-dropdown-item>
+                <el-dropdown-item :icon="Key" @click="$router.push('/settings/tokens')">令牌管理</el-dropdown-item>
+                <el-dropdown-item :icon="User">个人中心</el-dropdown-item>
+                <el-dropdown-item :icon="Lock">修改密码</el-dropdown-item>
+                <el-dropdown-item :icon="SwitchButton" divided @click="handleLogout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -84,14 +86,19 @@
       </el-main>
     </el-container>
   </el-container>
+
+  <!-- Public Layout (Login, etc.) -->
+  <router-view v-else />
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { 
-  Platform, Odometer, Files, Sunny, Moon, ArrowDown, Search
+  Platform, Odometer, Files, Sunny, Moon, ArrowDown, Search,
+  Key, User, Lock, SwitchButton
 } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { moduleManager } from './core/moduleManager'
 import { useDark, useToggle } from '@vueuse/core'
 import GlobalSearch from './components/common/GlobalSearch.vue'
@@ -99,11 +106,20 @@ import GlobalSearch from './components/common/GlobalSearch.vue'
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
 const route = useRoute()
+const router = useRouter()
 const menus = computed(() => moduleManager.getMenus())
+
+const handleLogout = () => {
+  localStorage.removeItem('simhub_token')
+  localStorage.removeItem('simhub_user')
+  ElMessage.success('已退出登录')
+  router.push('/login')
+}
 
 const searchRef = ref<InstanceType<typeof GlobalSearch>>()
 const isMac = /macintosh|mac os x/i.test(navigator.userAgent)
 
+const showLayout = computed(() => !route.meta.isPublic)
 const currentPageTitle = computed(() => {
   if (route.path === '/') return '工作台概览'
   const activeMenu = menus.value.find(m => m.path === route.path)

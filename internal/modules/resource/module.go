@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 // Module 实现了 module.Module 接口
 type Module struct {
 	uc          *core.UseCase
+	auth        *core.AuthManager
 	orderedKeys []string
 }
 
@@ -73,15 +75,30 @@ func NewModule(d *data.Data, store storage.MultipartBlobStore, stsProvider stora
 		orderedKeys = append(orderedKeys, rt.TypeKey)
 	}
 
+	// 确保 Admin 用户存在
+	authMgr := core.NewAuthManager(d)
+	if err := authMgr.EnsureAdminUser(context.Background(), "123456"); err != nil {
+		slog.Error("Failed to ensure admin user", "error", err)
+	}
+
 	return &Module{
 		uc:          core.NewUseCase(d, store, stsProvider, bucket, natsClient, role, apiBaseURL, handlers),
+		auth:        authMgr,
 		orderedKeys: orderedKeys,
 	}
 }
 
 func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
-	// /api/v1/integration/upload/... 路径组
-	integration := g.Group("/integration")
+	authGrp := g.Group("/auth")
+	{
+		authGrp.POST("/login", m.Login)
+		authGrp.GET("/tokens", m.ListTokens)
+		authGrp.POST("/tokens", m.CreateToken)
+		authGrp.DELETE("/tokens/:id", m.RevokeToken)
+	}
+
+	// /api/v1/integration/upload/... 路径组 (增加鉴权)
+	integration := g.Group("/integration", AuthMiddleware(m.auth))
 	{
 		integration.POST("/upload/token", m.ApplyUploadToken)
 		integration.POST("/upload/confirm", m.ConfirmUpload)
@@ -101,27 +118,38 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 	// /api/v1/resources 路径组
 	resources := g.Group("/resources")
 	{
+		// Public Read
 		resources.GET("", m.ListResources)
-		resources.POST("/sync", m.SyncFromStorage)          // 新增：同步存储
-		resources.POST("/clear", m.ClearResources)          // 新增：清空资源库
-		resources.POST("/create", m.CreateResourceFromData) // 新增：在线创建接口
 		resources.GET("/:id", m.GetResource)
-		resources.PATCH("/:id", m.UpdateResource) // 新增：更新基本信息 (更名/移动)
-		resources.DELETE("/:id", m.DeleteResource)
-		resources.PATCH("/:id/tags", m.UpdateResourceTags)
-		resources.PATCH("/:id/scope", m.UpdateResourceScope) // 新增：更新作用域
-		resources.PATCH("/:id/process-result", m.ReportProcessResult)
-
-		// 新增：版本历史与依赖管理
 		resources.GET("/:id/versions", m.ListVersions)
-		resources.POST("/:id/latest", m.SetLatestVersion)
 		resources.GET("/versions/:vid/dependencies", m.GetDependencies)
-		resources.PATCH("/versions/:vid/dependencies", m.UpdateResourceDependencies)
 		resources.GET("/versions/:vid/dependency-tree", m.GetDependencyTree)
-		resources.PATCH("/versions/:vid/meta", m.UpdateVersionMetadata) // 新增：更新版本元数据 (PATCH)
 		resources.GET("/versions/:vid/bundle", m.GetBundle)
 
-		// 新增：实时同步打包下载
+		// Protected Write
+		protected := resources.Group("", AuthMiddleware(m.auth))
+		{
+			protected.POST("/sync", m.SyncFromStorage)
+			protected.POST("/clear", m.ClearResources)
+			protected.POST("/create", m.CreateResourceFromData)
+			protected.PATCH("/:id", m.UpdateResource)
+			protected.DELETE("/:id", m.DeleteResource)
+			protected.PATCH("/:id/tags", m.UpdateResourceTags)
+			protected.PATCH("/:id/scope", m.UpdateResourceScope)
+			protected.PATCH("/:id/process-result", m.ReportProcessResult)
+
+			protected.POST("/:id/latest", m.SetLatestVersion)
+			protected.PATCH("/versions/:vid/dependencies", m.UpdateResourceDependencies)
+			protected.PATCH("/versions/:vid/meta", m.UpdateVersionMetadata)
+			// 下载需要鉴权么？暂时公开吧，或者是 protected？
+			// SDK 下载是带 Token 的，但是浏览器直接下载可能不方便带 Header。
+			// 鉴于目前是 PAT，浏览器下载如果是通过 URL，可能需要 Query Param Token 或者是 Cookie。
+			// 简单起见，下载先公开，或者保留在 protected 里但是前端暂时无法下载。
+			// 考虑到前端没有下载功能，主要是 SDK 下载，SDK 有 Token。
+			// 但是 walkthrough 里提到 "浏览器直接下载..."
+			// 既然暂时前端没登录，先公开下载吧，方便调试。
+		}
+		// 暂时公开下载
 		resources.GET("/versions/:vid/download-pack", m.DownloadBundle)
 	}
 
@@ -135,9 +163,13 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 	categories := g.Group("/categories")
 	{
 		categories.GET("", m.ListCategories)
-		categories.POST("", m.CreateCategory)
-		categories.DELETE("/:id", m.DeleteCategory)
-		categories.PATCH("/:id", m.UpdateCategory)
+
+		protected := categories.Group("", AuthMiddleware(m.auth))
+		{
+			protected.POST("", m.CreateCategory)
+			protected.DELETE("/:id", m.DeleteCategory)
+			protected.PATCH("/:id", m.UpdateCategory)
+		}
 	}
 }
 
@@ -590,4 +622,80 @@ func (m *Module) GetDashboardStats(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, stats)
+}
+
+// --- Token Management ---
+
+// Login 用户登录
+func (m *Module) Login(c *gin.Context) {
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	resp, err := m.auth.Login(c.Request.Context(), req.Username, req.Password)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// CreateToken 创建个人访问令牌
+func (m *Module) CreateToken(c *gin.Context) {
+	var req struct {
+		UserID       string `json:"user_id"`
+		Name         string `json:"name"`
+		ExpireInDays int    `json:"expire_days"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 临时方案：如果没传 userID，使用默认的 admin
+	if req.UserID == "" {
+		req.UserID = "admin"
+	}
+
+	resp, err := m.auth.CreateAccessToken(c.Request.Context(), req.UserID, req.Name, req.ExpireInDays)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, resp)
+}
+
+// ListTokens 列出令牌
+func (m *Module) ListTokens(c *gin.Context) {
+	userID := c.Query("user_id")
+	if userID == "" {
+		userID = "admin"
+	}
+
+	tokens, err := m.auth.ListAccessTokens(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, tokens)
+}
+
+// RevokeToken 撤销令牌
+func (m *Module) RevokeToken(c *gin.Context) {
+	id := c.Param("id")
+	userID := c.Query("user_id")
+	if userID == "" {
+		userID = "admin"
+	}
+
+	if err := m.auth.RevokeAccessToken(c.Request.Context(), userID, id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 200, "msg": "Token revoked"})
 }
