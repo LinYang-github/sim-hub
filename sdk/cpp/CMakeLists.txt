@@ -41,17 +41,21 @@ endif()
 
 # --- Examples ---
 if(SIMHUB_BUILD_EXAMPLES)
-    # Demo 1: Quickstart
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples/single_header_demo/main.cpp")
-        add_executable(example_01_quickstart examples/single_header_demo/main.cpp)
-        target_link_libraries(example_01_quickstart PRIVATE SimHub::SDK)
-    endif()
+    # 01: Quickstart
+    add_executable(example_01_quickstart examples/01_quickstart/main.cpp)
+    target_link_libraries(example_01_quickstart PRIVATE SimHub::SDK)
 
-    # Demo 2: Advanced Upload
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples/02_advanced_upload/main.cpp")
-        add_executable(example_02_upload examples/02_advanced_upload/main.cpp)
-        target_link_libraries(example_02_upload PRIVATE SimHub::SDK)
-    endif()
+    # 02: Async Operations
+    add_executable(example_02_async examples/02_async_ops/main.cpp)
+    target_link_libraries(example_02_async PRIVATE SimHub::SDK)
+
+    # 03: Bundle Download (requires C++17 filesystem)
+    add_executable(example_03_bundle examples/03_bundle_download/main.cpp)
+    target_link_libraries(example_03_bundle PRIVATE SimHub::SDK)
+
+    # 04: Advanced Upload
+    add_executable(example_04_upload examples/04_advanced_upload/main.cpp)
+    target_link_libraries(example_04_upload PRIVATE SimHub::SDK)
 endif()
 
 # --- Installation ---
