@@ -15,17 +15,11 @@ import (
 //go:embed all:dist_web
 var webFS embed.FS
 
-//go:embed all:dist_terrain
-var terrainFS embed.FS
-
 //go:embed all:dist_ext_apps
 var extAppsFS embed.FS
 
 // RegisterUIHandlers registers all embedded frontend routes
 func RegisterUIHandlers(r *gin.Engine) {
-	// 1. Terrain App (Prefix: /terrain)
-	terrainSub, _ := fs.Sub(terrainFS, "dist_terrain")
-	r.StaticFS("/terrain", http.FS(terrainSub))
 
 	// 2. Consolidated External Apps (MPA)
 	extSub, _ := fs.Sub(extAppsFS, "dist_ext_apps")

@@ -36,7 +36,6 @@ const loadExternalPlugins = () => {
 
 const routes = [
   { path: '/', component: Workstation },
-  { path: '/res/map_terrain', redirect: '/res/map_service' },
 ]
 
 const initApp = async () => {
