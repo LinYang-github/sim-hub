@@ -432,8 +432,35 @@ const syncActionData = () => {
 
 // Listen for guest ready or results
 const handleGlobalMessage = (e: MessageEvent) => {
-    if (e.data && e.data.type === 'GUEST_READY') {
+    if (!e.data || typeof e.data !== 'object') return
+
+    const { type, payload, status } = e.data
+
+    // 1. GUEST_READY: Specific to the dedicated action dialog
+    if (type === 'GUEST_READY' && e.source === actionIframeRef.value?.contentWindow) {
         syncActionData()
+    } 
+    
+    // 2. ACTION_COMPLETE / CLOSE_ME: Can come from any external component 
+    // (Action dialog, External View, or External Previewer)
+    else if (type === 'ACTION_COMPLETE') {
+        // If it comes from the special action dialog, close it
+        if (e.source === actionIframeRef.value?.contentWindow) {
+            externalActionVisible.value = false
+        }
+        
+        if (status === 'success') {
+            ElMessage.success(payload?.message || '操作成功')
+            fetchList()
+        } else if (status === 'error') {
+            ElMessage.error(payload?.message || '操作失败')
+        }
+    } else if (type === 'CLOSE_ME') {
+        if (e.source === actionIframeRef.value?.contentWindow) {
+            externalActionVisible.value = false
+        }
+        // Possible: close detail drawer if the message came from a previewer?
+        // detailDrawerVisible.value = false 
     }
 }
 

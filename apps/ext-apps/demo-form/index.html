@@ -120,12 +120,24 @@
         function handleSubmit() {
             const comment = document.getElementById('comment').value;
             if (!comment) {
+                // Use the host's style of alerts if possible, but standard alert works for demo
                 alert('请填写审核意见');
                 return;
             }
-            alert(`审核提交成功！\n资源：${document.getElementById('res-name').value}\n意见：${comment}`);
-            // 后续可以向父应用发送关闭窗口的消息
-            // window.parent.postMessage({ type: 'ACTION_COMPLETE', status: 'success' }, '*');
+            
+            // 模拟 API 调用
+            console.log('提交审核数据...', {
+                resId: document.getElementById('res-id').value,
+                comment,
+                status: 'APPROVED'
+            });
+
+            // 向父应用发送成功消息
+            window.parent.postMessage({ 
+                type: 'ACTION_COMPLETE', 
+                status: 'success',
+                payload: { message: '审核已提交' }
+            }, '*');
         }
     </script>
 </body>

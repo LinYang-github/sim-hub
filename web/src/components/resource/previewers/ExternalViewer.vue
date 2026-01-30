@@ -59,6 +59,8 @@ const iframeUrl = computed(() => {
 import { useDark } from '@vueuse/core'
 const isDark = useDark()
 
+const emit = defineEmits(['message', 'ready', 'complete', 'close'])
+
 const sendTheme = () => {
     if (iframeRef.value && iframeRef.value.contentWindow) {
         const style = getComputedStyle(document.documentElement)
@@ -88,9 +90,22 @@ const handleLoad = () => {
 
 // Global message handler for guest handshake
 const handleMessage = (e: MessageEvent) => {
-    if (e.data && e.data.type === 'GUEST_READY') {
+    if (!e.data || typeof e.data !== 'object') return
+    
+    // Only process messages from OUR iframe
+    if (e.source !== iframeRef.value?.contentWindow) return
+    
+    // Bubble up all messages
+    emit('message', e.data)
+
+    if (e.data.type === 'GUEST_READY') {
         sendTheme()
         syncData()
+        emit('ready')
+    } else if (e.data.type === 'ACTION_COMPLETE') {
+        emit('complete', e.data)
+    } else if (e.data.type === 'CLOSE_ME') {
+        emit('close')
     }
 }
 
@@ -106,8 +121,8 @@ const syncData = () => {
                     resource: serializableResource
                 }
             }, '*')
-        } catch (e) {
-            console.warn('Failed to serialize resource for external viewer:', e)
+        } catch (err) {
+            console.warn('Failed to serialize resource for external viewer:', err)
         }
     }
 }
