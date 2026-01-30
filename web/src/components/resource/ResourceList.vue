@@ -410,11 +410,21 @@ const handleActionLoad = () => {
 
 const syncActionData = () => {
     if (actionIframeRef.value && actionIframeRef.value.contentWindow && currentActionResource.value) {
+        const style = getComputedStyle(document.documentElement)
+        const tokens = {
+            primary: style.getPropertyValue('--el-color-primary').trim(),
+            success: style.getPropertyValue('--el-color-success').trim(),
+            warning: style.getPropertyValue('--el-color-warning').trim(),
+            danger: style.getPropertyValue('--el-color-danger').trim(),
+            radius: style.getPropertyValue('--el-border-radius-base').trim()
+        }
+
         actionIframeRef.value.contentWindow.postMessage({
             type: 'ACTION_INIT',
             payload: {
                 resource: JSON.parse(JSON.stringify(currentActionResource.value)),
-                theme: isDark.value ? 'dark' : 'light'
+                theme: isDark.value ? 'dark' : 'light',
+                tokens
             }
         }, '*')
     }

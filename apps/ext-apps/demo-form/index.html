@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>资源流转表单</title>
     <style>
-        :root { --primary: #4f46e5; --bg: #ffffff; --text: #1e293b; --input-bg: #f9fafb; --border: #e2e8f0; }
+        :root { --primary: #4f46e5; --bg: #ffffff; --text: #1e293b; --input-bg: #f9fafb; --border: #e2e8f0; --radius: 6px; }
         html.dark { --bg: #0f172a; --text: #f1f5f9; --input-bg: #1e293b; --border: #334155; }
         
         body {
@@ -24,7 +24,7 @@
             padding: 10px 12px;
             background: var(--input-bg);
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: var(--radius);
             color: var(--text);
             font-size: 0.95rem;
             box-sizing: border-box;
@@ -36,7 +36,7 @@
             background: var(--primary);
             color: white;
             border: none;
-            border-radius: 6px;
+            border-radius: var(--radius);
             font-weight: 500;
             cursor: pointer;
             transition: filter 0.2s;
@@ -88,12 +88,20 @@
         window.addEventListener('message', (e) => {
             const { type, payload } = e.data;
             
-            // 处理主题更新
+            // 处理主题与样式变量更新
             if (type === 'ACTION_INIT' || type === 'THEME_UPDATE') {
                 if (payload.theme === 'dark') {
                     document.documentElement.classList.add('dark');
                 } else {
                     document.documentElement.classList.remove('dark');
+                }
+
+                // 应用样式变量 (Token Bridging)
+                if (payload.tokens) {
+                    const root = document.documentElement;
+                    if (payload.tokens.primary) root.style.setProperty('--primary', payload.tokens.primary);
+                    if (payload.tokens.radius) root.style.setProperty('--radius', payload.tokens.radius);
+                    // 还可以同步 success, danger 等
                 }
             }
 
