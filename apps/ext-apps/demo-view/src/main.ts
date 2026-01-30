@@ -10,7 +10,7 @@ const registerDemoView = () => {
         console.log('[DemoView] Registering view: demo-view')
         target.registerView({
             key: 'demo-view',
-            label: '画廊视图', // 自定义 Label
+            label: '测试视图', // 更新为测试视图
             icon: 'Picture', // 使用 ElementPlus 图标名 (需主应用支持解析字符串)
             path: 'External:http://localhost:30031/demo-view/' // 必须以 External: 开头以触发 ExternalViewer
             // 如果需要提供组件，可以传入 Vue 组件对象
