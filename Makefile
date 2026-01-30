@@ -39,3 +39,16 @@ dev:
 # 运行所有扩展应用 (单端口模式)
 run-ext:
 	cd apps/ext-apps && npm run dev
+
+# 自动化测试相关
+.PHONY: test test-backend test-frontend
+
+test: test-backend test-frontend
+
+test-backend:
+	@echo "Running backend unit and integration tests..."
+	go test -v ./internal/...
+
+test-frontend:
+	@echo "Running frontend vitest..."
+	cd web && npm run test -- --run

@@ -1,11 +1,18 @@
 import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest'
+import { ref } from 'vue'
 import { useCategory } from '../useCategory'
-import axios from 'axios'
+import request from '../../../../core/utils/request'
 import { ElMessageBox } from 'element-plus'
+import { ROOT_CATEGORY_ID } from '../../../../core/constants/resource'
 
 // Mock dependencies
-vi.mock('axios')
-const mockedAxios = axios as Mocked<typeof axios>
+vi.mock('../../../../core/utils/request', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    delete: vi.fn()
+  }
+}))
 
 vi.mock('element-plus', () => ({
   ElMessage: {
@@ -18,6 +25,7 @@ vi.mock('element-plus', () => ({
   }
 }))
 
+const mockedRequest = request as Mocked<typeof request>
 const mockedMessageBox = ElMessageBox as Mocked<typeof ElMessageBox>
 
 describe('useCategory', () => {
@@ -26,33 +34,33 @@ describe('useCategory', () => {
   })
 
   it('fetchCategories should load and populate data', async () => {
-    const { fetchCategories, categories, categoryTree } = useCategory('model')
+    const typeKey = ref('model')
+    const { fetchCategories, categories, categoryTree } = useCategory(typeKey)
     
     const mockData = [
       { id: '1', name: 'Vehicles', parent_id: '' },
       { id: '2', name: 'Tank', parent_id: '1' }
     ]
-    mockedAxios.get.mockResolvedValue({ data: mockData })
+    mockedRequest.get.mockResolvedValue(mockData)
 
     await fetchCategories()
 
     expect(categories.value).toEqual(mockData)
-    // Verify tree building logic (flat -> tree)
     // Tree should contain root 'all' + built tree
-    expect(categoryTree.value).toHaveLength(2) // 'all' + 'Vehicles'
-    expect((categoryTree.value[1] as any).children).toHaveLength(1) // 'Vehicles' has 'Tank'
+    expect(categoryTree.value).toHaveLength(2) // ROOT + Vehicles
+    expect((categoryTree.value[1] as any).children).toHaveLength(1) // Vehicles has Tank
   })
 
   it('promptAddCategory should call API on confirm', async () => {
-    const { promptAddCategory } = useCategory('model')
+    const typeKey = ref('model')
+    const { promptAddCategory } = useCategory(typeKey)
     
-    // Type casting logic for message box return is complex, simplified for test
     mockedMessageBox.prompt.mockResolvedValue({ value: 'New Cat', action: 'confirm' } as any)
-    mockedAxios.post.mockResolvedValue({})
+    mockedRequest.post.mockResolvedValue({})
 
     await promptAddCategory()
 
-    expect(mockedAxios.post).toHaveBeenCalledWith('/api/v1/categories', {
+    expect(mockedRequest.post).toHaveBeenCalledWith('/api/v1/categories', {
       type_key: 'model',
       name: 'New Cat',
       parent_id: ''
@@ -60,18 +68,22 @@ describe('useCategory', () => {
   })
 
   it('confirmDeleteCategory should call API and callback', async () => {
-    const { confirmDeleteCategory, selectedCategoryId } = useCategory('model')
+    const typeKey = ref('model')
+    const { confirmDeleteCategory, selectedCategoryId, categories } = useCategory(typeKey)
     const onSuccess = vi.fn()
     
     mockedMessageBox.confirm.mockResolvedValue('confirm' as any)
-    mockedAxios.delete.mockResolvedValue({})
+    mockedRequest.delete.mockResolvedValue({})
+
+    // Initialize categories so find() works
+    categories.value = [{ id: 'cat-1', name: 'Cat 1', parent_id: '' }]
 
     // Simulate deleting the currently selected category
     selectedCategoryId.value = 'cat-1'
     await confirmDeleteCategory('cat-1', onSuccess)
 
-    expect(mockedAxios.delete).toHaveBeenCalledWith('/api/v1/categories/cat-1')
-    expect(selectedCategoryId.value).toBe('all')
+    expect(mockedRequest.delete).toHaveBeenCalledWith('/api/v1/categories/cat-1')
+    expect(selectedCategoryId.value).toBe(ROOT_CATEGORY_ID)
     expect(onSuccess).toHaveBeenCalled()
   })
 })

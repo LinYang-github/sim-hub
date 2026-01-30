@@ -200,12 +200,14 @@ func (w *ResourceWriter) UpdateResource(ctx context.Context, id string, req Upda
 		}
 
 		// 发送资源更新事件
-		w.emitter.Emit(LifecycleEvent{
-			Type:       EventResourceUpdated,
-			ResourceID: id,
-			Timestamp:  time.Now(),
-			Data:       updates,
-		})
+		if w.emitter != nil {
+			w.emitter.Emit(LifecycleEvent{
+				Type:       EventResourceUpdated,
+				ResourceID: id,
+				Timestamp:  time.Now(),
+				Data:       updates,
+			})
+		}
 
 		return nil
 	})
@@ -316,7 +318,7 @@ func (w *ResourceWriter) CreateResourceAndVersion(tx *gorm.DB, typeKey, category
 
 	// 2. 检查版本是否存在
 	var ver model.ResourceVersion
-	err = tx.Where("resource_id = ? AND sem_ver = ?", res.ID, semver).First(&ver).Error
+	err = tx.Where(&model.ResourceVersion{ResourceID: res.ID, SemVer: semver}).First(&ver).Error
 
 	// 3. 决定初始状态
 	initialState := "PENDING"
@@ -396,20 +398,22 @@ func (w *ResourceWriter) CreateResourceAndVersion(tx *gorm.DB, typeKey, category
 		slog.InfoContext(tx.Statement.Context, "资源类型无需后端处理，跳过 NATS 任务分发", "type", typeKey, "name", name)
 
 		// 发送版本就绪事件
-		w.emitter.Emit(LifecycleEvent{
-			Type:       EventVersionActivated,
-			ResourceID: res.ID,
-			VersionID:  ver.ID,
-			Timestamp:  time.Now(),
-			Data: map[string]any{
-				"semver":    ver.SemVer,
-				"file_path": ver.FilePath,
-			},
-		})
+		if w.emitter != nil {
+			w.emitter.Emit(LifecycleEvent{
+				Type:       EventVersionActivated,
+				ResourceID: res.ID,
+				VersionID:  ver.ID,
+				Timestamp:  time.Now(),
+				Data: map[string]any{
+					"semver":    ver.SemVer,
+					"file_path": ver.FilePath,
+				},
+			})
+		}
 	}
 
 	// 如果是新资源，发送创建事件
-	if res.CreatedAt.After(time.Now().Add(-5 * time.Second)) {
+	if res.CreatedAt.After(time.Now().Add(-5*time.Second)) && w.emitter != nil {
 		w.emitter.Emit(LifecycleEvent{
 			Type:       EventResourceCreated,
 			ResourceID: res.ID,
@@ -560,16 +564,18 @@ func (w *ResourceWriter) ReportProcessResult(ctx context.Context, versionID stri
 			})
 
 			// 发送版本就绪事件
-			w.emitter.Emit(LifecycleEvent{
-				Type:       EventVersionActivated,
-				ResourceID: ver.ResourceID,
-				VersionID:  ver.ID,
-				Timestamp:  time.Now(),
-				Data: map[string]any{
-					"semver":    ver.SemVer,
-					"file_path": ver.FilePath,
-				},
-			})
+			if w.emitter != nil {
+				w.emitter.Emit(LifecycleEvent{
+					Type:       EventVersionActivated,
+					ResourceID: ver.ResourceID,
+					VersionID:  ver.ID,
+					Timestamp:  time.Now(),
+					Data: map[string]any{
+						"semver":    ver.SemVer,
+						"file_path": ver.FilePath,
+					},
+				})
+			}
 		}
 
 		return nil

@@ -80,7 +80,7 @@ describe('useResourceList', () => {
     expect(request.get).toHaveBeenCalledWith('/api/v1/resources', {
       params: {
         type: 'map_terrain',
-        name: 'test-query',
+        query: 'test-query',
         category_id: 'cat-123',
         scope: RESOURCE_SCOPE.PRIVATE,
         owner_id: DEFAULT_ADMIN_ID
@@ -96,7 +96,7 @@ describe('useResourceList', () => {
     const { activeScope } = useResourceList(typeKey, enableScope, selectedCategoryId)
     
     // Initial state for enableScope = false
-    expect(activeScope.value).toBe(RESOURCE_SCOPE.PUBLIC)
+    expect(activeScope.value).toBe(RESOURCE_SCOPE.ALL)
 
     // Toggle enableScope to true
     enableScope.value = true
@@ -106,7 +106,7 @@ describe('useResourceList', () => {
     // Toggle back
     enableScope.value = false
     await new Promise(resolve => setTimeout(resolve, 0))
-    expect(activeScope.value).toBe(RESOURCE_SCOPE.PUBLIC)
+    expect(activeScope.value).toBe(RESOURCE_SCOPE.ALL)
   })
 
   it('should handle race conditions properly', async () => {
@@ -175,7 +175,7 @@ describe('useResourceList', () => {
     await new Promise(resolve => setTimeout(resolve, 0))
 
     expect(request.get).toHaveBeenCalledWith('/api/v1/resources', expect.objectContaining({
-      params: expect.objectContaining({ name: 'test-search' })
+      params: expect.objectContaining({ query: 'test-search' })
     }))
   })
 

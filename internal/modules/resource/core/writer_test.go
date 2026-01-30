@@ -18,7 +18,7 @@ type MockDispatcher struct {
 	DispatchedJobs []ProcessJob
 }
 
-func (m *MockDispatcher) Dispatch(job ProcessJob) {
+func (m *MockDispatcher) Dispatch(ctx context.Context, job ProcessJob) {
 	m.DispatchedJobs = append(m.DispatchedJobs, job)
 }
 
@@ -48,7 +48,7 @@ func TestSetResourceLatestVersion(t *testing.T) {
 	storageMock := new(mocks.MockBlobStore)
 	dispatcher := &MockDispatcher{}
 
-	writer := NewResourceWriter(d, storageMock, "test-bucket", dispatcher, nil)
+	writer := NewResourceWriter(d, storageMock, "test-bucket", dispatcher, nil, nil)
 
 	// Setup Data
 	resID := uuid.New().String()
@@ -104,7 +104,7 @@ func TestSetResourceLatestVersion_InvalidVersion(t *testing.T) {
 	storageMock := new(mocks.MockBlobStore)
 	dispatcher := &MockDispatcher{}
 
-	writer := NewResourceWriter(d, storageMock, "test-bucket", dispatcher, nil)
+	writer := NewResourceWriter(d, storageMock, "test-bucket", dispatcher, nil, nil)
 
 	// Setup Data
 	resID := uuid.New().String()
@@ -139,7 +139,7 @@ func TestCreateResourceAndVersion(t *testing.T) {
 	dispatcher := &MockDispatcher{}
 	handlers := map[string]string{"model_glb": "glb-processor"}
 
-	writer := NewResourceWriter(d, storageMock, "test-bucket", dispatcher, handlers)
+	writer := NewResourceWriter(d, storageMock, "test-bucket", dispatcher, nil, handlers)
 
 	// Create ResourceType to satisfy FK if needed (though sqlite might not enforce)
 	d.DB.Create(&model.ResourceType{TypeKey: "model_glb", TypeName: "GLB Model"})
@@ -176,14 +176,14 @@ func TestCreateResourceAndVersion_DuplicateSemVer_Pending(t *testing.T) {
 	dispatcher := &MockDispatcher{}
 	handlers := map[string]string{"model_glb": "glb-processor"}
 
-	writer := NewResourceWriter(d, storageMock, "test-bucket", dispatcher, handlers)
+	writer := NewResourceWriter(d, storageMock, "test-bucket", dispatcher, nil, handlers)
 
 	// Create ResourceType
 	d.DB.Create(&model.ResourceType{TypeKey: "model_glb", TypeName: "GLB Model"})
 
 	// Setup: Create Resource and PENDING Version
 	resID := uuid.New().String()
-	d.DB.Create(&model.Resource{ID: resID, TypeKey: "model_glb", Name: "test-dup", OwnerID: "owner-1"})
+	d.DB.Create(&model.Resource{ID: resID, TypeKey: "model_glb", CategoryID: "cat-1", Name: "test-dup", OwnerID: "owner-1"})
 
 	verID := uuid.New().String()
 	d.DB.Create(&model.ResourceVersion{
@@ -217,14 +217,14 @@ func TestCreateResourceAndVersion_DuplicateSemVer_Active(t *testing.T) {
 	storageMock := new(mocks.MockBlobStore)
 	dispatcher := &MockDispatcher{}
 
-	writer := NewResourceWriter(d, storageMock, "test-bucket", dispatcher, nil)
+	writer := NewResourceWriter(d, storageMock, "test-bucket", dispatcher, nil, nil)
 
 	// Create ResourceType
 	d.DB.Create(&model.ResourceType{TypeKey: "model_glb", TypeName: "GLB Model"})
 
 	// Setup: Create Resource and ACTIVE Version
 	resID := uuid.New().String()
-	d.DB.Create(&model.Resource{ID: resID, TypeKey: "model_glb", Name: "test-active", OwnerID: "owner-1"})
+	d.DB.Create(&model.Resource{ID: resID, TypeKey: "model_glb", CategoryID: "cat-1", Name: "test-active", OwnerID: "owner-1"})
 
 	d.DB.Create(&model.ResourceVersion{
 		ID:         uuid.New().String(),
