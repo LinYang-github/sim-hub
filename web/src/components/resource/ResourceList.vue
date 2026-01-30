@@ -147,7 +147,7 @@
             @view-details="handleViewDetails"
             @download="download"
             @delete="confirmDelete"
-            :custom-actions="customActions"
+            :custom-actions="resolvedActions"
             @custom-action="(key, row) => handleCustomAction(key, row)"
           />
 
@@ -158,7 +158,7 @@
             :loading="loading"
             :icon="icon"
             :status-map="statusMap"
-            :custom-actions="customActions"
+            :custom-actions="resolvedActions"
             @view-details="handleViewDetails"
             @download="download"
             @edit-tags="openTagEditor"
@@ -182,7 +182,7 @@
             @delete="confirmDelete"
             @rename="(res) => stewardRef?.openRename(res)"
             @move="(res) => stewardRef?.openMove(res)"
-            :custom-actions="customActions"
+            :custom-actions="resolvedActions"
             @custom-action="(key, row) => handleCustomAction(key, row)"
           />
 
@@ -200,7 +200,7 @@
               @change-scope="handleScopeChange"
               @rename="(res) => stewardRef?.openRename(res)"
               @move="(res) => stewardRef?.openMove(res)"
-              :custom-actions="customActions"
+              :custom-actions="resolvedActions"
               @custom-action="(key, row) => handleCustomAction(key, row)"
             />
         </template>
@@ -360,6 +360,7 @@ import {
 } from '@element-plus/icons-vue'
 import request from '../../core/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { moduleManager } from '../../core/moduleManager'
 import CategorySidebar from './components/CategorySidebar.vue'
 import type { Resource, ResourceScope, CategoryNode } from '../../core/types/resource'
 import ResourceTableView from './views/ResourceTableView.vue'
@@ -373,6 +374,7 @@ import OnlineCreateDialog from './components/OnlineCreateDialog.vue'
 import ResourceDataGrid from './views/ResourceDataGrid.vue'
 import ResourceGalleryView from './views/ResourceGalleryView.vue'
 import ExternalViewer from './previewers/ExternalViewer.vue'
+import { SupportedView, CustomAction } from '../../core/types'
 
 // Composables
 import { useCategory } from './composables/useCategory'
@@ -396,21 +398,39 @@ const props = defineProps<{
   viewer?: string
   icon?: string
   example?: string
-  supportedViews?: { key: string, label: string, icon: string, path?: string }[]
-  customActions?: { key: string, label: string, icon: string, handler: any }[]
+  supportedViews?: SupportedView[]
+  customActions?: CustomAction[]
 }>()
 
 // Computed for button text (use shortName if available, fallback to typeName)
 const actionLabel = computed(() => props.shortName || props.typeName)
 
-// Resolve current view config (especially for path)
-const activeViewConfig = computed(() => {
-  return props.supportedViews?.find(v => v.key === viewMode.value)
+const viewMode = ref('')
+const resolvedViews = computed(() => {
+  return (props.supportedViews || []).map(v => moduleManager.resolveView(v))
 })
 
-const statusMap = RESOURCE_STATUS_TEXT
+const activeViewConfig = computed(() => {
+  return resolvedViews.value.find(v => v.key === viewMode.value)
+})
 
-const viewMode = ref('table')
+const resolvedActions = computed(() => {
+  return (props.customActions || []).map(a => moduleManager.resolveAction(a))
+})
+
+watch(() => props.supportedViews, () => {
+  if (resolvedViews.value.length > 0) {
+    // If current viewMode is not supported, switch to the first available view
+    if (!resolvedViews.value.some(v => v.key === viewMode.value)) {
+      viewMode.value = resolvedViews.value[0].key
+    }
+  } else {
+    // Fallback if no supported views are provided
+    viewMode.value = 'table'
+  }
+}, { immediate: true })
+
+const statusMap = RESOURCE_STATUS_TEXT
 
 // Debug Log
 console.log('ResourceList Mounted. TypeKey:', props.typeKey, 'CustomActions:', props.customActions)

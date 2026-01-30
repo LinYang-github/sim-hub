@@ -116,13 +116,14 @@
 import { MapLocation, Download, PriceTag, MoreFilled, EditPen, Rank, Clock, Delete } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import GeoPreview from '../previewers/GeoPreview.vue'
+import type { CustomAction } from '../../../core/types'
 
 const props = defineProps<{
   resources: any[]
   loading: boolean
   statusMap: any
   icon?: string
-  customActions?: any[]
+  customActions?: CustomAction[]
 }>()
 
 const emit = defineEmits(['view-details', 'download', 'edit-tags', 'delete', 'rename', 'move', 'view-history', 'custom-action'])

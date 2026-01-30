@@ -12,37 +12,71 @@ class ModuleManager {
   // 已配置（活跃）的模块列表 (使用 shallowRef 确保 UI 响应式同步)
   private activeModules = shallowRef<SimHubModule[]>([])
   
+  public getActiveModules() {
+    return this.activeModules
+  }
+  
   // 可用的代码实现（内部模块映射表）
   private implementations: Map<string, SimHubModule> = new Map()
 
   // 统一存储从后端拉取的原始配置项
   private configItems: SimHubModule[] = []
   
-  // 视图注册表
-  private viewRegistry: Map<string, SupportedView> = new Map()
+  // 视图注册表 (使用 shallowRef 确保 UI 可以响应注册变化)
+  public viewRegistry = shallowRef<Map<string, SupportedView>>(new Map())
 
   // 动作注册表
-  private actionRegistry: Map<string, CustomAction> = new Map()
+  public actionRegistry = shallowRef<Map<string, CustomAction>>(new Map())
 
   /**
    * 注册视图元数据
    */
   registerView(meta: SupportedView) {
-      this.viewRegistry.set(meta.key, meta)
+      const newMap = new Map(this.viewRegistry.value)
+      newMap.set(meta.key, meta)
+      this.viewRegistry.value = newMap
+      console.log(`[ViewRegistry] Registered: ${meta.key}`)
   }
 
   /**
    * 注册自定义动作
    */
   registerAction(action: CustomAction) {
-      this.actionRegistry.set(action.key, action)
+      const newMap = new Map(this.actionRegistry.value)
+      newMap.set(action.key, action)
+      this.actionRegistry.value = newMap
+  }
+
+  /**
+   * 解析视图元数据（支持 key 查找）
+   */
+  resolveView(view: string | SupportedView): SupportedView {
+      if (typeof view === 'string') {
+          return this.viewRegistry.value.get(view) || { key: view, label: view, icon: 'Document' }
+      }
+      return view
+  }
+
+  /**
+   * 解析动作元数据与处理器
+   */
+  resolveAction(action: string | CustomAction): CustomAction {
+      if (typeof action === 'string') {
+          return this.actionRegistry.value.get(action) || { 
+              key: action, 
+              label: action, 
+              icon: 'Promotion', 
+              handler: () => console.warn('Action handler not found yet for', action) 
+          }
+      }
+      return action
   }
 
   private handleSupportedViews(views: any) {
       if (!views || !Array.isArray(views)) return views
       return views.map(v => {
           if (typeof v === 'string') {
-              const meta = this.viewRegistry.get(v)
+              const meta = this.viewRegistry.value.get(v)
               if (meta) return meta
               return { label: v, icon: 'Document', key: v }
           }
@@ -54,12 +88,12 @@ class ModuleManager {
       if (!actions || !Array.isArray(actions)) return actions
       return actions.map(a => {
           if (typeof a === 'string') {
-               const action = this.actionRegistry.get(a)
+               const action = this.actionRegistry.value.get(a)
                if (action) return action
                return { key: a, label: a, icon: 'Promotion', handler: () => console.warn('Action handler not found for', a) }
           }
            // If object, try to enrich from registry if handler is missing or string
-          const registered = this.actionRegistry.get(a.key)
+          const registered = this.actionRegistry.value.get(a.key)
           if (registered) {
               return { ...registered, ...a } // Allow override
           }

@@ -171,6 +171,7 @@ import {
   Download, MoreFilled, InfoFilled, 
   PriceTag, Edit, Promotion, Lock, Delete
 } from '@element-plus/icons-vue'
+import type { CustomAction } from '../../../core/types'
 import { RESOURCE_STATUS_TEXT, RESOURCE_STATE, RESOURCE_SCOPE } from '../../../core/constants/resource'
 import { formatSize, formatDate } from '../../../core/utils/format'
 
@@ -181,7 +182,7 @@ const props = defineProps<{
   loading: boolean
   enableScope?: boolean
   icon?: string
-  customActions?: { key: string, label: string, icon: string }[]
+  customActions?: CustomAction[]
 }>()
 
 console.log('ResourceTableView mounted. customActions:', props.customActions, 'Resource count:', props.resources?.length)

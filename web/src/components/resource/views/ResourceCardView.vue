@@ -141,6 +141,7 @@ import {
 } from '@element-plus/icons-vue'
 import { formatSize } from '../../../core/utils/format'
 import type { Resource, ResourceScope } from '../../../core/types/resource'
+import type { CustomAction } from '../../../core/types'
 import { RESOURCE_STATE, RESOURCE_SCOPE, DEFAULT_ADMIN_ID } from '../../../core/constants/resource'
 import ResourcePreview from '../previewers/ResourcePreview.vue'
 
@@ -151,7 +152,7 @@ defineProps<{
   statusMap: Record<string, string>
   viewer?: string
   icon?: string
-  customActions?: { key: string, label: string, icon: string }[]
+  customActions?: CustomAction[]
 }>()
 
 const emit = defineEmits<{

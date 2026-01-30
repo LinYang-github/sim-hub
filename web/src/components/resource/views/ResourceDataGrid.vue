@@ -141,6 +141,7 @@ import {
   Download, MoreFilled, View as ViewIcon, 
   PriceTag, Edit, Promotion, Delete
 } from '@element-plus/icons-vue'
+import type { CustomAction } from '../../../core/types'
 import { formatDate } from '../../../core/utils/format'
 
 const props = defineProps<{
@@ -148,7 +149,7 @@ const props = defineProps<{
   loading: boolean
   icon?: string
   schema?: any
-  customActions?: { key: string, label: string, icon: string }[]
+  customActions?: CustomAction[]
 }>()
 
 const emit = defineEmits(['view-details', 'download', 'delete', 'rename', 'move', 'edit-tags', 'custom-action'])
