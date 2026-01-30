@@ -5,48 +5,61 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>资源流转表单</title>
     <style>
+        :root { --primary: #4f46e5; --bg: #ffffff; --text: #1e293b; --input-bg: #f9fafb; --border: #e2e8f0; }
+        html.dark { --bg: #0f172a; --text: #f1f5f9; --input-bg: #1e293b; --border: #334155; }
+        
         body {
             font-family: system-ui, -apple-system, sans-serif;
-            padding: 20px;
-            background: #fff;
-            color: #333;
+            padding: 24px;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            transition: background 0.3s, color 0.3s;
         }
-        h2 { margin-top: 0; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: 500; }
+        h2 { margin-top: 0; font-size: 1.25rem; font-weight: 600; color: var(--primary); }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 6px; font-size: 0.875rem; font-weight: 500; opacity: 0.8; }
         input, textarea, select {
             width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            padding: 10px 12px;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 0.95rem;
             box-sizing: border-box;
         }
-        .actions { margin-top: 20px; text-align: right; }
+        input[readonly] { opacity: 0.6; cursor: not-allowed; }
+        .actions { margin-top: 24px; text-align: right; }
         button {
-            padding: 8px 16px;
-            background: #4f46e5;
+            padding: 10px 20px;
+            background: var(--primary);
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
+            font-weight: 500;
             cursor: pointer;
+            transition: filter 0.2s;
         }
-        button:hover { background: #4338ca; }
+        button:hover { filter: brightness(1.1); }
+        .hint { font-size: 0.75rem; color: #64748b; margin-top: 4px; }
     </style>
 </head>
 <body>
     <div id="app">
         <h2>资源流转审核单</h2>
         <div class="form-group">
-            <label>资源名称</label>
-            <input type="text" id="res-name" readonly style="background: #f3f4f6;">
+            <label>资源 ID</label>
+            <input type="text" id="res-id" readonly>
+            <div class="hint" id="url-hint">从 URL 参数解析中...</div>
         </div>
         <div class="form-group">
-            <label>当前状态</label>
-            <input type="text" id="res-status" readonly style="background: #f3f4f6;">
+            <label>资源名称</label>
+            <input type="text" id="res-name" readonly>
         </div>
         <div class="form-group">
             <label>审核意见</label>
-            <textarea rows="4" placeholder="请输入您的审核意见..."></textarea>
+            <textarea id="comment" rows="4" placeholder="请输入您的审核意见..."></textarea>
         </div>
         <div class="form-group">
             <label>流转目标</label>
@@ -57,12 +70,55 @@
             </select>
         </div>
         <div class="actions">
-            <button onclick="alert('提交成功！')">提交审核</button>
+            <button onclick="handleSubmit()">提交审核</button>
         </div>
     </div>
+
     <script>
-        // Simple bridge to get resource data if passed via query params or postMessage
-        // For simplicity in this demo, we just mock or leave blank
+        // 1. 从 URL 获取上下文 (最快响应)
+        const params = new URLSearchParams(window.location.search);
+        const resId = params.get('resId');
+        const resName = params.get('resName');
+
+        if (resId) document.getElementById('res-id').value = resId;
+        if (resName) document.getElementById('res-name').value = resName;
+        if (resId || resName) document.getElementById('url-hint').innerText = "✅ 已通过 URL 获取上下文";
+
+        // 2. 监听 postMessage 获取完整数据 (更丰富)
+        window.addEventListener('message', (e) => {
+            const { type, payload } = e.data;
+            
+            // 处理主题更新
+            if (type === 'ACTION_INIT' || type === 'THEME_UPDATE') {
+                if (payload.theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            }
+
+            // 处理完整资源数据回填
+            if (type === 'ACTION_INIT' && payload.resource) {
+                const res = payload.resource;
+                document.getElementById('res-id').value = res.id;
+                document.getElementById('res-name').value = res.name;
+                document.getElementById('url-hint').innerText = "✅ 已通过 PostMessage 同步完整元数据";
+            }
+        });
+
+        // 提示主应用准备就绪
+        window.parent.postMessage({ type: 'GUEST_READY' }, '*');
+
+        function handleSubmit() {
+            const comment = document.getElementById('comment').value;
+            if (!comment) {
+                alert('请填写审核意见');
+                return;
+            }
+            alert(`审核提交成功！\n资源：${document.getElementById('res-name').value}\n意见：${comment}`);
+            // 后续可以向父应用发送关闭窗口的消息
+            // window.parent.postMessage({ type: 'ACTION_COMPLETE', status: 'success' }, '*');
+        }
     </script>
 </body>
 </html>

@@ -48,6 +48,9 @@ const iframeUrl = computed(() => {
 
     const u = new URL(props.url, base)
     u.searchParams.set('mode', 'preview')
+    if (props.resource?.id) {
+        u.searchParams.set('resId', props.resource.id)
+    }
     u.searchParams.set('t', Date.now().toString()) // Anti-cache
     return u.toString()
 })
@@ -58,10 +61,20 @@ const isDark = useDark()
 
 const sendTheme = () => {
     if (iframeRef.value && iframeRef.value.contentWindow) {
+        const style = getComputedStyle(document.documentElement)
+        const tokens = {
+            primary: style.getPropertyValue('--el-color-primary').trim(),
+            success: style.getPropertyValue('--el-color-success').trim(),
+            warning: style.getPropertyValue('--el-color-warning').trim(),
+            danger: style.getPropertyValue('--el-color-danger').trim(),
+            radius: style.getPropertyValue('--el-border-radius-base').trim()
+        }
+
         iframeRef.value.contentWindow.postMessage({
             type: 'THEME_UPDATE',
             payload: {
-                theme: isDark.value ? 'dark' : 'light'
+                theme: isDark.value ? 'dark' : 'light',
+                tokens
             }
         }, '*')
     }

@@ -326,11 +326,13 @@
     >
       <div class="external-iframe-container">
         <iframe 
+          ref="actionIframeRef"
           v-if="externalActionUrl" 
           :src="externalActionUrl" 
           frameborder="0" 
           width="100%" 
           height="100%"
+          @load="handleActionLoad"
         ></iframe>
       </div>
     </el-dialog>
@@ -360,8 +362,15 @@ const handleCustomAction = (key: string, row: any) => {
 
     // 情况 2: 处理器是外部链接字符串 (External:)
     if (typeof actionDef.handler === 'string' && actionDef.handler.startsWith('External:')) {
+        const baseUrl = actionDef.handler.replace('External:', '')
+        const url = new URL(baseUrl, window.location.origin)
+        url.searchParams.set('resId', row.id)
+        url.searchParams.set('resName', row.name)
+        url.searchParams.set('mode', 'action')
+        
         externalActionTitle.value = actionDef.label
-        externalActionUrl.value = actionDef.handler.replace('External:', '')
+        externalActionUrl.value = url.toString()
+        currentActionResource.value = row
         externalActionVisible.value = true
         return
     }
@@ -379,6 +388,9 @@ const handleCustomAction = (key: string, row: any) => {
 }
 
 const actionComponentsRef = ref<any>({})
+const actionIframeRef = ref<HTMLIFrameElement | null>(null)
+const currentActionResource = ref<any>(null)
+
 const setActionRef = (el: any, key: string) => {
     if (el) actionComponentsRef.value[key] = el
 }
@@ -387,6 +399,40 @@ const setActionRef = (el: any, key: string) => {
 const externalActionVisible = ref(false)
 const externalActionUrl = ref('')
 const externalActionTitle = ref('')
+
+// PostMessage for External Actions
+import { useDark } from '@vueuse/core'
+const isDark = useDark()
+
+const handleActionLoad = () => {
+    syncActionData()
+}
+
+const syncActionData = () => {
+    if (actionIframeRef.value && actionIframeRef.value.contentWindow && currentActionResource.value) {
+        actionIframeRef.value.contentWindow.postMessage({
+            type: 'ACTION_INIT',
+            payload: {
+                resource: JSON.parse(JSON.stringify(currentActionResource.value)),
+                theme: isDark.value ? 'dark' : 'light'
+            }
+        }, '*')
+    }
+}
+
+// Listen for guest ready or results
+const handleGlobalMessage = (e: MessageEvent) => {
+    if (e.data && e.data.type === 'GUEST_READY') {
+        syncActionData()
+    }
+}
+
+onMounted(() => {
+    window.addEventListener('message', handleGlobalMessage)
+})
+onUnmounted(() => {
+    window.removeEventListener('message', handleGlobalMessage)
+})
 
 import { 
   Upload as UploadIcon, Connection, DataLine, Grid, Refresh,
