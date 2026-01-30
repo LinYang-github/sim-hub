@@ -25,6 +25,7 @@
 import { computed, defineAsyncComponent, markRaw } from 'vue'
 import DefaultIconPreview from './DefaultIconPreview.vue'
 import { RESOURCE_STATE } from '../../../core/constants/resource'
+import { moduleManager } from '../../../core/moduleManager'
 
 const props = defineProps<{
   typeKey: string
@@ -50,8 +51,10 @@ const AsyncJsonPreview = defineAsyncComponent(() => import('./JsonPreview.vue'))
 
 // 2. 映射表，支持按需返回组件
 const getViewerComponent = (name?: string) => {
+  const resolvedName = name ? moduleManager.resolveViewer(name) : name
+  
   // If explicitly requested External or starts with External:
-  if (name?.startsWith('External:')) return AsyncExternalViewer
+  if (resolvedName?.startsWith('External:')) return AsyncExternalViewer
 
   const viewerMap: Record<string, any> = {
     'GLBPreview': AsyncGLBPreview,
@@ -72,8 +75,9 @@ const getViewerComponent = (name?: string) => {
 
 // Special logic for ExternalViewer URL
 const finalUrl = computed(() => {
-    if (props.viewer?.startsWith('External:')) {
-        return props.viewer.replace('External:', '')
+    const resolvedViewer = props.viewer ? moduleManager.resolveViewer(props.viewer) : props.viewer
+    if (resolvedViewer?.startsWith('External:')) {
+        return resolvedViewer.replace('External:', '')
     }
     return props.downloadUrl
 })

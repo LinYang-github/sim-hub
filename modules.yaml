@@ -109,6 +109,7 @@ resource_types:
     meta_data:
       icon: "Coin"
       enable_scope: true
+      viewer: "demo-preview"
       short_name: "测试资源"
       supported_views: ["demo-view", "data-grid"]
       custom_actions: ["demo-action"]

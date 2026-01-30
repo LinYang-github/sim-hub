@@ -43,6 +43,6 @@ export interface SimHubModule {
   devUrl?: string      
   integrationMode?: 'iframe' | 'new-tab' | 'internal'
   viewer?: string
-  supportedViews?: SupportedView[]
-  customActions?: CustomAction[]
+  supportedViews?: (string | SupportedView)[]
+  customActions?: (string | CustomAction)[]
 }

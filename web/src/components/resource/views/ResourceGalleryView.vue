@@ -30,24 +30,9 @@
                </div>
             </template>
 
-            <!-- Status Tag Overlay -->
-            <div class="status-overlay">
-              <el-tag 
-                :type="statusMap[res.latest_version?.state || 0]?.type" 
-                size="small" 
-                effect="dark"
-              >
-                {{ statusMap[res.latest_version?.state || 0]?.text }}
-              </el-tag>
-            </div>
             
             <!-- Actions Overlay (Visible on Hover) -->
             <div class="actions-overlay" @click.stop>
-              <el-tooltip content="下载" placement="top">
-                <el-button circle size="small" @click="$emit('download', res)">
-                  <el-icon><Download /></el-icon>
-                </el-button>
-              </el-tooltip>
               <el-tooltip :content="`更多操作`" placement="top">
                 <el-dropdown trigger="click" @command="(cmd: string) => handleCommand(cmd, res)">
                   <el-button circle size="small">
@@ -104,6 +89,18 @@
                 {{ tag }}
               </el-tag>
               <span v-if="res.tags.length > 2" class="more-tags">+{{ res.tags.length - 2 }}</span>
+            </div>
+            
+            <!-- Status Tag (bottom-right) -->
+            <div class="info-status" v-else-if="res.latest_version?.state">
+              <el-tag 
+                :type="statusMap[res.latest_version.state]?.type || 'info'" 
+                size="small" 
+                effect="plain"
+                round
+              >
+                {{ statusMap[res.latest_version.state]?.text || res.latest_version.state }}
+              </el-tag>
             </div>
           </div>
         </div>
@@ -237,12 +234,6 @@ export const viewMeta = {
   }
 }
 
-.status-overlay {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  z-index: 2;
-}
 
 .actions-overlay {
   position: absolute;
@@ -325,6 +316,11 @@ export const viewMeta = {
           color: var(--el-text-color-placeholder);
           font-weight: 600;
       }
+  }
+
+  .info-status {
+      display: flex;
+      align-items: center;
   }
 }
 

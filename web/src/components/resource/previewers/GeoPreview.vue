@@ -3,7 +3,8 @@
     <div class="leaflet-map" ref="mapElement"></div>
     <div class="geo-info-overlay" v-if="hasGeoInfo">
       <div class="info-item">
-        <span class="label">坐标系:</span>
+        <el-icon class="info-icon"><MapLocation /></el-icon>
+        <span class="label">参考系:</span>
         <span class="value">{{ metaData?.crs || 'EPSG:4326' }}</span>
       </div>
     </div>
@@ -173,6 +174,10 @@ watch(() => props.metaData, () => {
 }
 
 .info-item .label { color: #888; }
+.info-item .info-icon {
+  font-size: 14px;
+  color: var(--el-color-primary);
+}
 
 .geo-no-data {
   position: absolute;

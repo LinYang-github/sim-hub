@@ -91,18 +91,19 @@
             </el-tooltip>
             
             <!-- View Toggles (Only show if multiple views are supported) -->
-            <div class="view-toggle-group" v-if="supportedViews && supportedViews.length > 1">
+            <div class="view-toggle-group" v-if="resolvedViews.length > 1">
                <div 
-                 v-for="v in supportedViews" 
+                 v-for="v in resolvedViews" 
                  :key="v.key"
                  class="toggle-item" 
                  :class="{ active: viewMode === v.key }" 
                  @click="viewMode = v.key"
+                 :title="v.label"
                >
                  <el-icon><component :is="v.icon" /></el-icon>
                </div>
             </div>
-            <div class="view-toggle-group" v-else-if="!supportedViews">
+            <div class="view-toggle-group" v-else-if="resolvedViews.length === 0">
                <div class="toggle-item" :class="{ active: viewMode === 'table' }" @click="viewMode = 'table'">
                  <el-icon><DataLine /></el-icon>
                </div>
@@ -157,7 +158,7 @@
             :resources="resources"
             :loading="loading"
             :icon="icon"
-            :status-map="statusMap"
+            :status-map="galleryStatusMap"
             :custom-actions="resolvedActions"
             @view-details="handleViewDetails"
             @download="download"
@@ -304,10 +305,10 @@
     />
 
     <!-- Custom Action Handlers Renderer -->
-    <template v-if="customActions && customActions.length">
-        <div v-for="action in customActions" :key="action.key" style="display:none">
+    <template v-if="resolvedActions && resolvedActions.length">
+        <div v-for="action in resolvedActions" :key="action.key" style="display:none">
             <component 
-                v-if="typeof action.handler !== 'function' && typeof action.handler !== 'string'"
+                v-if="action.handler && typeof action.handler !== 'function' && typeof action.handler !== 'string'"
                 :is="action.handler"
                 :ref="(el: any) => setActionRef(el, action.key)"
             />
@@ -323,7 +324,7 @@ import { ref, onMounted, onUnmounted, toRef, computed, watch, defineAsyncCompone
 
 
 const handleCustomAction = (key: string, row: any) => {
-    const actionDef = props.customActions?.find(a => a.key === key)
+    const actionDef = resolvedActions.value.find(a => a.key === key)
     if (!actionDef || !actionDef.handler) {
       console.warn('Action definition or handler missing', key)
       return
@@ -398,8 +399,8 @@ const props = defineProps<{
   viewer?: string
   icon?: string
   example?: string
-  supportedViews?: SupportedView[]
-  customActions?: CustomAction[]
+  supportedViews?: (string | SupportedView)[]
+  customActions?: (string | CustomAction)[]
 }>()
 
 // Computed for button text (use shortName if available, fallback to typeName)
@@ -432,13 +433,30 @@ watch(() => props.supportedViews, () => {
 
 const statusMap = RESOURCE_STATUS_TEXT
 
+const galleryStatusMap = {
+  [RESOURCE_STATE.ACTIVE]: { text: '已生效', type: 'success' },
+  [RESOURCE_STATE.READY]: { text: '已就绪', type: 'info' },
+  [RESOURCE_STATE.PROCESSING]: { text: '处理中', type: 'primary' },
+  [RESOURCE_STATE.PENDING]: { text: '排队中', type: 'warning' },
+  [RESOURCE_STATE.FAILED]: { text: '失败', type: 'danger' },
+}
+
 // Debug Log
 console.log('ResourceList Mounted. TypeKey:', props.typeKey, 'CustomActions:', props.customActions)
+
+watch([resolvedViews, activeViewConfig], () => {
+  console.log('[ResourceList] Views updated:', {
+    count: resolvedViews.value.length,
+    activeKey: viewMode.value,
+    hasPath: !!activeViewConfig.value?.path
+  })
+}, { immediate: true })
 
 // Sync viewMode with supportedViews
 watch(() => props.typeKey, () => {
   if (props.supportedViews && props.supportedViews.length > 0) {
-    viewMode.value = props.supportedViews[0].key
+    const firstView = props.supportedViews[0]
+    viewMode.value = typeof firstView === 'string' ? firstView : firstView.key
   } else {
     // Legacy fallback
     viewMode.value = props.uploadMode === 'online' ? 'table' : 'table'
