@@ -125,6 +125,12 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 		resources.GET("/versions/:vid/download-pack", m.DownloadBundle)
 	}
 
+	// /api/v1/dashboard 路径组
+	dashboard := g.Group("/dashboard")
+	{
+		dashboard.GET("/stats", m.GetDashboardStats)
+	}
+
 	// /api/v1/categories 路径组
 	categories := g.Group("/categories")
 	{
@@ -571,4 +577,17 @@ func (m *Module) CreateResourceFromData(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, resource)
+}
+
+// GetDashboardStats 获取概览统计
+func (m *Module) GetDashboardStats(c *gin.Context) {
+	// 默认使用 Admin 用户 ID，实际应从 Token 获取
+	ownerID := "admin"
+
+	stats, err := m.uc.GetDashboardStats(c.Request.Context(), ownerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
 }

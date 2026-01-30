@@ -142,3 +142,8 @@ type ResourceVersionDTO struct {
 	State       string         `json:"state"`
 	DownloadURL string         `json:"download_url,omitempty"`
 }
+
+type DashboardStatsDTO struct {
+	TotalCounts map[string]int64 `json:"total_counts"`
+	RecentItems []*ResourceDTO   `json:"recent_items"`
+}

@@ -7,13 +7,13 @@ const scenarioModule: SimHubModule = {
   menu: [
     {
       label: '想定资源库',
-      path: '/scenarios',
+      path: '/res/scenario',
       icon: Folder
     }
   ],
   routes: [
     {
-      path: '/scenarios',
+      path: '/res/scenario',
       component: () => import('../../components/resource/ResourceList.vue'),
       props: { 
         typeKey: 'scenario', 

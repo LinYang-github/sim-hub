@@ -230,7 +230,10 @@ class ModuleManager {
   install(_app: App, router: Router) {
     this.activeModules.value.forEach(m => {
       if (m.routes) {
-        m.routes.forEach(r => router.addRoute(r))
+        m.routes.forEach(r => {
+           console.log(`[Router] Registering route: ${r.path} for module ${m.key}`)
+           router.addRoute(r)
+        })
       }
       if (m.integrationMode === 'iframe') {
         const url = (import.meta.env.DEV && m.devUrl) ? m.devUrl : m.externalUrl

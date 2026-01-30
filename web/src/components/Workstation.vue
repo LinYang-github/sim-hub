@@ -1,5 +1,18 @@
 <template>
   <div class="dashboard-container">
+    <!-- Search Hero -->
+    <div class="search-hero">
+       <div class="hero-content">
+          <h1>探索您的数字资产</h1>
+          <p>搜索想定、3D 模型、地理数据或系统文档</p>
+          <div class="hero-search-bar" @click="triggerGlobalSearch">
+             <el-icon><Search /></el-icon>
+             <span>输入关键词搜索...</span>
+             <div class="search-badge">{{ isMac ? '⌘' : 'Ctrl' }} + K</div>
+          </div>
+       </div>
+    </div>
+
     <!-- Stats Cards -->
     <el-row :gutter="20" class="stats-row">
       <el-col :span="6" v-for="stat in stats" :key="stat.label">
@@ -21,10 +34,34 @@
         <div class="content-panel">
           <div class="panel-header">
             <span class="panel-title">最近上传资源</span>
-            <el-button link type="primary">查看全部</el-button>
+            <el-button link type="primary" @click="triggerGlobalSearch">查看全部</el-button>
           </div>
-          <div class="panel-body">
-            <el-empty description="暂无近期上传数据" :image-size="80" />
+          <div class="panel-body recent-list-body">
+            <template v-if="recentResources && recentResources.length > 0">
+               <div class="recent-list">
+                  <div 
+                    v-for="res in recentResources" 
+                    :key="res.id" 
+                    class="recent-res-item"
+                    @click="router.push(`/res/${res.type_key}`)"
+                  >
+                     <div class="res-main">
+                        <el-icon class="res-icon"><component :is="res.icon" /></el-icon>
+                        <div class="res-info">
+                           <span class="res-name">{{ res.name }}</span>
+                           <span class="res-type">{{ res.typeName }}</span>
+                        </div>
+                     </div>
+                     <div class="res-side">
+                        <el-tag size="small" :type="getStatusType(res.latest_version?.state)" effect="plain">
+                           {{ res.latest_version?.state || 'UNKNOWN' }}
+                        </el-tag>
+                        <span class="res-date">{{ formatDate(res.created_at) }}</span>
+                     </div>
+                  </div>
+               </div>
+            </template>
+            <el-empty v-else description="暂无近期上传数据" :image-size="80" />
           </div>
         </div>
       </el-col>
@@ -46,24 +83,65 @@
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted, markRaw } from 'vue'
 import { useRouter } from 'vue-router'
-import { Files, Document, Promotion, Connection, Box, Location, Folder } from '@element-plus/icons-vue'
+import { Files, Document, Promotion, Connection, Box, Location, Folder, Search, Tickets } from '@element-plus/icons-vue'
+import request from '../core/utils/request'
+import { moduleManager } from '../core/moduleManager'
+import dayjs from 'dayjs'
 
 const router = useRouter()
+const isMac = /macintosh|mac os x/i.test(navigator.userAgent)
 
-interface StatItem {
-  label: string
-  value: string
-  icon: any
-  color: string
+const stats = ref([
+  { label: '想定资源', key: 'scenario', value: '0', icon: markRaw(Folder), color: '#409eff' },
+  { label: '3D 模型', key: 'model_glb', value: '0', icon: markRaw(Box), color: '#67c23a' },
+  { label: '地图服务', key: 'map_service', value: '0', icon: markRaw(Location), color: '#e6a23c' },
+  { label: '测试资源', key: 'test_db', value: '0', icon: markRaw(Tickets), color: '#f56c6c' }
+])
+
+const recentResources = ref<any[]>([])
+
+const triggerGlobalSearch = () => {
+    window.dispatchEvent(new CustomEvent('open-global-search'))
 }
 
-const stats: StatItem[] = [
-  { label: '想定资源', value: '12', icon: Folder, color: '#409eff' },
-  { label: '3D 模型', value: '45', icon: Box, color: '#67c23a' },
-  { label: '地形图', value: '8', icon: Location, color: '#e6a23c' },
-  { label: '系统通知', value: '23', icon: Promotion, color: '#f56c6c' }
-]
+const fetchStats = async () => {
+    try {
+        const data = await request.get<any>('/api/v1/dashboard/stats')
+        if (data && data.total_counts) {
+            stats.value.forEach(s => {
+                if (data.total_counts[s.key] !== undefined) {
+                    s.value = data.total_counts[s.key].toString()
+                }
+            })
+        }
+        if (data && data.recent_items) {
+            recentResources.value = data.recent_items.map((item: any) => {
+                const typeConfig = moduleManager.getActiveModules().value.find(t => t.key === item.type_key)
+                const icon = typeConfig?.icon || 'Files'
+                return {
+                    ...item,
+                    typeName: typeConfig?.typeName || item.type_key,
+                    icon: typeof icon === 'string' ? icon : markRaw(icon)
+                }
+            })
+        }
+    } catch (e) {}
+}
+
+onMounted(() => {
+    fetchStats()
+})
+
+const getStatusType = (state?: string) => {
+    if (state === 'ACTIVE') return 'success'
+    if (state === 'PROCESSING') return 'primary'
+    if (state === 'FAILED') return 'danger'
+    return 'info'
+}
+
+const formatDate = (date: string) => dayjs(date).format('MM-DD HH:mm')
 
 interface QuickAction {
   name: string
@@ -72,10 +150,10 @@ interface QuickAction {
 }
 
 const quickActions: QuickAction[] = [
-  { name: '想定库', path: '/scenarios', icon: Folder },
-  { name: '模型库', path: '/res/model_glb', icon: Box },
-  { name: '地图服务', path: '/res/map_service', icon: Location },
-  { name: '帮助文档', path: '/', icon: Document }
+  { name: '想定库', path: '/res/scenario', icon: markRaw(Folder) },
+  { name: '模型库', path: '/res/model_glb', icon: markRaw(Box) },
+  { name: '地图服务', path: '/res/map_service', icon: markRaw(Location) },
+  { name: '帮助文档', path: '/', icon: markRaw(Document) }
 ]
 </script>
 
@@ -85,6 +163,120 @@ const quickActions: QuickAction[] = [
   flex-direction: column;
   gap: 20px;
   animation: fadeIn 0.4s ease-out;
+}
+
+.search-hero {
+  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+  padding: 50px 40px;
+  border-radius: 20px;
+  margin-bottom: 8px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 30px -10px rgba(79, 70, 229, 0.3);
+
+  // Decorative blur elements
+  &::before, &::after {
+     content: '';
+     position: absolute;
+     border-radius: 50%;
+     filter: blur(80px);
+     z-index: 0;
+     opacity: 0.6;
+  }
+
+  &::before {
+     top: -20%;
+     left: -10%;
+     width: 300px;
+     height: 300px;
+     background: rgba(255, 255, 255, 0.15);
+  }
+
+  &::after {
+     bottom: -30%;
+     right: -5%;
+     width: 400px;
+     height: 400px;
+     background: rgba(99, 102, 241, 0.4);
+  }
+
+  .hero-content {
+     position: relative;
+     z-index: 1;
+     max-width: 600px;
+
+     h1 {
+        font-size: 34px;
+        font-weight: 800;
+        margin: 0 0 8px 0;
+        letter-spacing: -1.5px;
+        background: linear-gradient(to bottom, #ffffff, #e2e8f0);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+     }
+     p {
+        font-size: 15px;
+        opacity: 0.85;
+        margin: 0 0 32px 0;
+        color: #f1f5f9;
+     }
+  }
+
+  .hero-search-bar {
+     display: flex;
+     align-items: center;
+     gap: 12px;
+     background: rgba(255, 255, 255, 0.12);
+     backdrop-filter: blur(12px);
+     padding: 12px 24px;
+     border-radius: 14px;
+     border: 1px solid rgba(255, 255, 255, 0.2);
+     cursor: pointer;
+     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+     max-width: 480px;
+
+     &:hover {
+        background: rgba(255, 255, 255, 0.18);
+        transform: translateY(-3px) scale(1.01);
+        box-shadow: 0 15px 30px -10px rgba(0, 0, 0, 0.3);
+        border-color: rgba(255, 255, 255, 0.4);
+     }
+
+     .el-icon { font-size: 20px; color: #cbd5e1; }
+     span { flex: 1; font-size: 15px; font-weight: 400; color: #f1f5f9; }
+     .search-badge {
+        font-size: 11px;
+        background: rgba(255, 255, 255, 0.15);
+        color: white;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+     }
+  }
+}
+
+// Dark mode refinements
+:deep(.dark) .search-hero {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    box-shadow: 0 10px 40px -15px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+
+    &::after {
+        background: rgba(79, 70, 229, 0.2);
+        filter: blur(100px);
+    }
+    
+    .hero-search-bar {
+        background: rgba(30, 41, 59, 0.5);
+        border-color: rgba(255, 255, 255, 0.1);
+        &:hover {
+            background: rgba(30, 41, 59, 0.8);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+    }
 }
 
 .stats-row {
@@ -159,6 +351,76 @@ const quickActions: QuickAction[] = [
     display: flex;
     align-items: center;
     justify-content: center;
+
+    &.recent-list-body {
+       align-items: stretch;
+       justify-content: flex-start;
+       padding: 8px 0;
+    }
+  }
+
+  .recent-list {
+     width: 100%;
+     display: flex;
+     flex-direction: column;
+     
+     .recent-res-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 20px;
+        cursor: pointer;
+        transition: background 0.2s;
+
+        &:hover {
+           background: var(--el-fill-color-light);
+        }
+
+        .res-main {
+           display: flex;
+           align-items: center;
+           gap: 12px;
+
+           .res-icon {
+              font-size: 20px;
+              color: var(--el-color-primary);
+              width: 36px;
+              height: 36px;
+              background: var(--el-color-primary-light-9);
+              border-radius: 8px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+           }
+
+           .res-info {
+              display: flex;
+              flex-direction: column;
+
+              .res-name {
+                 font-size: 14px;
+                 font-weight: 500;
+                 color: var(--el-text-color-primary);
+              }
+              .res-type {
+                 font-size: 12px;
+                 color: var(--el-text-color-secondary);
+              }
+           }
+        }
+
+        .res-side {
+           display: flex;
+           flex-direction: column;
+           align-items: flex-end;
+           gap: 4px;
+
+           .res-date {
+              font-size: 11px;
+              color: var(--el-text-color-placeholder);
+           }
+        }
+     }
   }
 
   .quick-actions {

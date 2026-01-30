@@ -24,7 +24,7 @@ export function useResourceList(
     try {
       const params: Record<string, string> = { 
         type: typeKey.value,
-        name: searchQuery.value 
+        query: searchQuery.value 
       }
       
       if (selectedCategoryId.value !== ROOT_CATEGORY_ID) {

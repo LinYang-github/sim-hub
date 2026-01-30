@@ -97,6 +97,10 @@ func (uc *UseCase) ListResources(ctx context.Context, typeKey string, categoryID
 	return uc.reader.ListResources(ctx, typeKey, categoryID, ownerID, scope, keyword, page, size)
 }
 
+func (uc *UseCase) GetDashboardStats(ctx context.Context, ownerID string) (*DashboardStatsDTO, error) {
+	return uc.reader.GetDashboardStats(ctx, ownerID)
+}
+
 func (uc *UseCase) ListResourceTypes(ctx context.Context) ([]model.ResourceType, error) {
 	return uc.reader.GetResourceTypes(ctx)
 }

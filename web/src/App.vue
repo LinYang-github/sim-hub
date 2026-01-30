@@ -39,6 +39,16 @@
         </div>
         
         <div class="header-right">
+          <!-- Search Trigger -->
+          <div class="header-search-trigger" @click="searchRef?.open()">
+            <el-icon><Search /></el-icon>
+            <span class="search-placeholder">搜索资源...</span>
+            <div class="search-shortcut">
+               <span class="key">{{ isMac ? '⌘' : 'Ctrl' }}</span>
+               <span class="key">K</span>
+            </div>
+          </div>
+
           <div class="theme-toggle" @click="toggleDark()">
             <el-icon v-if="isDark"><Moon /></el-icon>
             <el-icon v-else><Sunny /></el-icon>
@@ -60,6 +70,9 @@
           </el-dropdown>
         </div>
       </el-header>
+
+      <!-- Global Spotlight Search Panel -->
+      <GlobalSearch ref="searchRef" />
       
       <!-- Main Content -->
       <el-main class="app-main">
@@ -74,18 +87,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { 
-  Platform, Odometer, Files, Sunny, Moon, ArrowDown 
+  Platform, Odometer, Files, Sunny, Moon, ArrowDown, Search
 } from '@element-plus/icons-vue'
 import { moduleManager } from './core/moduleManager'
 import { useDark, useToggle } from '@vueuse/core'
+import GlobalSearch from './components/common/GlobalSearch.vue'
 
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
 const route = useRoute()
 const menus = computed(() => moduleManager.getMenus())
+
+const searchRef = ref<InstanceType<typeof GlobalSearch>>()
+const isMac = /macintosh|mac os x/i.test(navigator.userAgent)
 
 const currentPageTitle = computed(() => {
   if (route.path === '/') return '工作台概览'
@@ -202,14 +219,47 @@ body {
     align-items: center;
     gap: 20px;
 
-    .header-icon {
-      font-size: 20px;
-      color: var(--el-text-color-secondary);
+    .header-search-trigger {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 14px;
+      background: var(--el-fill-color-lighter);
+      border: 1px solid var(--el-border-color-lighter);
+      border-radius: 8px;
       cursor: pointer;
-      transition: color 0.2s;
-      
+      color: var(--el-text-color-secondary);
+      transition: all 0.2s;
+      min-width: 180px;
+
       &:hover {
-        color: var(--el-color-primary);
+        background: var(--el-fill-color-light);
+        border-color: var(--el-border-color);
+        .search-placeholder { color: var(--el-text-color-primary); }
+      }
+
+      .search-placeholder {
+        font-size: 13px;
+        flex: 1;
+        transition: color 0.2s;
+      }
+
+      .search-shortcut {
+        display: flex;
+        gap: 2px;
+        .key {
+          min-width: 18px;
+          height: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--el-bg-color);
+          border: 1px solid var(--el-border-color);
+          border-radius: 3px;
+          font-size: 11px;
+          font-family: inherit;
+          box-shadow: 0 1px 0 rgba(0,0,0,0.05);
+        }
       }
     }
 

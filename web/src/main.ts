@@ -36,6 +36,23 @@ const loadExternalPlugins = () => {
 
 const routes = [
   { path: '/', component: Workstation },
+  // Generic Resource List Route (Fallback)
+  { 
+    path: '/res/:typeKey', 
+    component: () => import('./components/resource/ResourceList.vue'),
+    props: (route: any) => {
+      const module = moduleManager.getActiveModules().value.find(m => m.key === route.params.typeKey)
+      if (!module) return { typeKey: route.params.typeKey }
+      
+      return {
+        ...module,
+        typeKey: route.params.typeKey,
+        // Resolve views and actions to full objects for the component
+        supportedViews: module.supportedViews?.map(v => moduleManager.resolveView(v)),
+        customActions: module.customActions?.map(a => moduleManager.resolveAction(a))
+      }
+    }
+  },
 ]
 
 const initApp = async () => {

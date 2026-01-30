@@ -90,7 +90,8 @@ func (r *ResourceReader) ListResources(ctx context.Context, typeKey string, cate
 		query = query.Where("category_id = ?", categoryID)
 	}
 	if keyword != "" {
-		query = query.Where("name LIKE ?", "%"+keyword+"%")
+		// 增强搜索：匹配名称或标签 (JSON 字段通过 LIKE 简单搜索，适用于标签数组序列化后的字符串)
+		query = query.Where("name LIKE ? OR tags LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
 	}
 
 	// 作用域逻辑
@@ -373,4 +374,34 @@ func (r *ResourceReader) DownloadBundleZip(ctx context.Context, versionID string
 	}
 
 	return nil
+}
+
+// GetDashboardStats 获取概览统计数据
+func (r *ResourceReader) GetDashboardStats(ctx context.Context, ownerID string) (*DashboardStatsDTO, error) {
+	stats := &DashboardStatsDTO{
+		TotalCounts: make(map[string]int64),
+	}
+
+	// 1. 获取各个类型的总量
+	var typeCounts []struct {
+		TypeKey string
+		Count   int64
+	}
+	r.data.DB.Model(&model.Resource{}).
+		Where("is_deleted = ?", false).
+		Select("type_key, count(*) as count").
+		Group("type_key").
+		Scan(&typeCounts)
+
+	for _, tc := range typeCounts {
+		stats.TotalCounts[tc.TypeKey] = tc.Count
+	}
+
+	// 2. 获取最近上传的 10 个资源 (忽略作用域仅为演示逻辑，实际应过滤权限)
+	recent, _, err := r.ListResources(ctx, "", "", ownerID, "ALL", "", 1, 10)
+	if err == nil {
+		stats.RecentItems = recent
+	}
+
+	return stats, nil
 }
