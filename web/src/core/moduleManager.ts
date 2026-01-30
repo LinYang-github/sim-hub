@@ -45,6 +45,7 @@ class ModuleManager {
       const newMap = new Map(this.actionRegistry.value)
       newMap.set(action.key, action)
       this.actionRegistry.value = newMap
+      console.log(`[ActionRegistry] Registered: ${action.key}`, action)
   }
 
   /**
@@ -96,11 +97,13 @@ class ModuleManager {
   }
 
   private handleSupportedViews(views: any): (string | SupportedView)[] {
-    return Array.isArray(views) ? views : []
+    if (!Array.isArray(views)) return []
+    return views.map((v: any) => typeof v === 'object' ? v.key : v)
   }
 
   private handleCustomActions(actions: any): (string | CustomAction)[] {
-    return Array.isArray(actions) ? actions : []
+    if (!Array.isArray(actions)) return []
+    return actions.map((a: any) => typeof a === 'object' ? a.key : a)
   }
 
   /**
@@ -118,6 +121,33 @@ class ModuleManager {
       
       this.configItems = rawItems.map(item => {
           const meta = item.meta_data || {}
+          
+          // Auto-register Viewer if defined as object
+          if (meta.viewer && typeof meta.viewer === 'object' && meta.viewer.key) {
+               this.registerViewer(meta.viewer)
+               // Flatten for prop usage
+               meta.viewer = meta.viewer.key
+          }
+
+          // Auto-register Views if defined as objects
+          if (meta.supported_views && Array.isArray(meta.supported_views)) {
+              meta.supported_views.forEach((v: any) => {
+                  if (typeof v === 'object' && v.key) {
+                      this.registerView(v)
+                  }
+              })
+          }
+
+          // Auto-register Actions if defined as objects
+          if (meta.custom_actions && Array.isArray(meta.custom_actions)) {
+              meta.custom_actions.forEach((a: any) => {
+                  console.log('[AutoRegister] Checking action:', a)
+                  if (typeof a === 'object' && a.key) {
+                      this.registerAction(a)
+                  }
+              })
+          }
+
           return {
               key: item.type_key,
               label: item.type_name,
@@ -127,7 +157,7 @@ class ModuleManager {
               uploadMode: item.upload_mode || 'online',
               enableScope: meta.enable_scope,
               categoryMode: item.category_mode || 'flat',
-              viewer: meta.viewer,
+              viewer: typeof meta.viewer === 'string' ? meta.viewer : meta.viewer?.key,
               supportedViews: this.handleSupportedViews(meta.supported_views),
               customActions: this.handleCustomActions(meta.custom_actions),
               externalUrl: meta.external_url,

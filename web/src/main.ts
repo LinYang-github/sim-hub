@@ -30,18 +30,8 @@ moduleManager.registerImplementation(scenarioModule)
 
 // 动态插件发现机制：根据活跃模块的配置自动加载外部视图注册脚本
 const loadExternalPlugins = () => {
-  moduleManager.getActiveModules().value.forEach(m => {
-    // 只有在开发模式或显式指定了 devUrl 时才尝试加载开发中的插件脚本
-    const baseUrl = (import.meta.env.DEV && m.devUrl) ? m.devUrl : m.externalUrl
-    if (baseUrl) {
-      const script = document.createElement('script')
-      // 约定：如果一个外部应用支持注册到主应用，其入口脚本必须位于 /src/main.ts (Vite Dev)
-      script.src = `${baseUrl}/src/main.ts`
-      script.type = 'module'
-      document.head.appendChild(script)
-      console.log(`[PluginLoader] Loading plugin for module: ${m.key} from ${script.src}`)
-    }
-  })
+    // External plugins are now registered via configuration (modules.yaml)
+    // No need to inject scripts manually.
 }
 
 const routes = [

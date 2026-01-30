@@ -109,10 +109,22 @@ resource_types:
     meta_data:
       icon: "Coin"
       enable_scope: true
-      viewer: "demo-preview"
+      viewer: 
+        key: "demo-preview"
+        label: "深度质检"
+        path: "External:http://localhost:30031/demo-preview/"
       short_name: "测试资源"
-      supported_views: ["demo-view", "data-grid"]
-      custom_actions: ["demo-action"]
+      supported_views: 
+        - "data-grid"
+        - key: "demo-view"
+          label: "测试视图"
+          icon: "Picture"
+          path: "External:http://localhost:30031/demo-view/"
+      custom_actions: 
+        - key: "demo-action"
+          label: "提交审核"
+          icon: "Stamp"
+          handler: "External:http://localhost:30031/demo-form/"
       example: "单元测试数据集-202401"
     schema_def:
       type: "object"
