@@ -32,6 +32,9 @@ func NewUploadManager(d *data.Data, store storage.MultipartBlobStore, stsProvide
 
 // RequestUploadToken 请求上传令牌
 func (u *UploadManager) RequestUploadToken(ctx context.Context, req ApplyUploadTokenRequest) (*UploadTicket, error) {
+	if u.store == nil {
+		return nil, fmt.Errorf("storage service (MinIO) is not available, please check server status")
+	}
 	ticketID := uuid.New().String()
 	// objectKey 格式: resources/{type}/{uuid}/{filename}
 	// objectKey 格式: resources/{type}/{uuid}/{filename}
@@ -67,6 +70,9 @@ func (u *UploadManager) RequestUploadToken(ctx context.Context, req ApplyUploadT
 
 // InitMultipartUpload 初始化分片上传
 func (u *UploadManager) InitMultipartUpload(ctx context.Context, req InitMultipartUploadRequest) (*InitMultipartUploadResponse, error) {
+	if u.store == nil {
+		return nil, fmt.Errorf("storage service (MinIO) is not available")
+	}
 	ticketID := uuid.New().String()
 	objectKey := "resources/" + req.ResourceType + "/" + ticketID + "/" + req.Filename
 
@@ -86,6 +92,9 @@ func (u *UploadManager) InitMultipartUpload(ctx context.Context, req InitMultipa
 
 // GetMultipartUploadPartURL 获取分片上传的预签名 URL
 func (u *UploadManager) GetMultipartUploadPartURL(ctx context.Context, req GetPartURLRequest) (*GetPartURLResponse, error) {
+	if u.store == nil {
+		return nil, fmt.Errorf("storage service (MinIO) is not available")
+	}
 	objectKey := ""
 	if len(req.TicketID) > 38 {
 		objectKey = req.TicketID[38:]
@@ -102,6 +111,9 @@ func (u *UploadManager) GetMultipartUploadPartURL(ctx context.Context, req GetPa
 
 // CompleteMultipartUpload 完成分片上传并注册资源
 func (u *UploadManager) CompleteMultipartUpload(ctx context.Context, req CompleteMultipartUploadRequest) error {
+	if u.store == nil {
+		return fmt.Errorf("storage service (MinIO) is not available")
+	}
 	objectKey := ""
 	if len(req.TicketID) > 38 {
 		objectKey = req.TicketID[38:]
@@ -128,6 +140,9 @@ func (u *UploadManager) CompleteMultipartUpload(ctx context.Context, req Complet
 
 // ConfirmUpload 确认上传完成
 func (u *UploadManager) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest) error {
+	if u.store == nil {
+		return fmt.Errorf("storage service (MinIO) is not available")
+	}
 	objectKey := ""
 	if len(req.TicketID) > 38 {
 		objectKey = req.TicketID[38:]

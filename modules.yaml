@@ -9,8 +9,10 @@ resource_types:
           type: "string"
           description: "想定引擎"
     category_mode: "flat"
+    upload_mode: "folder-zip"
     meta_data:
       icon: "Files"
+      viewer: "FolderPreview"
       short_name: "想定"
       example: "红方西北演习想定A-01"
   

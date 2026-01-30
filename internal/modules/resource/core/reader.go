@@ -50,7 +50,11 @@ func (r *ResourceReader) GetResource(ctx context.Context, id string) (*ResourceD
 		}
 	}
 
-	url, err := r.store.PresignGet(ctx, r.bucket, v.FilePath, time.Hour)
+	var url string
+	var err error
+	if r.store != nil {
+		url, err = r.store.PresignGet(ctx, r.bucket, v.FilePath, time.Hour)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +282,10 @@ func (r *ResourceReader) collectBundleFiles(ctx context.Context, versionID strin
 		return err
 	}
 
-	url, _ := r.store.PresignGet(ctx, r.bucket, ver.FilePath, time.Hour*24)
+	var url string
+	if r.store != nil {
+		url, _ = r.store.PresignGet(ctx, r.bucket, ver.FilePath, time.Hour*24)
+	}
 
 	flatList[versionID] = map[string]any{
 		"resource_id":   ver.ResourceID,
@@ -354,6 +361,9 @@ func (r *ResourceReader) DownloadBundleZip(ctx context.Context, versionID string
 		)
 
 		// 获取 MinIO 对象流
+		if r.store == nil {
+			return fmt.Errorf("storage service unavailable")
+		}
 		obj, err := r.store.Get(ctx, r.bucket, rawPath)
 		if err != nil {
 			slog.WarnContext(ctx, "跳过文件下载失败", "key", rawPath, "error", err)

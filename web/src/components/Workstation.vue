@@ -1,17 +1,5 @@
 <template>
   <div class="dashboard-container">
-    <!-- Search Hero -->
-    <div class="search-hero">
-       <div class="hero-content">
-          <h1>探索您的数字资产</h1>
-          <p>搜索想定、3D 模型、地理数据或系统文档</p>
-          <div class="hero-search-bar" @click="triggerGlobalSearch">
-             <el-icon><Search /></el-icon>
-             <span>输入关键词搜索...</span>
-             <div class="search-badge">{{ isMac ? '⌘' : 'Ctrl' }} + K</div>
-          </div>
-       </div>
-    </div>
 
     <!-- Stats Cards -->
     <el-row :gutter="20" class="stats-row">
@@ -91,7 +79,6 @@ import { moduleManager } from '../core/moduleManager'
 import dayjs from 'dayjs'
 
 const router = useRouter()
-const isMac = /macintosh|mac os x/i.test(navigator.userAgent)
 
 const stats = ref([
   { label: '想定资源', key: 'scenario', value: '0', icon: markRaw(Folder), color: '#409eff' },
@@ -165,119 +152,6 @@ const quickActions: QuickAction[] = [
   animation: fadeIn 0.4s ease-out;
 }
 
-.search-hero {
-  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
-  padding: 50px 40px;
-  border-radius: 20px;
-  margin-bottom: 8px;
-  color: white;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 10px 30px -10px rgba(79, 70, 229, 0.3);
-
-  // Decorative blur elements
-  &::before, &::after {
-     content: '';
-     position: absolute;
-     border-radius: 50%;
-     filter: blur(80px);
-     z-index: 0;
-     opacity: 0.6;
-  }
-
-  &::before {
-     top: -20%;
-     left: -10%;
-     width: 300px;
-     height: 300px;
-     background: rgba(255, 255, 255, 0.15);
-  }
-
-  &::after {
-     bottom: -30%;
-     right: -5%;
-     width: 400px;
-     height: 400px;
-     background: rgba(99, 102, 241, 0.4);
-  }
-
-  .hero-content {
-     position: relative;
-     z-index: 1;
-     max-width: 600px;
-
-     h1 {
-        font-size: 34px;
-        font-weight: 800;
-        margin: 0 0 8px 0;
-        letter-spacing: -1.5px;
-        background: linear-gradient(to bottom, #ffffff, #e2e8f0);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-     }
-     p {
-        font-size: 15px;
-        opacity: 0.85;
-        margin: 0 0 32px 0;
-        color: #f1f5f9;
-     }
-  }
-
-  .hero-search-bar {
-     display: flex;
-     align-items: center;
-     gap: 12px;
-     background: rgba(255, 255, 255, 0.12);
-     backdrop-filter: blur(12px);
-     padding: 12px 24px;
-     border-radius: 14px;
-     border: 1px solid rgba(255, 255, 255, 0.2);
-     cursor: pointer;
-     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-     max-width: 480px;
-
-     &:hover {
-        background: rgba(255, 255, 255, 0.18);
-        transform: translateY(-3px) scale(1.01);
-        box-shadow: 0 15px 30px -10px rgba(0, 0, 0, 0.3);
-        border-color: rgba(255, 255, 255, 0.4);
-     }
-
-     .el-icon { font-size: 20px; color: #cbd5e1; }
-     span { flex: 1; font-size: 15px; font-weight: 400; color: #f1f5f9; }
-     .search-badge {
-        font-size: 11px;
-        background: rgba(255, 255, 255, 0.15);
-        color: white;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-weight: 600;
-        letter-spacing: 0.5px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-     }
-  }
-}
-
-// Dark mode refinements
-:deep(.dark) .search-hero {
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-    box-shadow: 0 10px 40px -15px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-
-    &::after {
-        background: rgba(79, 70, 229, 0.2);
-        filter: blur(100px);
-    }
-    
-    .hero-search-bar {
-        background: rgba(30, 41, 59, 0.5);
-        border-color: rgba(255, 255, 255, 0.1);
-        &:hover {
-            background: rgba(30, 41, 59, 0.8);
-            border-color: rgba(255, 255, 255, 0.2);
-        }
-    }
-}
 
 .stats-row {
   margin-bottom: 4px;
