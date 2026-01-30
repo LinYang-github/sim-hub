@@ -29,6 +29,15 @@ const registerPlugins = () => {
         path: 'External:http://localhost:30031/demo-preview/'
     })
 
+    // 3. 注册自定义动作 (Action)
+    console.log('[PluginHost] Registering action: demo-action')
+    target.registerAction({
+        key: 'demo-action',
+        label: '提交审核',
+        icon: 'Stamp',
+        handler: 'External:http://localhost:30031/demo-form/'
+    })
+
     console.log('[PluginHost] All plugins registered successfully.')
 }
 

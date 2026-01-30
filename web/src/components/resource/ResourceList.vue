@@ -315,6 +315,26 @@
         </div>
     </template>
 
+    <!-- External Action Dialog -->
+    <el-dialog
+      v-model="externalActionVisible"
+      :title="externalActionTitle"
+      width="800px"
+      :close-on-click-modal="false"
+      destroy-on-close
+      class="external-action-dialog"
+    >
+      <div class="external-iframe-container">
+        <iframe 
+          v-if="externalActionUrl" 
+          :src="externalActionUrl" 
+          frameborder="0" 
+          width="100%" 
+          height="100%"
+        ></iframe>
+      </div>
+    </el-dialog>
+
   </div>
 </template>
 
@@ -338,7 +358,15 @@ const handleCustomAction = (key: string, row: any) => {
         return
     }
 
-    // 情况 2: 处理器是组件 (通过 Ref 调用 execute 方法)
+    // 情况 2: 处理器是外部链接字符串 (External:)
+    if (typeof actionDef.handler === 'string' && actionDef.handler.startsWith('External:')) {
+        externalActionTitle.value = actionDef.label
+        externalActionUrl.value = actionDef.handler.replace('External:', '')
+        externalActionVisible.value = true
+        return
+    }
+
+    // 情况 3: 处理器是组件 (通过 Ref 调用 execute 方法)
     // 组件已被模板中的隐藏区域挂载，我们尝试获取其实例并调用 execute
     setTimeout(() => {
         const componentRef = actionComponentsRef.value[key]
@@ -354,6 +382,11 @@ const actionComponentsRef = ref<any>({})
 const setActionRef = (el: any, key: string) => {
     if (el) actionComponentsRef.value[key] = el
 }
+
+// External Action State
+const externalActionVisible = ref(false)
+const externalActionUrl = ref('')
+const externalActionTitle = ref('')
 
 import { 
   Upload as UploadIcon, Connection, DataLine, Grid, Refresh,
@@ -929,5 +962,13 @@ onUnmounted(() => {
     font-size: 13px;
     color: var(--el-text-color-regular);
   }
+}
+
+.external-iframe-container {
+  height: 500px;
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--el-bg-color-page);
 }
 </style>

@@ -20,7 +20,8 @@ registerStandardViews()
 // 暴露全局 API 给外部应用 (demo-view 等)
 ;(window as any).SimHub = {
     registerView: (meta: any) => moduleManager.registerView(meta),
-    registerViewer: (meta: any) => moduleManager.registerViewer(meta)
+    registerViewer: (meta: any) => moduleManager.registerViewer(meta),
+    registerAction: (meta: any) => moduleManager.registerAction(meta)
 }
 
 // 注册内部模块实现 (此处仅注册有特殊定制需求的模块)
