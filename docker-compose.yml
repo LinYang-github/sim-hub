@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # Elasticsearch 7.17 - 搜索引擎核心
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
+    container_name: simhub-es
+    environment:
+      # 单节点模式启动，避免寻找集群
+      - discovery.type=single-node
+      # 显式指定节点名称
+      - node.name=simhub-es
+      # 限制 JVM 堆内存，适合本地开发
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      # 关闭 xpack 安全特性（开发环境如果不需要密码可开启）
+      # - xpack.security.enabled=false 
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      # 数据持久化挂载
+      - es_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - simhub-net
+
+  # Kibana - (可选) 可视化管理界面
+  # 访问 http://localhost:5601 查看索引数据
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.10
+    container_name: simhub-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    networks:
+      - simhub-net
+    depends_on:
+      - elasticsearch
+
+volumes:
+  es_data:
+    driver: local
+
+networks:
+  simhub-net:
+    driver: bridge

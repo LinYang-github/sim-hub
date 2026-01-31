@@ -9,8 +9,10 @@ import (
 	"sim-hub/internal/conf"
 	"sim-hub/internal/data"
 	"sim-hub/internal/modules/resource/core"
+	"sim-hub/internal/search"
 	"sim-hub/pkg/logger"
 	"sim-hub/pkg/storage/minio"
+
 	"github.com/spf13/viper"
 )
 
@@ -62,6 +64,17 @@ func main() {
 	_ = core.NewUseCase(nil, store, store, cfg.MinIO.Bucket, natsClient, "worker", cfg.Worker.ApiBaseURL, cfg.Worker.Handlers)
 
 	slog.Info("SimHub 计算 Worker 已启动", "subject", cfg.NATS.Subject)
+
+	// 7. 启动 ES Search Worker (可选)
+	if len(cfg.Elasticsearch.Addresses) > 0 {
+		esClient, err := data.NewElasticsearch(&cfg.Elasticsearch)
+		if err != nil {
+			slog.Error("Elasticsearch 初始化失败，将跳过搜索增强功能", "error", err)
+		} else {
+			esWorker := search.NewESWorker(esClient, natsClient, cfg.Worker.ApiBaseURL, cfg.Elasticsearch.Index)
+			go esWorker.Start()
+		}
+	}
 
 	// 优雅停机
 	quit := make(chan os.Signal, 1)

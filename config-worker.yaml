@@ -19,6 +19,13 @@ nats:
   url: "nats://localhost:4222"
   subject: "simhub.jobs"
 
+elasticsearch:
+  addresses:
+    - "http://localhost:9200"
+  username: ""
+  password: ""
+  index: "simhub_resources"
+
 worker:
   api_base_url: "http://localhost:30030"
   handlers:

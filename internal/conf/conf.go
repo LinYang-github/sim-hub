@@ -7,6 +7,14 @@ type Data struct {
 	Log           Log            `mapstructure:"log" json:"log"`
 	NATS          NATS           `mapstructure:"nats" json:"nats"`
 	Worker        Worker         `mapstructure:"worker" json:"worker"`
+	Elasticsearch Elasticsearch  `mapstructure:"elasticsearch" json:"elasticsearch"`
+}
+
+type Elasticsearch struct {
+	Addresses []string `mapstructure:"addresses" json:"addresses"`
+	Username  string   `mapstructure:"username" json:"username"`
+	Password  string   `mapstructure:"password" json:"password"`
+	Index     string   `mapstructure:"index" json:"index"`
 }
 
 type Worker struct {

@@ -1,12 +1,16 @@
 package data
 
 import (
+	"errors"
 	"log/slog"
 	"time"
 
 	"sim-hub/internal/conf"
+
 	"github.com/nats-io/nats.go"
 )
+
+var ErrNATSDisabled = errors.New("NATS is disabled")
 
 type NATSClient struct {
 	Conn    *nats.Conn

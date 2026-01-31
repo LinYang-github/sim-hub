@@ -12,6 +12,7 @@ import (
 
 	"sim-hub/internal/data"
 	"sim-hub/internal/model"
+	"sim-hub/internal/search"
 	"sim-hub/pkg/storage"
 )
 
@@ -19,13 +20,15 @@ type ResourceReader struct {
 	data   *data.Data
 	store  storage.MultipartBlobStore
 	bucket string
+	search *search.SearchClient
 }
 
-func NewResourceReader(d *data.Data, store storage.MultipartBlobStore, bucket string) *ResourceReader {
+func NewResourceReader(d *data.Data, store storage.MultipartBlobStore, bucket string, natsClient *data.NATSClient) *ResourceReader {
 	return &ResourceReader{
 		data:   d,
 		store:  store,
 		bucket: bucket,
+		search: search.NewSearchClient(natsClient),
 	}
 }
 
@@ -94,8 +97,31 @@ func (r *ResourceReader) ListResources(ctx context.Context, typeKey string, cate
 		query = query.Where("category_id = ?", categoryID)
 	}
 	if keyword != "" {
-		// 增强搜索：匹配名称或标签 (JSON 字段通过 LIKE 简单搜索，适用于标签数组序列化后的字符串)
-		query = query.Where("name LIKE ? OR tags LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+		// 增强搜索：先尝试通过 NATS 调用 Worker 的 ES 搜索
+		var searchHit bool
+		if r.search != nil {
+			ids, err := r.search.Search(keyword)
+			// 如果调用成功，使用返回的 IDs（即使为空）
+			if err == nil {
+				// 优化：如果有 ID 列表，直接 Filter。如果列表空，说明 ES 认为没结果。
+				// 但为了保险（比如未索引完），如果 ES 返回空，是否要降级？
+				// 策略：ES 返回空列表 = 无结果。
+				// 为避免误判，如果 ES 明确返回了（err==nil），就信它。
+				if len(ids) > 0 {
+					query = query.Where("id IN ?", ids)
+				} else {
+					// ES 返回无匹配，强制让 SQL 也查不到 (id IN empty)
+					// GORM IN empty slice 通常会生成 false 条件
+					query = query.Where("1 = 0")
+				}
+				searchHit = true
+			}
+		}
+
+		if !searchHit {
+			// 降级：SQL 模糊搜索
+			query = query.Where("name LIKE ? OR tags LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+		}
 	}
 
 	// 作用域逻辑

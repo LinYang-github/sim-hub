@@ -52,7 +52,7 @@ func NewUseCase(d *data.Data, store storage.MultipartBlobStore, stsProvider stor
 	writer.SetDispatcher(scheduler)
 
 	// 7. 初始化 Reader
-	reader := NewResourceReader(d, store, bucket)
+	reader := NewResourceReader(d, store, bucket, natsClient)
 
 	// 8. 初始化 Uploader
 	uploader := NewUploadManager(d, store, stsProvider, bucket, writer)
