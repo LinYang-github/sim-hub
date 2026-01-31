@@ -9,6 +9,8 @@ import okhttp3.*;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -193,20 +195,23 @@ public class SimHubClient {
                 semaphore.acquire();
                 
                 final String uploadId = initResp.getUploadId();
-                final String key = initResp.getKey();
+                final String ticketId = initResp.getTicketId();
 
                 completionService.submit(() -> {
                     try {
-                        // A. 获取分片上传 URL
-                        String partUrlQuery = String.format("%s/api/v1/integration/upload/multipart/part-url?upload_id=%s&key=%s&part_number=%d",
-                                baseUrl, uploadId, key, currentPartNumber);
-                        
+                        // A. 获取分片上传 URL (改为 POST 并传递 JSON)
+                        String partUrlPath = baseUrl + "/api/v1/integration/upload/multipart/part-url";
+                        Map<String, Object> partUrlReq = new HashMap<>();
+                        partUrlReq.put("upload_id", uploadId);
+                        partUrlReq.put("ticket_id", ticketId);
+                        partUrlReq.put("part_number", currentPartNumber);
+
                         String presignedUrl;
-                        try (Response resp = getRequest(partUrlQuery)) {
+                        try (Response resp = postJson(partUrlPath, partUrlReq)) {
                             handleErrorResponse(resp);
                             @SuppressWarnings("unchecked")
                             Map<String, String> urlMap = objectMapper.readValue(resp.body().string(), Map.class);
-                            presignedUrl = urlMap.get("presigned_url");
+                            presignedUrl = urlMap.get("url");
                         }
 
                         // B. 执行上传
@@ -218,6 +223,9 @@ public class SimHubClient {
                         try (Response resp = httpClient.newCall(putReq).execute()) {
                             handleErrorResponse(resp);
                             String etag = resp.header("ETag");
+                            if (etag != null && etag.startsWith("\"") && etag.endsWith("\"")) {
+                                etag = etag.substring(1, etag.length() - 1);
+                            }
                             
                             // 更新进度
                             long uploaded = totalBytesUploaded.addAndGet(currentPartSize);
@@ -244,29 +252,20 @@ public class SimHubClient {
                 }
             }
 
-            // 4. 完成合并
+            // 4. 完成合并 (后端在这一步完成 Resource 注册)
             MultipartCompleteRequest completeReq = MultipartCompleteRequest.builder()
                     .uploadId(initResp.getUploadId())
-                    .key(initResp.getKey())
+                    .ticketId(initResp.getTicketId())
+                    .objectKey(initResp.getObjectKey())
                     .parts(java.util.Arrays.asList(partETags))
-                    .build();
-
-            String ticketId;
-            try (Response response = postJson(baseUrl + "/api/v1/integration/upload/multipart/complete", completeReq)) {
-                handleErrorResponse(response);
-                @SuppressWarnings("unchecked")
-                Map<String, String> resMap = objectMapper.readValue(response.body().string(), Map.class);
-                ticketId = resMap.get("ticket_id");
-            }
-
-            // 5. 最终确认
-            ConfirmUploadRequest confirmReq = ConfirmUploadRequest.builder()
-                    .ticketId(ticketId)
+                    .typeKey(resourceType)
                     .name(name)
                     .semver(semver)
+                    .ownerId("admin")
+                    .scope("public")
                     .build();
 
-            try (Response response = postJson(baseUrl + "/api/v1/integration/upload/confirm", confirmReq)) {
+            try (Response response = postJson(baseUrl + "/api/v1/integration/upload/multipart/complete", completeReq)) {
                 handleErrorResponse(response);
             }
 

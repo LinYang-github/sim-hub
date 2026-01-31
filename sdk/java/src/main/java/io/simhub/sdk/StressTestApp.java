@@ -10,8 +10,8 @@ import java.util.Random;
 public class StressTestApp {
     
     public static void main(String[] args) {
-        String baseUrl = "http://localhost:30030";
-        String token = "shp_admin_test_token"; // 请替换为实际可用的 Token
+        String baseUrl = args.length > 0 ? args[0] : "http://localhost:30030";
+        String token = args.length > 1 ? args[1] : "shp_0a1292f15c64595eda39562274db6900eb3a29c8d4a46e765899a171bf0c197c";
         
         // 压力测试参数
         int totalSizeMB = 50;       // 总大小 50MB

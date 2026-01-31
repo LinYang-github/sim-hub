@@ -98,6 +98,20 @@ sdk/java/**/*.war
 sdk/java/**/*.ear
 sdk/java/*.iml
 
+# --- Python SDK ---
+sdk/python/venv/
+sdk/python/__pycache__/
+sdk/python/**/*.pyc
+sdk/python/build/
+sdk/python/dist/
+sdk/python/*.egg-info/
+sdk/python/.pytest_cache/
+
+# --- Go SDK ---
+sdk/go/bin/
+sdk/go/**/*.test
+sdk/go/example/go_test_file.txt
+
 # --- IDE & OS ---
 .vscode/*
 !.vscode/tasks.json

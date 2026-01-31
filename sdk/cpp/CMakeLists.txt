@@ -64,7 +64,14 @@ endif()
 # --- Tests ---
 if(SIMHUB_BUILD_TESTS)
     enable_testing()
-    find_package(GTest REQUIRED)
+    include(FetchContent)
+    FetchContent_Declare(
+      googletest
+      SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tests/lib/googletest
+    )
+    # For Windows: Prevent overriding the parent project's compiler/linker settings
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
     include(GoogleTest)
 
     # Result/Types Test

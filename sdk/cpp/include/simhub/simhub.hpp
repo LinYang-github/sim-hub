@@ -335,6 +335,13 @@ Client::Client(const std::string& b) : impl_(std::make_unique<ClientImpl>()) {
     impl_->baseUrl = b;
     if (!impl_->baseUrl.empty() && impl_->baseUrl.back() == '/') impl_->baseUrl.pop_back();
 }
+void Client::setToken(const std::string& token) {
+    if (impl_) impl_->setToken(token);
+}
+const std::string& Client::getBaseUrl() const {
+    return impl_->baseUrl;
+}
+
 Client::~Client() = default;
 
 // --- Discovery Implementations ---

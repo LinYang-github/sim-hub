@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "simhub/types.h"
+#include "simhub/simhub.hpp"
 
 using namespace simhub;
 

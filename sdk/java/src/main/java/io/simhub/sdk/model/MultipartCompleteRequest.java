@@ -8,14 +8,26 @@ import java.util.List;
 @Data
 @Builder
 public class MultipartCompleteRequest {
+    @JsonProperty("ticket_id")
+    private String ticketId;
+
     @JsonProperty("upload_id")
     private String uploadId;
     
-    @JsonProperty("key")
-    private String key;
+    @JsonProperty("object_key")
+    private String objectKey;
     
     // ETag list for S3/MinIO completion
     private List<PartETag> parts;
+
+    // Resource metadata for registration after completion
+    @JsonProperty("type_key")
+    private String typeKey;
+    private String name;
+    private String semver;
+    @JsonProperty("owner_id")
+    private String ownerId;
+    private String scope;
 
     @Data
     @lombok.AllArgsConstructor

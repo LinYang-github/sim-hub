@@ -6,9 +6,12 @@ import java.util.List;
 
 @Data
 public class MultipartInitResponse {
+    @JsonProperty("ticket_id")
+    private String ticketId;
+
     @JsonProperty("upload_id")
     private String uploadId;
     
-    @JsonProperty("key")
-    private String key;
+    @JsonProperty("object_key")
+    private String objectKey;
 }
