@@ -7,13 +7,16 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"sim-hub/internal/conf"
 	"sim-hub/internal/core/module"
 	"sim-hub/internal/data"
 	"sim-hub/internal/model"
 	"sim-hub/internal/modules/resource/core"
 	"sim-hub/pkg/storage"
+
+	"github.com/gin-gonic/gin"
+
+	"gorm.io/gorm/clause"
 )
 
 // Module 实现了 module.Module 接口
@@ -63,7 +66,7 @@ func NewModule(d *data.Data, store storage.MultipartBlobStore, stsProvider stora
 		}
 
 		// 4. Upsert config types
-		if err := d.DB.Save(&types).Error; err != nil {
+		if err := d.DB.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "type_key"}}, UpdateAll: true}).Create(&types).Error; err != nil {
 			slog.Error("Sync resource types failed", "error", err)
 		} else {
 			slog.Info("Synced resource types to DB", "count", len(types))

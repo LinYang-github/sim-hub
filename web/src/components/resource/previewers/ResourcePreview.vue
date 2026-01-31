@@ -61,6 +61,7 @@ const getViewerComponent = (name?: string) => {
     'ImagePreview': AsyncImagePreview,
     'VideoPreview': AsyncVideoPreview,
     'DocPreview': AsyncDocPreview,
+    'PDFPreview': AsyncDocPreview,
     'GeoPreview': AsyncGeoPreview,
     'CesiumViewer': AsyncGeoPreview,
     'FolderPreview': AsyncFolderPreview,

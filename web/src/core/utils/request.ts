@@ -24,9 +24,9 @@ const request = axios.create({
 // Request Interceptor
 request.interceptors.request.use(
   (config) => {
-    // You can add Auth Token here if needed
-    // const token = localStorage.getItem('token')
-    // if (token) config.headers.Authorization = `Bearer ${token}`
+    // Add Auth Token
+    const token = localStorage.getItem('simhub_token')
+    if (token) config.headers.Authorization = `Bearer ${token}`
     return config
   },
   (error) => {

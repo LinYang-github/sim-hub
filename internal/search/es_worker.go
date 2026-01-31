@@ -13,6 +13,8 @@ import (
 
 	"sim-hub/internal/data"
 
+	"sim-hub/pkg/storage"
+
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 )
@@ -39,14 +41,20 @@ type ESWorker struct {
 	nats       *data.NATSClient
 	apiBaseURL string
 	indexName  string
+	tika       *TikaClient
+	store      storage.MultipartBlobStore
+	bucket     string
 }
 
-func NewESWorker(es *elasticsearch.Client, nats *data.NATSClient, apiBaseURL, indexName string) *ESWorker {
+func NewESWorker(es *elasticsearch.Client, nats *data.NATSClient, apiBaseURL, indexName string, tika *TikaClient, store storage.MultipartBlobStore, bucket string) *ESWorker {
 	return &ESWorker{
 		es:         es,
 		nats:       nats,
 		apiBaseURL: apiBaseURL,
 		indexName:  indexName,
+		tika:       tika,
+		store:      store,
+		bucket:     bucket,
 	}
 }
 
@@ -87,6 +95,7 @@ func (w *ESWorker) ensureIndex() {
 					"name": { "type": "text", "analyzer": "standard" },
 					"tags": { "type": "keyword" },
 					"type_name": { "type": "keyword" },
+					"content": { "type": "text", "analyzer": "standard" },
 					"created_at": { "type": "date" }
 				}
 			}
@@ -149,14 +158,52 @@ func (w *ESWorker) syncToIndex(ctx context.Context, id string) {
 		slog.Warn("API returned non-200 for resource sync", "status", resp.StatusCode)
 		return
 	}
-
 	body, _ := io.ReadAll(resp.Body)
+
+	var doc map[string]interface{}
+	if err := json.Unmarshal(body, &doc); err != nil {
+		slog.Error("Failed to unmarshal API response", "error", err)
+		return
+	}
+
+	// 文本内容提取 (Tika)
+	if w.tika != nil && w.store != nil {
+		// 检查是否有 LatestVersion 且有 FilePath
+		if latest, ok := doc["latest_version"].(map[string]interface{}); ok {
+			// 如果有 download_url，说明有文件。或者直接看 file_size > 0
+			// 但这里我们要直接从 Store 读
+			// 这里有个问题：API 返回的 DTO 里并没有包含 storage path (filepath)，只有 download_url
+			// 因此，我们需要 API 返回 filepath，或者我们利用 download_url 下载？
+			// 更好的方式：DTO 里包含 filepath (需要改 Reader)，或者直接用 download_url (需要 fetch)
+			// 为了简单，我们用 download_url 下载，这样不需要改 DTO 暴露内部路径
+
+			if downloadURL, ok := latest["download_url"].(string); ok && downloadURL != "" {
+				slog.Info("Downloading file for extraction", "url", downloadURL)
+				fileResp, err := http.Get(downloadURL)
+				if err == nil && fileResp.StatusCode == 200 {
+					defer fileResp.Body.Close()
+
+					// 提取文本
+					content, err := w.tika.Extract(fileResp.Body)
+					if err == nil && content != "" {
+						doc["content"] = content
+						slog.Info("Text content extracted", "length", len(content))
+					} else if err != nil {
+						slog.Warn("Tika extraction failed", "error", err)
+					}
+				}
+			}
+		}
+	}
+
+	// Re-encode for ES
+	reqBody, _ := json.Marshal(doc)
 
 	// Index document
 	req := esapi.IndexRequest{
 		Index:      w.indexName,
 		DocumentID: id,
-		Body:       bytes.NewReader(body),
+		Body:       bytes.NewReader(reqBody),
 		Refresh:    "true",
 	}
 
@@ -184,7 +231,7 @@ func (w *ESWorker) handleSearchRequest(subject, reply string, query string) {
 		"query": map[string]interface{}{
 			"multi_match": map[string]interface{}{
 				"query":     query,
-				"fields":    []string{"name^3", "tags", "type_name"},
+				"fields":    []string{"name^3", "tags", "type_name", "content"},
 				"fuzziness": "AUTO",
 			},
 		},

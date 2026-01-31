@@ -71,7 +71,12 @@ func main() {
 		if err != nil {
 			slog.Error("Elasticsearch 初始化失败，将跳过搜索增强功能", "error", err)
 		} else {
-			esWorker := search.NewESWorker(esClient, natsClient, cfg.Worker.ApiBaseURL, cfg.Elasticsearch.Index)
+			var tikaClient *search.TikaClient
+			if cfg.Tika.URL != "" {
+				tikaClient = search.NewTikaClient(cfg.Tika.URL)
+				slog.Info("Apache Tika 文本提取增强已启用", "url", cfg.Tika.URL)
+			}
+			esWorker := search.NewESWorker(esClient, natsClient, cfg.Worker.ApiBaseURL, cfg.Elasticsearch.Index, tikaClient, store, cfg.MinIO.Bucket)
 			go esWorker.Start()
 		}
 	}

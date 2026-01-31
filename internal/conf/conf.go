@@ -8,6 +8,11 @@ type Data struct {
 	NATS          NATS           `mapstructure:"nats" json:"nats"`
 	Worker        Worker         `mapstructure:"worker" json:"worker"`
 	Elasticsearch Elasticsearch  `mapstructure:"elasticsearch" json:"elasticsearch"`
+	Tika          Tika           `mapstructure:"tika" json:"tika"`
+}
+
+type Tika struct {
+	URL string `mapstructure:"url" json:"url"` // e.g., http://localhost:9998
 }
 
 type Elasticsearch struct {

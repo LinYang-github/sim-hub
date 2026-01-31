@@ -153,12 +153,16 @@ export function useUpload(
       resource_type: typeKey.value,
       checksum: 'skip-for-now',
       size: blob.size,
-      filename: filename
+      checksum: 'skip-for-now',
+      size: blob.size,
+      filename: encodeURIComponent(filename) // 使用 URL 编码确保所有特殊字符（包括中文、括号等）在签名时保持一致
     })
     
     const { ticket_id, presigned_url } = res
     
-    await axios.put(presigned_url, blob, {
+    // 使用新的 axios 实例上传，避免全局拦截器注入 Authorization Header
+    // MinIO/S3 若检测到 Presigned URL + Auth Header 同时存在会报 400 错误
+    await axios.create().put(presigned_url, blob, {
       headers: { 'Content-Type': contentType },
       onUploadProgress: (p) => {
         if (p.total) {

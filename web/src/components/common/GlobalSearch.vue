@@ -46,6 +46,15 @@
                    <span class="type-tag">{{ item.typeName }}</span>
                    <span class="divider">·</span>
                    <span class="date">{{ formatDate(item.createdAt) }}</span>
+                   
+                   <template v-if="item.latest_version?.file_size">
+                       <span class="divider">·</span>
+                       <span class="size">{{ formatSize(item.latest_version.file_size) }}</span>
+                   </template>
+
+                   <span v-if="!isNameMatch(item, query)" class="match-badge">
+                       <el-icon><Document /></el-icon> 内容匹配
+                   </span>
                 </div>
              </div>
              <div class="item-action">
@@ -93,7 +102,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, markRaw } from 'vue'
-import { Search, Loading, Right, Files } from '@element-plus/icons-vue'
+import { Search, Loading, Right, Files, Document } from '@element-plus/icons-vue'
 import request from '../../core/utils/request'
 import { moduleManager } from '../../core/moduleManager'
 import { useRouter } from 'vue-router'
@@ -189,6 +198,19 @@ const addToRecent = (item: any) => {
 }
 
 const formatDate = (date: string) => dayjs(date).format('YYYY-MM-DD')
+const formatSize = (bytes: number) => {
+    if (!bytes) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+}
+
+const isNameMatch = (item: any, q: string) => {
+    if (!q) return true
+    const lowerQ = q.toLowerCase()
+    return item.name.toLowerCase().includes(lowerQ)
+}
 
 // Global shortcut
 const handleKeyDown = (e: KeyboardEvent) => {
@@ -339,6 +361,20 @@ onUnmounted(() => {
                     font-weight: 500;
                 }
                 .divider { opacity: 0.5; }
+                
+                .match-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 2px;
+                    background: var(--el-color-success-light-9);
+                    color: var(--el-color-success);
+                    font-size: 10px;
+                    padding: 0 4px;
+                    border-radius: 4px;
+                    margin-left: 6px;
+                    border: 1px solid var(--el-color-success-light-5);
+                    height: 18px;
+                }
             }
         }
 

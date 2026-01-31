@@ -26,6 +26,9 @@ elasticsearch:
   password: ""
   index: "simhub_resources"
 
+tika:
+  url: "http://localhost:9998"
+
 worker:
   api_base_url: "http://localhost:30030"
   handlers:

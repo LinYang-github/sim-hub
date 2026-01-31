@@ -26,6 +26,16 @@ services:
     networks:
       - simhub-net
 
+  # Apache Tika - 文档内容提取服务
+  # 支持 PDF, DOC, DOCX, PPT, XLS, TXT 等 1000+ 种格式
+  tika:
+    image: apache/tika:latest
+    container_name: simhub-tika
+    ports:
+      - "9998:9998"
+    networks:
+      - simhub-net
+
   # Kibana - (可选) 可视化管理界面
   # 访问 http://localhost:5601 查看索引数据
   kibana:

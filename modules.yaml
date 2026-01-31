@@ -35,6 +35,23 @@ resource_types:
       supported_views: ["card", "table"]
       example: "J-20战斗机隐藏挂架型"
   
+  - type_key: "documents"
+    type_name: "文档资源库"
+    schema_def:
+      type: "object"
+      properties:
+        author:
+          type: "string"
+          description: "作者"
+    category_mode: "tree"
+    upload_mode: "file"
+    meta_data:
+      icon: "Document"
+      viewer: "PDFPreview"
+      short_name: "文档"
+      supported_views: ["table", "card"]
+      example: "某系统操作手册 V1.0"
+  
   - type_key: "map_service"
     type_name: "地理信息服务"
     upload_mode: "online"
@@ -119,9 +136,9 @@ resource_types:
       supported_views: 
         - "data-grid"
         - key: "demo-view"
-          label: "测试视图"
-          icon: "Picture"
-          path: "External:http://localhost:30031/demo-view/"
+        label: "测试视图"
+        icon: "Picture"
+        path: "External:http://localhost:30031/demo-view/"
       custom_actions: 
         - key: "demo-action"
           label: "提交审核"
