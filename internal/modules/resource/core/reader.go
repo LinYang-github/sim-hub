@@ -96,22 +96,28 @@ func (r *ResourceReader) ListResources(ctx context.Context, typeKey string, cate
 	if categoryID != "" {
 		query = query.Where("category_id = ?", categoryID)
 	}
+	// 增强搜索的高亮映射表
+	var highlightsMap map[string]map[string][]string
+
 	if keyword != "" {
 		// 增强搜索：先尝试通过 NATS 调用 Worker 的 ES 搜索
 		var searchHit bool
+
 		if r.search != nil {
-			ids, err := r.search.Search(keyword)
+			results, err := r.search.Search(keyword)
 			// 如果调用成功，使用返回的 IDs（即使为空）
 			if err == nil {
-				// 优化：如果有 ID 列表，直接 Filter。如果列表空，说明 ES 认为没结果。
-				// 但为了保险（比如未索引完），如果 ES 返回空，是否要降级？
-				// 策略：ES 返回空列表 = 无结果。
-				// 为避免误判，如果 ES 明确返回了（err==nil），就信它。
+				highlightsMap = make(map[string]map[string][]string)
+				var ids []string
+				for _, res := range results {
+					ids = append(ids, res.ID)
+					highlightsMap[res.ID] = res.Highlights
+				}
+
 				if len(ids) > 0 {
 					query = query.Where("id IN ?", ids)
 				} else {
 					// ES 返回无匹配，强制让 SQL 也查不到 (id IN empty)
-					// GORM IN empty slice 通常会生成 false 条件
 					query = query.Where("1 = 0")
 				}
 				searchHit = true
@@ -162,7 +168,7 @@ func (r *ResourceReader) ListResources(ctx context.Context, typeKey string, cate
 			dv.DownloadURL = url
 		}
 
-		cw = append(cw, &ResourceDTO{
+		dto := &ResourceDTO{
 			ID:         res.ID,
 			TypeKey:    res.TypeKey,
 			CategoryID: res.CategoryID,
@@ -172,8 +178,19 @@ func (r *ResourceReader) ListResources(ctx context.Context, typeKey string, cate
 			Tags:       res.Tags,
 			CreatedAt:  res.CreatedAt,
 			LatestVer:  dv,
-		})
+		}
+		cw = append(cw, dto)
 	}
+
+	// 填充高亮信息
+	if highlightsMap != nil {
+		for _, dto := range cw {
+			if hl, ok := highlightsMap[dto.ID]; ok {
+				dto.Highlights = hl
+			}
+		}
+	}
+
 	return cw, total, nil
 }
 

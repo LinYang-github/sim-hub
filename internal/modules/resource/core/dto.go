@@ -131,6 +131,7 @@ type ResourceDTO struct {
 	Tags       []string            `json:"tags"`
 	CreatedAt  time.Time           `json:"created_at"`
 	LatestVer  *ResourceVersionDTO `json:"latest_version,omitempty"`
+	Highlights map[string][]string `json:"highlights,omitempty"`
 }
 
 type ResourceVersionDTO struct {

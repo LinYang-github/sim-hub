@@ -17,12 +17,12 @@ func NewSearchClient(nats *data.NATSClient) *SearchClient {
 }
 
 // Search executes a search query via NATS RPC
-func (s *SearchClient) Search(query string) ([]string, error) {
+func (s *SearchClient) Search(query string) ([]SearchResult, error) {
 	if s.nats == nil || !s.nats.Config.Enabled {
 		return nil, data.ErrNATSDisabled
 	}
 
-	var result []string
+	var result []SearchResult
 
 	// Request with short timeout (e.g., 200ms) for fast downgrade
 	err := s.nats.Encoded.Request("simhub.search.query", query, &result, 200*time.Millisecond)

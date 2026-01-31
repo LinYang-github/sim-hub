@@ -221,6 +221,12 @@ func (w *ESWorker) syncToIndex(ctx context.Context, id string) {
 	}
 }
 
+// SearchResult holds ID and highlights
+type SearchResult struct {
+	ID         string              `json:"id"`
+	Highlights map[string][]string `json:"highlights"`
+}
+
 func (w *ESWorker) handleSearchRequest(subject, reply string, query string) {
 	// NATS RPC handler
 	// Query ES
@@ -234,6 +240,14 @@ func (w *ESWorker) handleSearchRequest(subject, reply string, query string) {
 				"fields":    []string{"name^3", "tags", "type_name", "content"},
 				"fuzziness": "AUTO",
 			},
+		},
+		"highlight": map[string]interface{}{
+			"fields": map[string]interface{}{
+				"name":    map[string]interface{}{},
+				"content": map[string]interface{}{"fragment_size": 150, "number_of_fragments": 1},
+			},
+			"pre_tags":  []string{"<em>"},
+			"post_tags": []string{"</em>"},
 		},
 		"_source": []string{"id"}, // Only need IDs
 		"size":    50,
@@ -259,13 +273,34 @@ func (w *ESWorker) handleSearchRequest(subject, reply string, query string) {
 		return
 	}
 
-	var ids []string
+	var results []SearchResult
 	if hits, ok := result["hits"].(map[string]interface{}); ok {
 		if hitList, ok := hits["hits"].([]interface{}); ok {
 			for _, hit := range hitList {
 				if h, ok := hit.(map[string]interface{}); ok {
-					if id, ok := h["_id"].(string); ok {
-						ids = append(ids, id)
+					id, _ := h["_id"].(string)
+
+					var highlights map[string][]string
+					if hl, ok := h["highlight"].(map[string]interface{}); ok {
+						highlights = make(map[string][]string)
+						for k, v := range hl {
+							if fragments, ok := v.([]interface{}); ok {
+								var strs []string
+								for _, frag := range fragments {
+									if s, ok := frag.(string); ok {
+										strs = append(strs, s)
+									}
+								}
+								highlights[k] = strs
+							}
+						}
+					}
+
+					if id != "" {
+						results = append(results, SearchResult{
+							ID:         id,
+							Highlights: highlights,
+						})
 					}
 				}
 			}
@@ -273,5 +308,5 @@ func (w *ESWorker) handleSearchRequest(subject, reply string, query string) {
 	}
 
 	// Respond via NATS
-	w.nats.Encoded.Publish(reply, ids)
+	w.nats.Encoded.Publish(reply, results)
 }

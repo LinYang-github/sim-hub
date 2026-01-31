@@ -52,10 +52,13 @@
                        <span class="size">{{ formatSize(item.latest_version.file_size) }}</span>
                    </template>
 
-                   <span v-if="!isNameMatch(item, query)" class="match-badge">
+                   <span v-if="!isNameMatch(item, query) && !item.highlights?.content" class="match-badge">
                        <el-icon><Document /></el-icon> 内容匹配
                    </span>
                 </div>
+
+                <!-- 高亮片段展示 -->
+                <div v-if="item.highlights?.content" class="search-snippet" v-html="'... ' + item.highlights.content[0] + ' ...'"></div>
              </div>
              <div class="item-action">
                 <el-icon><Right /></el-icon>
@@ -374,6 +377,26 @@ onUnmounted(() => {
                     margin-left: 6px;
                     border: 1px solid var(--el-color-success-light-5);
                     height: 18px;
+                }
+            }
+            
+            .search-snippet {
+                font-size: 12px;
+                color: var(--el-text-color-secondary);
+                margin-top: 4px;
+                line-height: 1.4;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+                
+                em {
+                    color: var(--el-color-primary);
+                    font-style: normal;
+                    font-weight: bold;
+                    background: var(--el-color-primary-light-9);
+                    padding: 0 2px;
+                    border-radius: 2px;
                 }
             }
         }
