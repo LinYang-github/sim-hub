@@ -101,31 +101,28 @@ func (r *ResourceReader) ListResources(ctx context.Context, typeKey string, cate
 
 	if keyword != "" {
 		// 增强搜索：先尝试通过 NATS 调用 Worker 的 ES 搜索
-		var searchHit bool
+		// 策略升级：ES 结果与 SQL 模糊搜索结果取并集 (OR)
+		var esIDs []string
 
 		if r.search != nil {
 			results, err := r.search.Search(keyword)
-			// 如果调用成功，使用返回的 IDs（即使为空）
 			if err == nil {
 				highlightsMap = make(map[string]map[string][]string)
-				var ids []string
 				for _, res := range results {
-					ids = append(ids, res.ID)
+					esIDs = append(esIDs, res.ID)
 					highlightsMap[res.ID] = res.Highlights
 				}
-
-				if len(ids) > 0 {
-					query = query.Where("id IN ?", ids)
-				} else {
-					// ES 返回无匹配，强制让 SQL 也查不到 (id IN empty)
-					query = query.Where("1 = 0")
-				}
-				searchHit = true
 			}
 		}
 
-		if !searchHit {
-			// 降级：SQL 模糊搜索
+		if len(esIDs) > 0 {
+			// 如果 ES 有结果，查询 = (id IN esIDs) OR (name LIKE %k% OR tags LIKE %k%)
+			query = query.Where(
+				r.data.DB.Where("id IN ?", esIDs).
+					Or("name LIKE ? OR tags LIKE ?", "%"+keyword+"%", "%"+keyword+"%"),
+			)
+		} else {
+			// 只有 SQL 搜索
 			query = query.Where("name LIKE ? OR tags LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
 		}
 	}
