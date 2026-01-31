@@ -73,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, reactive } from 'vue'
+import { ref, reactive } from 'vue'
 import { InfoFilled, Folder } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import request from '../../../core/utils/request'

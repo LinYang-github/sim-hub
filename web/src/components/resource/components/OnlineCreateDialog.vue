@@ -71,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, h } from 'vue'
+import { ref, defineAsyncComponent, h } from 'vue'
 import DynamicSchemaForm from '../../common/DynamicSchemaForm.vue'
 import request from '../../../core/utils/request'
 import { ElMessage } from 'element-plus'

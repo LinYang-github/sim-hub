@@ -69,7 +69,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { Share, Search } from '@element-plus/icons-vue'
+import { Share } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import request from '../../../core/utils/request'
 import type { Resource, ResourceDependency } from '../../../core/types/resource'

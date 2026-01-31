@@ -30,10 +30,6 @@ moduleManager.registerImplementation(scenarioModule)
 // model_glb 将通过 modules.json 中的元数据自动使用 ResourceList 兜底
 
 // 动态插件发现机制：根据活跃模块的配置自动加载外部视图注册脚本
-const loadExternalPlugins = () => {
-    // External plugins are now registered via configuration (modules.yaml)
-    // No need to inject scripts manually.
-}
 
 const routes = [
   { path: '/login', component: () => import('./views/Login.vue'), meta: { isPublic: true } },
@@ -107,7 +103,7 @@ const initApp = async () => {
   })
 
   // 路由守卫
-  router.beforeEach((to, from, next) => {
+  router.beforeEach((to, _from, next) => {
     const token = localStorage.getItem('simhub_token')
     if (to.path === '/login') {
       if (token) return next('/')

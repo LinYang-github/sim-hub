@@ -151,10 +151,8 @@ export function useUpload(
   ) => {
     const res = await request.post<{ ticket_id: string; presigned_url: string }>('/api/v1/integration/upload/token', {
       resource_type: typeKey.value,
-      checksum: 'skip-for-now',
       size: blob.size,
       checksum: 'skip-for-now',
-      size: blob.size,
       filename: encodeURIComponent(filename) // 使用 URL 编码确保所有特殊字符（包括中文、括号等）在签名时保持一致
     })
     

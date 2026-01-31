@@ -73,7 +73,7 @@
 <script setup lang="ts">
 import { ref, onMounted, markRaw } from 'vue'
 import { useRouter } from 'vue-router'
-import { Files, Document, Promotion, Connection, Box, Location, Folder, Search, Tickets } from '@element-plus/icons-vue'
+import { Document, Box, Location, Folder, Tickets } from '@element-plus/icons-vue'
 import request from '../core/utils/request'
 import { moduleManager } from '../core/moduleManager'
 import dayjs from 'dayjs'
