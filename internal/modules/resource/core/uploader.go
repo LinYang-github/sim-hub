@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/liny/sim-hub/internal/data"
-	"github.com/liny/sim-hub/pkg/storage"
+	"sim-hub/internal/data"
+	"sim-hub/pkg/storage"
 	"gorm.io/gorm"
 )
 

@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/liny/sim-hub/internal/data"
-	"github.com/liny/sim-hub/internal/model"
-	"github.com/liny/sim-hub/pkg/logger"
-	"github.com/liny/sim-hub/pkg/storage"
+	"sim-hub/internal/data"
+	"sim-hub/internal/model"
+	"sim-hub/pkg/logger"
+	"sim-hub/pkg/storage"
 )
 
 const (

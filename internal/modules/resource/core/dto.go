@@ -3,7 +3,7 @@ package core
 import (
 	"time"
 
-	"github.com/liny/sim-hub/pkg/storage"
+	"sim-hub/pkg/storage"
 )
 
 // DTOs 数据传输对象

@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/liny/sim-hub/internal/data"
-	"github.com/liny/sim-hub/internal/model"
+	"sim-hub/internal/data"
+	"sim-hub/internal/model"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )

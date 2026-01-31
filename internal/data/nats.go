@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/liny/sim-hub/internal/conf"
+	"sim-hub/internal/conf"
 	"github.com/nats-io/nats.go"
 )
 

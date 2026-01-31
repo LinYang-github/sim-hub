@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/liny/sim-hub/internal/data"
-	"github.com/liny/sim-hub/internal/model"
+	"sim-hub/internal/data"
+	"sim-hub/internal/model"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

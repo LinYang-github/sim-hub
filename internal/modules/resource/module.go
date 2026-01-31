@@ -8,12 +8,12 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/liny/sim-hub/internal/conf"
-	"github.com/liny/sim-hub/internal/core/module"
-	"github.com/liny/sim-hub/internal/data"
-	"github.com/liny/sim-hub/internal/model"
-	"github.com/liny/sim-hub/internal/modules/resource/core"
-	"github.com/liny/sim-hub/pkg/storage"
+	"sim-hub/internal/conf"
+	"sim-hub/internal/core/module"
+	"sim-hub/internal/data"
+	"sim-hub/internal/model"
+	"sim-hub/internal/modules/resource/core"
+	"sim-hub/pkg/storage"
 )
 
 // Module 实现了 module.Module 接口

@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/liny/sim-hub/pkg/storage"
+	"sim-hub/pkg/storage"
 	"github.com/stretchr/testify/mock"
 )
 

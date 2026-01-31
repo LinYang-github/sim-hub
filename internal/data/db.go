@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/liny/sim-hub/internal/conf"
-	"github.com/liny/sim-hub/internal/model"
+	"sim-hub/internal/conf"
+	"sim-hub/internal/model"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"

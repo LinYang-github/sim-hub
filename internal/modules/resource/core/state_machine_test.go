@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/liny/sim-hub/internal/data"
-	"github.com/liny/sim-hub/internal/model"
-	"github.com/liny/sim-hub/internal/modules/resource/core/mocks"
+	"sim-hub/internal/data"
+	"sim-hub/internal/model"
+	"sim-hub/internal/modules/resource/core/mocks"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

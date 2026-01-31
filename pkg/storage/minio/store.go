@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/liny/sim-hub/pkg/storage"
+	"sim-hub/pkg/storage"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )

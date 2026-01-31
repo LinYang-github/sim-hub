@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/liny/sim-hub/internal/data"
-	"github.com/liny/sim-hub/internal/model"
-	"github.com/liny/sim-hub/pkg/storage"
+	"sim-hub/internal/data"
+	"sim-hub/internal/model"
+	"sim-hub/pkg/storage"
 	"gorm.io/gorm"
 )
 

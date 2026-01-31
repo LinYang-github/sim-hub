@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/liny/sim-hub/internal/data"
+	"sim-hub/internal/data"
 )
 
 // 生命周期事件类型

@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/liny/sim-hub/pkg/logger"
+	"sim-hub/pkg/logger"
 )
 
 // RequestIDMiddleware 注入请求 ID 到 Context 和响应头

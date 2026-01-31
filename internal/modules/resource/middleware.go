@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/liny/sim-hub/internal/modules/resource/core"
+	"sim-hub/internal/modules/resource/core"
 )
 
 // AuthMiddleware 鉴权中间件 (支持 JWT 与 Trusted Proxy)

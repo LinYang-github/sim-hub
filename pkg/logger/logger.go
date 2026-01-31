@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/liny/sim-hub/internal/conf"
+	"sim-hub/internal/conf"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 

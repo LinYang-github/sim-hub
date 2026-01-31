@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/liny/sim-hub/internal/data"
+	"sim-hub/internal/data"
 )
 
 // ResultWatcher 负责监听 Worker 上报的处理结果并更新数据库

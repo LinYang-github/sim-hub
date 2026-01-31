@@ -3,7 +3,7 @@ package core
 import (
 	"context"
 
-	"github.com/liny/sim-hub/internal/model"
+	"sim-hub/internal/model"
 )
 
 // GetResourceTypes 获取所有资源类型定义

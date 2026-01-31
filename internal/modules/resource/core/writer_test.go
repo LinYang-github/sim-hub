@@ -9,9 +9,9 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/liny/sim-hub/internal/data"
-	"github.com/liny/sim-hub/internal/model"
-	"github.com/liny/sim-hub/internal/modules/resource/core/mocks"
+	"sim-hub/internal/data"
+	"sim-hub/internal/model"
+	"sim-hub/internal/modules/resource/core/mocks"
 )
 
 type MockDispatcher struct {

@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/liny/sim-hub/internal/data"
-	"github.com/liny/sim-hub/pkg/storage"
+	"sim-hub/internal/data"
+	"sim-hub/pkg/storage"
 )
 
 // ResultEmitter 定义了 Worker 如何上报任务执行结果

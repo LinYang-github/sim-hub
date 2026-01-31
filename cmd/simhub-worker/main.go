@@ -6,11 +6,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/liny/sim-hub/internal/conf"
-	"github.com/liny/sim-hub/internal/data"
-	"github.com/liny/sim-hub/internal/modules/resource/core"
-	"github.com/liny/sim-hub/pkg/logger"
-	"github.com/liny/sim-hub/pkg/storage/minio"
+	"sim-hub/internal/conf"
+	"sim-hub/internal/data"
+	"sim-hub/internal/modules/resource/core"
+	"sim-hub/pkg/logger"
+	"sim-hub/pkg/storage/minio"
 	"github.com/spf13/viper"
 )
 
