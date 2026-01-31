@@ -99,7 +99,7 @@ func (s *Scheduler) startNATSSubscriber() {
 	}
 }
 
-func (s *Scheduler) startLocalWorker(id int) {
+func (s *Scheduler) startLocalWorker(_ int) {
 	for job := range s.jobChan {
 		s.handleJob(context.Background(), job)
 	}

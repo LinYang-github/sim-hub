@@ -11,6 +11,7 @@ import (
 
 	"sim-hub/internal/data"
 	"sim-hub/internal/model"
+
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -126,7 +127,7 @@ func (m *AuthManager) hashToken(token string) string {
 }
 
 // seedRoles 预埋系统基础角色与权限
-func (m *AuthManager) seedRoles(ctx context.Context) error {
+func (m *AuthManager) seedRoles(_ context.Context) error {
 	roles := []model.Role{
 		{
 			Name:        "管理员",

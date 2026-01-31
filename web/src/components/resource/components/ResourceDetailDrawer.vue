@@ -250,7 +250,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { InfoFilled, Edit, Download, Share, Rank, FullScreen, Close } from '@element-plus/icons-vue'
+import { InfoFilled, Edit, Download, Rank, FullScreen, Close } from '@element-plus/icons-vue'
 import { formatDate, formatSize } from '../../../core/utils/format'
 import { useAuth } from '../../../core/auth'
 import type { Resource, ResourceVersion, ResourceDependency } from '../../../core/types/resource'

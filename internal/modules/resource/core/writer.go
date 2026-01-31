@@ -10,6 +10,7 @@ import (
 	"sim-hub/internal/data"
 	"sim-hub/internal/model"
 	"sim-hub/pkg/storage"
+
 	"gorm.io/gorm"
 )
 
@@ -327,7 +328,8 @@ func (w *ResourceWriter) CreateResourceAndVersion(tx *gorm.DB, typeKey, category
 		initialState = "ACTIVE"
 	}
 
-	if err == nil {
+	switch err {
+	case nil:
 		// 版本已存在
 		if ver.State == "ACTIVE" {
 			return fmt.Errorf("version %s already exists and is ACTIVE", semver)
@@ -346,7 +348,7 @@ func (w *ResourceWriter) CreateResourceAndVersion(tx *gorm.DB, typeKey, category
 		if err := tx.Delete(&model.ResourceDependency{}, "source_version_id = ?", ver.ID).Error; err != nil {
 			return err
 		}
-	} else if err == gorm.ErrRecordNotFound {
+	case gorm.ErrRecordNotFound:
 		// 创建新版本
 		var count int64
 		// 注意：这里的 VersionNum 仍然可能存在并发问题，但在同一资源下冲突概率较低
@@ -370,7 +372,7 @@ func (w *ResourceWriter) CreateResourceAndVersion(tx *gorm.DB, typeKey, category
 		if res.LatestVersionID == "" {
 			tx.Model(&res).Update("latest_version_id", ver.ID)
 		}
-	} else {
+	default:
 		return err
 	}
 

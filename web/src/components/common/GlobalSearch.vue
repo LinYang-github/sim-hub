@@ -104,8 +104,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, markRaw } from 'vue'
-import { Search, Loading, Right, Files, Document } from '@element-plus/icons-vue'
+import { ref, onMounted, onUnmounted, markRaw } from 'vue'
+import { Search, Loading, Right, Document } from '@element-plus/icons-vue'
 import request from '../../core/utils/request'
 import { moduleManager } from '../../core/moduleManager'
 import { useRouter } from 'vue-router'
@@ -387,6 +387,7 @@ onUnmounted(() => {
                 line-height: 1.4;
                 display: -webkit-box;
                 -webkit-line-clamp: 2;
+                line-clamp: 2;
                 -webkit-box-orient: vertical;
                 overflow: hidden;
                 

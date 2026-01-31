@@ -142,7 +142,7 @@ func (w *ESWorker) syncToIndex(ctx context.Context, id string) {
 	// For now assuming internal API is accessible directly or we skip auth.
 	// Actually the API might require auth.
 	// But let's assume the sidecar pattern where worker is in trusted network / localhost.
-	// Or we can add a system token. For simplicty V1, try direct access.
+	// Or we can add a system token. For simplicity V1, try direct access.
 	// NOTE: The `ListResources` in API might be public or protected. `GetResource` is usually protected?
 	// `GetResource` allows PUBLIC access.
 

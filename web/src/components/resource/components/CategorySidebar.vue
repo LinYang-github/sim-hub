@@ -114,7 +114,7 @@ const allowDrag = (node: any) => {
 }
 
 // type can be 'prev', 'next', 'inner'
-const allowDrop = (draggingNode: any, dropNode: any, type: string) => {
+const allowDrop = (_draggingNode: any, dropNode: any, type: string) => {
   // 1. Cannot drop 'prev' or 'next' relative to Root node (it must stay at top)
   if (dropNode.data.id === ROOT_CATEGORY_ID && type !== 'inner') {
     return false
@@ -122,7 +122,7 @@ const allowDrop = (draggingNode: any, dropNode: any, type: string) => {
   return true
 }
 
-const handleNodeDrop = (draggingNode: any, dropNode: any, type: string, ev: DragEvent) => {
+const handleNodeDrop = (draggingNode: any, dropNode: any, type: string, _ev: DragEvent) => {
   // Calculate new parent ID
   let newParentId = ''
   if (type === 'inner') {
