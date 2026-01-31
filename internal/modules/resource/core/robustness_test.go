@@ -6,6 +6,7 @@ import (
 
 	"sim-hub/internal/data"
 	"sim-hub/internal/model"
+
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -18,7 +19,7 @@ func TestStorageUnavailableRobustness(t *testing.T) {
 
 	d := &data.Data{DB: db}
 	uploader := NewUploadManager(d, nil, nil, "test-bucket", nil)
-	reader := NewResourceReader(d, nil, "test-bucket")
+	reader := NewResourceReader(d, nil, "test-bucket", nil)
 
 	t.Run("RequestUploadToken returns error when store is nil", func(t *testing.T) {
 		req := ApplyUploadTokenRequest{

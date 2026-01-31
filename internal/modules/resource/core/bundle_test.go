@@ -8,10 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"sim-hub/internal/data"
 	"sim-hub/internal/model"
 	"sim-hub/internal/modules/resource/core/mocks"
+
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gorm.io/driver/sqlite"
@@ -24,7 +25,7 @@ func TestBundleLogicDepth(t *testing.T) {
 	d := &data.Data{DB: db}
 
 	storageMock := new(mocks.MockBlobStore)
-	reader := NewResourceReader(d, storageMock, "test-bucket")
+	reader := NewResourceReader(d, storageMock, "test-bucket", nil)
 
 	// Pre-setup common mock for PresignGet
 	storageMock.On("PresignGet", mock.Anything, "test-bucket", mock.Anything, mock.Anything).

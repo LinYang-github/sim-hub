@@ -2,27 +2,29 @@ package resource
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"sim-hub/internal/conf"
 	"sim-hub/internal/data"
 	"sim-hub/internal/model"
 	"sim-hub/internal/modules/resource/core"
 	"sim-hub/internal/modules/resource/core/mocks"
+
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
-func setupAPIEnv(t *testing.T) (*gin.Engine, *mocks.MockBlobStore) {
+func setupAPIEnv(t *testing.T) (*gin.Engine, *mocks.MockBlobStore, string) {
 	gin.SetMode(gin.TestMode)
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	db.AutoMigrate(&model.ResourceType{})
+	db.AutoMigrate(&model.ResourceType{}, &model.Role{}, &model.User{}, &model.AccessToken{})
 	d := &data.Data{DB: db}
 
 	// Mock components
@@ -40,11 +42,18 @@ func setupAPIEnv(t *testing.T) (*gin.Engine, *mocks.MockBlobStore) {
 	api := r.Group("/api/v1")
 	m.RegisterRoutes(api)
 
-	return r, mockStore
+	// Login as admin to get token
+	authMgr := core.NewAuthManager(d)
+	tokenResp, err := authMgr.Login(context.Background(), "admin", "123456")
+	if err != nil {
+		t.Fatalf("Failed to login as admin in test: %v", err)
+	}
+
+	return r, mockStore, tokenResp.RawToken
 }
 
 func TestApplyUploadTokenAPI(t *testing.T) {
-	r, mockStore := setupAPIEnv(t)
+	r, mockStore, token := setupAPIEnv(t)
 
 	t.Run("Successfully get upload token", func(t *testing.T) {
 		mockStore.On("PresignPut", mock.Anything, "test-bucket", mock.Anything, mock.Anything).
@@ -58,6 +67,7 @@ func TestApplyUploadTokenAPI(t *testing.T) {
 
 		req, _ := http.NewRequest(http.MethodPost, "/api/v1/integration/upload/token", bytes.NewBuffer(jsonBody))
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
@@ -72,6 +82,7 @@ func TestApplyUploadTokenAPI(t *testing.T) {
 
 	t.Run("Invalid JSON should return 400", func(t *testing.T) {
 		req, _ := http.NewRequest(http.MethodPost, "/api/v1/integration/upload/token", bytes.NewBufferString("invalid-json"))
+		req.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -79,7 +90,7 @@ func TestApplyUploadTokenAPI(t *testing.T) {
 }
 
 func TestResourceTypesAPI(t *testing.T) {
-	r, _ := setupAPIEnv(t)
+	r, _, _ := setupAPIEnv(t)
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/resource-types", nil)
 	w := httptest.NewRecorder()

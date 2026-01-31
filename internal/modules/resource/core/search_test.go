@@ -6,6 +6,7 @@ import (
 
 	"sim-hub/internal/data"
 	"sim-hub/internal/model"
+
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -16,7 +17,7 @@ func TestSearchLogicDepth(t *testing.T) {
 	db.AutoMigrate(&model.Resource{}, &model.ResourceVersion{})
 	d := &data.Data{DB: db}
 
-	reader := NewResourceReader(d, nil, "test-bucket")
+	reader := NewResourceReader(d, nil, "test-bucket", nil)
 
 	// Seed data
 	db.Create(&model.Resource{Name: "Model A", TypeKey: "model", Tags: []string{"tag1", "common"}})
