@@ -71,7 +71,7 @@
           <el-descriptions-item label="资源名称" :span="2">
             <div class="name-edit-cell">
               <span class="text-bold">{{ resource.name }}</span>
-              <el-button link type="primary" size="small" @click="$emit('rename', resource)">
+              <el-button v-if="hasPermission('resource:update')" link type="primary" size="small" @click="$emit('rename', resource)">
                 <el-icon><Edit /></el-icon> 重命名
               </el-button>
             </div>
@@ -98,7 +98,7 @@
           <el-descriptions-item label="归属分类" :span="2">
             <div class="scope-edit-cell">
               <span class="category-path">{{ currentCategoryName || '默认分类' }}</span>
-              <el-button link type="primary" size="small" @click="$emit('move', resource)">
+              <el-button v-if="hasPermission('resource:update')" link type="primary" size="small" @click="$emit('move', resource)">
                 <el-icon><Rank /></el-icon> 移动
               </el-button>
             </div>
@@ -116,7 +116,7 @@
       <div class="details-section">
         <div class="section-label">
           管理标签
-          <el-button link type="primary" size="small" @click="$emit('edit-tags', resource)">
+          <el-button v-if="hasPermission('resource:update')" link type="primary" size="small" @click="$emit('edit-tags', resource)">
             <el-icon><Edit /></el-icon> 编辑
           </el-button>
         </div>
@@ -161,7 +161,7 @@
                 <template #default="{ row }">
                   <el-button link type="primary" size="small" @click="$emit('download-version', row.download_url)">下载</el-button>
                   <el-button 
-                    v-if="row.id !== resource?.latest_version?.id" 
+                    v-if="hasPermission('resource:update') && row.id !== resource?.latest_version?.id" 
                     link 
                     type="warning" 
                     size="small" 
@@ -213,7 +213,7 @@
           </div>
         </el-tab-pane>
 
-        <el-tab-pane name="steward" label="元数据治理">
+        <el-tab-pane v-if="hasPermission('resource:update')" name="steward" label="元数据治理">
           <div class="tab-pane-content">
             <!-- 1. Metadata JSON Editor -->
             <MetadataEditor 
@@ -252,12 +252,15 @@
 import { ref, computed } from 'vue'
 import { InfoFilled, Edit, Download, Share, Rank, FullScreen, Close } from '@element-plus/icons-vue'
 import { formatDate, formatSize } from '../../../core/utils/format'
+import { useAuth } from '../../../core/auth'
 import type { Resource, ResourceVersion, ResourceDependency } from '../../../core/types/resource'
 import { RESOURCE_STATE } from '../../../core/constants/resource'
 import ResourcePreview from '../previewers/ResourcePreview.vue'
 import DependencyGraph from '../previewers/DependencyGraph.vue'
 import MetadataEditor from './MetadataEditor.vue'
 import DependencyEditor from './DependencyEditor.vue'
+
+const { hasPermission } = useAuth()
 
 const props = defineProps<{
   modelValue: boolean

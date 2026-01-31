@@ -9,6 +9,8 @@
 bin/
 sim-hub
 simhub-api
+simhub-worker
+simhub-auth-proxy
 # 忽略所有驱动编译后的二进制文件，保留源代码
 drivers/*
 !drivers/*.go
@@ -23,6 +25,9 @@ vendor/
 
 # --- 数据库与存储 / Storage ---
 simhub.db
+simhub.db-journal
+simhub.db-shm
+simhub.db-wal
 *.db
 *.sqlite
 minio_data/
@@ -31,16 +36,22 @@ temp/
 tmp/
 *.zip
 *.tar.gz
+*.simpack
 
 # --- 配置文件 / Config ---
 config.local.yaml
 .env
 .env.local
+.env.development.local
+.env.test.local
+.env.production.local
 .env.*.local
 
 # --- 前端 / Frontend ---
-node_modules/
-dist/
+**/node_modules/
+**/dist/
+web/dist/
+web/node_modules/
 log/
 # 以下是 apps/ 目录下模块的构建产物
 apps/*/dist/
@@ -54,6 +65,8 @@ yarn-error.log*
 pnpm-debug.log*
 .eslintcache
 .stylelintcache
+.vite-inspect
+*.local-build
 
 # --- C++ SDK & CMake ---
 sdk/cpp/build/
@@ -91,6 +104,9 @@ Thumbs.db
 # --- 开发调试 / Debug ---
 *.log
 debug/
+debug_*.go
+fix_*.go
+test_*.go
 terrain.log
 web-main.log
 web-terrain.log

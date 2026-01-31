@@ -12,8 +12,8 @@ import scenarioModule from './modules/scenario'
 import VNetworkGraph from "v-network-graph"
 import "v-network-graph/lib/style.css"
 import axios from 'axios'
-
 import { registerStandardViews } from './core/registerStandardViews'
+import { useAuth } from './core/auth'
 
 // 注册标准视图
 registerStandardViews()
@@ -75,8 +75,32 @@ const initApp = async () => {
 
   // 1. 加载模块配置（异步）
   await moduleManager.loadConfig()
+
+  // 2. 初始化 Axios 拦截器 (必须在请求之前)
+  axios.interceptors.request.use(config => {
+    const token = localStorage.getItem('simhub_token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  })
+
+  // 3. 初始化用户信息与权限指令
+  const { hasPermission, fetchCurrentUser } = useAuth()
+  app.directive('auth', {
+    mounted(el, binding) {
+      if (!hasPermission(binding.value)) {
+        el.style.display = 'none'
+      }
+    }
+  })
+
+  const token = localStorage.getItem('simhub_token')
+  if (token) {
+    await fetchCurrentUser()
+  }
   
-  // 2. 初始化 Router
+  // 4. 初始化 Router
   const router = createRouter({
     history: createWebHistory(),
     routes,
@@ -96,15 +120,6 @@ const initApp = async () => {
     next()
   })
 
-  // Axios 拦截器
-  axios.interceptors.request.use(config => {
-    const token = localStorage.getItem('simhub_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  })
-
   axios.interceptors.response.use(
     response => response,
     error => {
@@ -116,13 +131,8 @@ const initApp = async () => {
     }
   )
 
-
-  // 3. 安装已加载模块的路由
+  // 5. 安装模块
   moduleManager.install(app, router)
-  
-  // 4. 加载插件
-  loadExternalPlugins()
-  
   app.use(router)
   app.mount('#app')
 }

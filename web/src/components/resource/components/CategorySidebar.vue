@@ -4,7 +4,7 @@
       <div class="header-main">
         <el-icon class="title-icon"><FolderOpened /></el-icon>
         <span class="title-text">资源分类</span>
-        <el-tooltip content="新建分类" placement="top">
+        <el-tooltip v-if="hasPermission('resource:update')" content="新建分类" placement="top">
           <el-button class="add-btn" circle @click="$emit('add-category')">
             <el-icon><Plus /></el-icon>
           </el-button>
@@ -49,12 +49,12 @@
               <span class="node-label">{{ node.label }}</span>
               <div class="node-actions" v-if="data.id !== ROOT_CATEGORY_ID">
                 <el-icon 
-                  v-if="categoryMode === 'tree'" 
+                  v-if="hasPermission('resource:update') && categoryMode === 'tree'" 
                   class="action-icon add-icon" 
                   @click.stop="$emit('add-subcategory', data.id)"
                   title="新建子分类"
                 ><Plus /></el-icon>
-                <el-icon class="action-icon delete-icon" @click.stop="$emit('delete-category', data.id)"><Delete /></el-icon>
+                <el-icon v-if="hasPermission('resource:delete')" class="action-icon delete-icon" @click.stop="$emit('delete-category', data.id)"><Delete /></el-icon>
               </div>
             </div>
           </template>
@@ -70,6 +70,9 @@ import { FolderOpened, Plus, Grid, Folder, Delete, Search } from '@element-plus/
 import type { ElTree } from 'element-plus'
 import type { CategoryNode } from '../../../core/types/resource'
 import { ROOT_CATEGORY_ID } from '../../../core/constants/resource'
+import { useAuth } from '../../../core/auth'
+
+const { hasPermission } = useAuth()
 
 const props = defineProps<{
   categoryTree: CategoryNode[]
@@ -105,6 +108,7 @@ const handleNodeClick = (data: CategoryNode) => {
 }
 
 const allowDrag = (node: any) => {
+  if (!hasPermission('resource:update')) return false
   // Prevent dragging the root "All Categories" node
   return node.data.id !== ROOT_CATEGORY_ID
 }

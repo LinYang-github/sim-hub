@@ -51,6 +51,7 @@ func NewData(c *conf.Data) (*Data, func(), error) {
 		&model.Resource{},
 		&model.ResourceVersion{},
 		&model.ResourceDependency{},
+		&model.Role{},
 		&model.User{},
 		&model.AccessToken{},
 	); err != nil {

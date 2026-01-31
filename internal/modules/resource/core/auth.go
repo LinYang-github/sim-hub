@@ -19,6 +19,10 @@ type AuthManager struct {
 	data *data.Data
 }
 
+func (m *AuthManager) DB() *gorm.DB {
+	return m.data.DB
+}
+
 func NewAuthManager(d *data.Data) *AuthManager {
 	return &AuthManager{data: d}
 }
@@ -74,10 +78,12 @@ func (m *AuthManager) RevokeAccessToken(ctx context.Context, userID string, toke
 	return m.data.DB.Delete(&model.AccessToken{}, "id = ? AND user_id = ?", tokenID, userID).Error
 }
 
-// ListAccessTokens 列出用户的所有令牌
+// ListAccessTokens 列出用户的所有令牌 (排除系统生成的会话令牌)
 func (m *AuthManager) ListAccessTokens(ctx context.Context, userID string) ([]model.AccessToken, error) {
 	var tokens []model.AccessToken
-	err := m.data.DB.Where("user_id = ?", userID).Order("created_at desc").Find(&tokens).Error
+	// 排除名称为 "SimHub Web Session" 或以 "shp_" 为前缀的会话令牌 (如果有特殊标记的话)
+	// 这里简单排除名称
+	err := m.data.DB.Where("user_id = ? AND name != ?", userID, "SimHub Web Session").Order("created_at desc").Find(&tokens).Error
 	return tokens, err
 }
 
@@ -119,13 +125,68 @@ func (m *AuthManager) hashToken(token string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+// seedRoles 预埋系统基础角色与权限
+func (m *AuthManager) seedRoles(ctx context.Context) error {
+	roles := []model.Role{
+		{
+			Name:        "管理员",
+			Key:         "admin",
+			Permissions: []string{"*"},
+		},
+		{
+			Name: "操作员",
+			Key:  "operator",
+			Permissions: []string{
+				"resource:list", "resource:create", "resource:update",
+				"node:shell",
+			},
+		},
+		{
+			Name: "访客",
+			Key:  "viewer",
+			Permissions: []string{
+				"resource:list",
+			},
+		},
+	}
+
+	for _, r := range roles {
+		var existing model.Role
+		if err := m.data.DB.Where("key = ?", r.Key).First(&existing).Error; err == nil {
+			// 角色已存在，确保权限列表是最新的
+			existing.Permissions = r.Permissions
+			m.data.DB.Save(&existing)
+		} else if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 角色不存在，创建
+			if err := m.data.DB.Create(&r).Error; err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return nil
+}
+
 // EnsureAdminUser 确保管理员账户存在
 func (m *AuthManager) EnsureAdminUser(ctx context.Context, defaultPwd string) error {
-	var count int64
-	if err := m.data.DB.Model(&model.User{}).Where("username = ?", "admin").Count(&count).Error; err != nil {
+	// 1. 先确保角色已播种
+	if err := m.seedRoles(ctx); err != nil {
 		return err
 	}
-	if count > 0 {
+
+	// 2. 查找角色 ID
+	var adminRole model.Role
+	if err := m.data.DB.Where("key = ?", "admin").First(&adminRole).Error; err != nil {
+		return fmt.Errorf("admin role not found: %w", err)
+	}
+
+	var existing model.User
+	if err := m.data.DB.Where("username = ?", "admin").First(&existing).Error; err == nil {
+		// 确保角色 ID 正确
+		if existing.RoleID != adminRole.ID {
+			m.data.DB.Model(&existing).Update("role_id", adminRole.ID)
+		}
 		return nil
 	}
 
@@ -137,7 +198,7 @@ func (m *AuthManager) EnsureAdminUser(ctx context.Context, defaultPwd string) er
 	admin := model.User{
 		Username:     "admin",
 		PasswordHash: string(hash),
-		Role:         "admin",
+		RoleID:       adminRole.ID,
 	}
 	return m.data.DB.Create(&admin).Error
 }
@@ -159,4 +220,16 @@ func (m *AuthManager) Login(ctx context.Context, username, password string) (*Cr
 	// 登录成功，生成一个 Web Session Token (本质上也是 AccessToken，但用途不同)
 	// 有效期默认 7 天
 	return m.CreateAccessToken(ctx, user.ID, "SimHub Web Session", 7)
+}
+
+// GetUserWithRole 获取用户及其关联的角色权限
+func (m *AuthManager) GetUserWithRole(ctx context.Context, userID string) (*model.User, error) {
+	var user model.User
+	if err := m.data.DB.Preload("Role").Where("id = ?", userID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("user not found")
+		}
+		return nil, err
+	}
+	return &user, nil
 }

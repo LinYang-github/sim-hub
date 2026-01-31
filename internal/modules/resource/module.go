@@ -92,21 +92,24 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 	authGrp := g.Group("/auth")
 	{
 		authGrp.POST("/login", m.Login)
-		authGrp.GET("/tokens", m.ListTokens)
-		authGrp.POST("/tokens", m.CreateToken)
-		authGrp.DELETE("/tokens/:id", m.RevokeToken)
+		authGrp.GET("/me", AuthMiddleware(m.auth), m.Me)
+		authGrp.GET("/tokens", AuthMiddleware(m.auth), m.ListTokens)
+		authGrp.POST("/tokens", AuthMiddleware(m.auth), m.CreateToken)
+		authGrp.DELETE("/tokens/:id", AuthMiddleware(m.auth), m.RevokeToken)
 	}
 
-	// /api/v1/integration/upload/... 路径组 (增加鉴权)
+	// /api/v1/integration/upload/... 路径组 (增加鉴权与 RBAC)
 	integration := g.Group("/integration", AuthMiddleware(m.auth))
 	{
-		integration.POST("/upload/token", m.ApplyUploadToken)
-		integration.POST("/upload/confirm", m.ConfirmUpload)
-
-		// 分片上传子路由
-		integration.POST("/upload/multipart/init", m.InitMultipartUpload)
-		integration.POST("/upload/multipart/part-url", m.GetMultipartUploadPartURL)
-		integration.POST("/upload/multipart/complete", m.CompleteMultipartUpload)
+		// 只有具备 resource:create 权限的角色才能上传
+		upload := integration.Group("", RBACMiddleware(m.auth, "resource:create"))
+		{
+			upload.POST("/upload/token", m.ApplyUploadToken)
+			upload.POST("/upload/confirm", m.ConfirmUpload)
+			upload.POST("/upload/multipart/init", m.InitMultipartUpload)
+			upload.POST("/upload/multipart/part-url", m.GetMultipartUploadPartURL)
+			upload.POST("/upload/multipart/complete", m.CompleteMultipartUpload)
+		}
 	}
 
 	// /api/v1/resource-types
@@ -129,18 +132,18 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 		// Protected Write
 		protected := resources.Group("", AuthMiddleware(m.auth))
 		{
-			protected.POST("/sync", m.SyncFromStorage)
-			protected.POST("/clear", m.ClearResources)
-			protected.POST("/create", m.CreateResourceFromData)
-			protected.PATCH("/:id", m.UpdateResource)
-			protected.DELETE("/:id", m.DeleteResource)
-			protected.PATCH("/:id/tags", m.UpdateResourceTags)
-			protected.PATCH("/:id/scope", m.UpdateResourceScope)
+			protected.POST("/sync", RBACMiddleware(m.auth, "resource:sync"), m.SyncFromStorage)
+			protected.POST("/clear", RBACMiddleware(m.auth, "resource:delete"), m.ClearResources)
+			protected.POST("/create", RBACMiddleware(m.auth, "resource:create"), m.CreateResourceFromData)
+			protected.PATCH("/:id", RBACMiddleware(m.auth, "resource:update"), m.UpdateResource)
+			protected.DELETE("/:id", RBACMiddleware(m.auth, "resource:delete"), m.DeleteResource)
+			protected.PATCH("/:id/tags", RBACMiddleware(m.auth, "resource:update"), m.UpdateResourceTags)
+			protected.PATCH("/:id/scope", RBACMiddleware(m.auth, "resource:update"), m.UpdateResourceScope)
 			protected.PATCH("/:id/process-result", m.ReportProcessResult)
 
-			protected.POST("/:id/latest", m.SetLatestVersion)
-			protected.PATCH("/versions/:vid/dependencies", m.UpdateResourceDependencies)
-			protected.PATCH("/versions/:vid/meta", m.UpdateVersionMetadata)
+			protected.POST("/:id/latest", RBACMiddleware(m.auth, "resource:update"), m.SetLatestVersion)
+			protected.PATCH("/versions/:vid/dependencies", RBACMiddleware(m.auth, "resource:update"), m.UpdateResourceDependencies)
+			protected.PATCH("/versions/:vid/meta", RBACMiddleware(m.auth, "resource:update"), m.UpdateVersionMetadata)
 			// 下载需要鉴权么？暂时公开吧，或者是 protected？
 			// SDK 下载是带 Token 的，但是浏览器直接下载可能不方便带 Header。
 			// 鉴于目前是 PAT，浏览器下载如果是通过 URL，可能需要 Query Param Token 或者是 Cookie。
@@ -166,9 +169,9 @@ func (m *Module) RegisterRoutes(g *gin.RouterGroup) {
 
 		protected := categories.Group("", AuthMiddleware(m.auth))
 		{
-			protected.POST("", m.CreateCategory)
-			protected.DELETE("/:id", m.DeleteCategory)
-			protected.PATCH("/:id", m.UpdateCategory)
+			protected.POST("", RBACMiddleware(m.auth, "resource:update"), m.CreateCategory)
+			protected.DELETE("/:id", RBACMiddleware(m.auth, "resource:delete"), m.DeleteCategory)
+			protected.PATCH("/:id", RBACMiddleware(m.auth, "resource:update"), m.UpdateCategory)
 		}
 	}
 }
@@ -625,6 +628,34 @@ func (m *Module) GetDashboardStats(c *gin.Context) {
 }
 
 // --- Token Management ---
+
+// Me 获取当前用户信息
+func (m *Module) Me(c *gin.Context) {
+	// 优先从 Context 获取已识别的 userID (JWT 或 Proxy 注入)
+	userID, exists := c.Get("user_id")
+	var user *model.User
+	var err error
+
+	if exists {
+		uid := userID.(string)
+		user, err = m.auth.GetUserWithRole(c.Request.Context(), uid)
+	} else {
+		// 备选方案：通过 username 查询 (仅用于兼容或特殊调试)
+		username := c.Query("username")
+		if username == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "identity not found"})
+			return
+		}
+		user = &model.User{}
+		err = m.auth.DB().Preload("Role").Where("username = ?", username).First(user).Error
+	}
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+	c.JSON(http.StatusOK, user)
+}
 
 // Login 用户登录
 func (m *Module) Login(c *gin.Context) {

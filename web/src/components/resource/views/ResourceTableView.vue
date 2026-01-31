@@ -97,28 +97,28 @@
                     </el-dropdown-item>
                   </template>
                   
-                  <el-dropdown-item command="tags">
+                  <el-dropdown-item v-if="hasPermission('resource:update')" command="tags">
                     <div class="menu-item-content">
                       <el-icon><PriceTag /></el-icon>
                       <span>编辑标签</span>
                     </div>
                   </el-dropdown-item>
 
-                  <el-dropdown-item command="rename">
+                  <el-dropdown-item v-if="hasPermission('resource:update')" command="rename">
                     <div class="menu-item-content">
                       <el-icon><Edit /></el-icon>
                       <span>重命名</span>
                     </div>
                   </el-dropdown-item>
 
-                  <el-dropdown-item command="move">
+                  <el-dropdown-item v-if="hasPermission('resource:update')" command="move">
                     <div class="menu-item-content">
                       <el-icon><Promotion /></el-icon>
                       <span>移动目录</span>
                     </div>
                   </el-dropdown-item>
                   
-                  <el-dropdown-item v-if="enableScope && scope.row.owner_id === DEFAULT_ADMIN_ID" class="nested-menu-parent">
+                  <el-dropdown-item v-if="hasPermission('resource:update') && enableScope && scope.row.owner_id === DEFAULT_ADMIN_ID" class="nested-menu-parent">
                     <el-dropdown trigger="hover" placement="left" popper-class="resource-popper" @command="(scopeCmd) => $emit('change-scope', scope.row, scopeCmd)">
                        <div class="menu-item-content">
                          <el-icon><Promotion /></el-icon>
@@ -143,7 +143,7 @@
                     </el-dropdown>
                   </el-dropdown-item>
 
-                  <el-dropdown-item divided command="delete" class="danger-item">
+                  <el-dropdown-item v-if="hasPermission('resource:delete')" divided command="delete" class="danger-item">
                     <div class="menu-item-content">
                       <el-icon><Delete /></el-icon>
                       <span>删除资源</span>
@@ -174,7 +174,9 @@ import {
 import type { CustomAction } from '../../../core/types'
 import { RESOURCE_STATUS_TEXT, RESOURCE_STATE, RESOURCE_SCOPE } from '../../../core/constants/resource'
 import { formatSize, formatDate } from '../../../core/utils/format'
+import { useAuth } from '../../../core/auth'
 
+const { hasPermission } = useAuth()
 const DEFAULT_ADMIN_ID = "admin" // TODO: get from user store
 
 const props = defineProps<{

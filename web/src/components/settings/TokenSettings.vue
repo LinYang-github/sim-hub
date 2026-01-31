@@ -5,7 +5,7 @@
         <h2 class="title">个人访问令牌</h2>
         <p class="subtitle">用于 SDK 集成与 Open API 自动化的身份凭证。令牌代表您的操作权限，请妥善保管。</p>
       </div>
-      <el-button type="primary" :icon="Plus" @click="showCreateDialog = true">生成新令牌</el-button>
+      <el-button v-if="hasPermission('auth:token_manage')" type="primary" :icon="Plus" @click="showCreateDialog = true">生成新令牌</el-button>
     </div>
 
     <el-card class="token-card" shadow="never">
@@ -30,7 +30,7 @@
         </el-table-column>
         <el-table-column label="操作" width="100" fixed="right">
           <template #default="{ row }">
-            <el-popconfirm title="确定要撤销此令牌吗？撤销后 SDK 将无法使用该令牌访问。" @confirm="handleRevoke(row.id)">
+            <el-popconfirm v-if="hasPermission('auth:token_manage')" title="确定要撤销此令牌吗？撤销后 SDK 将无法使用该令牌访问。" @confirm="handleRevoke(row.id)">
               <template #reference>
                 <el-button type="danger" link>撤销</el-button>
               </template>
@@ -90,6 +90,9 @@ import { Plus, CopyDocument } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import dayjs from 'dayjs'
 import axios from 'axios'
+import { useAuth } from '../../core/auth'
+
+const { hasPermission, currentUser } = useAuth()
 
 const tokens = ref([])
 const loading = ref(false)
@@ -104,9 +107,10 @@ const createForm = ref({
 })
 
 const fetchTokens = async () => {
+  if (!currentUser.value) return
   loading.value = true
   try {
-    const res = await axios.get('/api/v1/auth/tokens?user_id=admin')
+    const res = await axios.get(`/api/v1/auth/tokens?user_id=${currentUser.value.id}`)
     tokens.value = res.data || []
   } catch (err) {
     ElMessage.error('无法获取令牌列表')
@@ -123,7 +127,7 @@ const handleCreate = async () => {
   creating.value = true
   try {
     const res = await axios.post('/api/v1/auth/tokens', {
-      user_id: 'admin',
+      user_id: currentUser.value?.id,
       ...createForm.value
     })
     newToken.value = res.data
@@ -139,7 +143,7 @@ const handleCreate = async () => {
 
 const handleRevoke = async (id: string) => {
   try {
-    await axios.delete(`/api/v1/auth/tokens/${id}?user_id=admin`)
+    await axios.delete(`/api/v1/auth/tokens/${id}?user_id=${currentUser.value?.id}`)
     ElMessage.success('令牌已撤销')
     fetchTokens()
   } catch (err) {

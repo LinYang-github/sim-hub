@@ -55,15 +55,15 @@
           <!-- Primary Primary Action -->
           <div class="primary-actions">
             <!-- Folder Upload -->
-            <el-button v-if="uploadMode === 'folder-zip'" type="primary" class="upload-btn" @click="triggerFolderUpload">
+            <el-button v-if="hasPermission('resource:create') && uploadMode === 'folder-zip'" type="primary" class="upload-btn" @click="triggerFolderUpload">
               <el-icon><UploadIcon /></el-icon> 导入{{ actionLabel }}包
             </el-button>
             <!-- Online Create -->
-            <el-button v-else-if="uploadMode === 'online'" type="primary" class="upload-btn" @click="openOnlineCreate">
+            <el-button v-else-if="hasPermission('resource:create') && uploadMode === 'online'" type="primary" class="upload-btn" @click="openOnlineCreate">
               <el-icon><Plus /></el-icon> 新建{{ actionLabel }}
             </el-button>
             <!-- Single File Upload -->
-            <el-button v-else type="primary" class="upload-btn" @click="triggerFileUpload">
+            <el-button v-else-if="hasPermission('resource:create')" type="primary" class="upload-btn" @click="triggerFileUpload">
               <el-icon><UploadIcon /></el-icon> 上传{{ actionLabel }}
             </el-button>
           </div>
@@ -72,7 +72,7 @@
 
           <!-- Secondary Actions -->
           <div class="secondary-actions">
-            <el-tooltip content="同步存储" placement="bottom">
+            <el-tooltip v-if="hasPermission('resource:sync')" content="同步存储" placement="bottom">
               <el-button class="icon-btn" @click="syncFromStorage" :loading="syncing" circle>
                 <el-icon><Connection /></el-icon>
               </el-button>
@@ -84,7 +84,7 @@
               </el-button>
             </el-tooltip>
 
-            <el-tooltip content="清空当前库" placement="bottom">
+            <el-tooltip v-if="hasPermission('resource:delete')" content="清空当前库" placement="bottom">
               <el-button class="icon-btn delete-all-btn" @click="handleClear" circle>
                 <el-icon><Delete /></el-icon>
               </el-button>
@@ -501,6 +501,7 @@ import { useTags } from './composables/useTags'
 import { useHistory } from './composables/useHistory'
 import { useDependency } from './composables/useDependency'
 import { useResourceAction } from './composables/useResourceAction'
+import { useAuth } from '../../core/auth'
 
 import { RESOURCE_STATUS_TEXT, SCOPE_OPTIONS, RESOURCE_STATE } from '../../core/constants/resource'
 
@@ -521,6 +522,8 @@ const props = defineProps<{
 
 // Computed for button text (use shortName if available, fallback to typeName)
 const actionLabel = computed(() => props.shortName || props.typeName)
+
+const { hasPermission } = useAuth()
 
 const viewMode = ref('')
 const resolvedViews = computed(() => {
