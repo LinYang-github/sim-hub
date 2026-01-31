@@ -69,9 +69,9 @@ pnpm-debug.log*
 *.local-build
 
 # --- C++ SDK & CMake ---
-sdk/cpp/build/
+sdk/cpp/build*/
 sdk/cpp/bin/
-sdk/cpp/**/build/
+sdk/cpp/**/build*/
 sdk/cpp/**/cmake-build-*/
 sdk/cpp/**/CMakeFiles/
 sdk/cpp/**/CMakeCache.txt
@@ -81,11 +81,22 @@ sdk/cpp/**/*.o
 sdk/cpp/**/*.a
 sdk/cpp/**/*.dylib
 sdk/cpp/**/*.lib
-sdk/cpp/**/demo
-sdk/cpp/**/demo.exe
-sdk/cpp/**/single_header_demo/demo
+sdk/cpp/**/demo*
 sdk/cpp/**/multipart_example
 sdk/cpp/**/query_and_download_example
+sdk/cpp/**/example_*
+sdk/cpp/**/test_simhub_*
+sdk/cpp/**/StressTestApp
+sdk/cpp/**/*.bin
+
+# --- Java SDK / Maven ---
+sdk/java/target/
+sdk/java/.mvn/
+sdk/java/**/*.class
+sdk/java/**/*.jar
+sdk/java/**/*.war
+sdk/java/**/*.ear
+sdk/java/*.iml
 
 # --- IDE & OS ---
 .vscode/*
@@ -100,6 +111,7 @@ Thumbs.db
 .classpath
 .project
 .settings/
+*.iml
 
 # --- 开发调试 / Debug ---
 *.log

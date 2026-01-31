@@ -544,8 +544,170 @@ Status Client::uploadFileSimple(const std::string& typeKey, const std::string& f
 }
 
 Status Client::uploadFileMultipart(const std::string& typeKey, const std::string& filePath, const std::string& name, std::function<void(double)> callback, int maxRetries) {
-    // Falls back to simple upload for now, full multipart involves Init/Part/Complete
-    return uploadFileSimple(typeKey, filePath, name, callback);
+    // 1. 获取文件信息
+    struct stat st;
+    if (stat(filePath.c_str(), &st) != 0) return Status::Fail(ErrorCode::FileSystemError, "File not found");
+    long long totalSize = st.st_size;
+
+    const long long partSize = 5 * 1024 * 1024; // 5MB per part
+    int partCount = (int)std::ceil((double)totalSize / partSize);
+
+    // 2. 初始化分片上传
+    json initJ;
+    initJ["resource_type"] = typeKey;
+    initJ["filename"] = filePath;
+    initJ["part_count"] = partCount;
+
+    auto initRes = impl_->request("/api/v1/integration/upload/multipart/init", "POST", initJ.dump());
+    if (!initRes.ok()) return Status::Fail(initRes.code, initRes.message);
+
+    std::string uploadId, objectKey;
+    try {
+        auto r = json::parse(initRes.value);
+        uploadId = r.value("upload_id", "");
+        objectKey = r.value("key", "");
+    } catch (...) {
+        return Status::Fail(ErrorCode::ServerError, "Failed to parse init response");
+    }
+
+    // 3. 并发上传分片
+    struct PartETag {
+        int part_number;
+        std::string etag;
+    };
+
+    std::vector<PartETag> etags(partCount);
+    std::vector<std::thread> workers;
+    std::atomic<long long> uploadedBytes{0};
+    std::mutex etagMutex;
+    std::atomic<bool> failed{false};
+    std::string errorMessage;
+
+    const int concurrency = 4;
+    std::mutex taskMutex;
+    int nextPart = 1;
+
+    auto workerFunc = [&]() {
+        while (true) {
+            int partNum = 0;
+            {
+                std::lock_guard<std::mutex> lock(taskMutex);
+                if (nextPart > partCount || failed) return;
+                partNum = nextPart++;
+            }
+
+            long long offset = (long long)(partNum - 1) * partSize;
+            long long currentPartSize = std::min(partSize, totalSize - offset);
+
+            // A. 获取分片 URL
+            std::string partUrlQuery = "/api/v1/integration/upload/multipart/part-url?upload_id=" + uploadId + 
+                                      "&key=" + objectKey + "&part_number=" + std::to_string(partNum);
+            auto urlRes = impl_->request(partUrlQuery);
+            if (!urlRes.ok()) {
+                failed = true;
+                errorMessage = urlRes.message;
+                return;
+            }
+
+            std::string presignedUrl;
+            try {
+                presignedUrl = json::parse(urlRes.value).value("presigned_url", "");
+            } catch (...) {
+                failed = true;
+                errorMessage = "Failed to parse part url";
+                return;
+            }
+
+            // B. 上传分片至 S3
+            // 为每个线程分配独立的 CURL 句柄，实现真正的并发
+            CURL* pCurl = curl_easy_init();
+            FILE* pFp = fopen(filePath.c_str(), "rb");
+            if (!pFp) {
+                failed = true;
+                errorMessage = "Failed to reopen file for thread";
+                curl_easy_cleanup(pCurl);
+                return;
+            }
+            fseeko(pFp, offset, SEEK_SET);
+
+            curl_easy_setopt(pCurl, CURLOPT_URL, presignedUrl.c_str());
+            curl_easy_setopt(pCurl, CURLOPT_UPLOAD, 1L);
+            curl_easy_setopt(pCurl, CURLOPT_READDATA, pFp);
+            curl_easy_setopt(pCurl, CURLOPT_INFILESIZE_LARGE, (curl_off_t)currentPartSize);
+            
+            // 捕获 ETag
+            std::string etag;
+            auto headerCb = [](char* b, size_t s, size_t n, void* u) -> size_t {
+                size_t len = s * n;
+                std::string h(b, len);
+                if (h.find("ETag:") == 0 || h.find("etag:") == 0) {
+                    size_t start = h.find(":") + 1;
+                    size_t end = h.find_last_not_of(" \r\n");
+                    std::string val = h.substr(start, end - start + 1);
+                    if (val.size() >= 2 && val.front() == '"') val = val.substr(1, val.size() - 2);
+                    *((std::string*)u) = val;
+                }
+                return len;
+            };
+            curl_easy_setopt(pCurl, CURLOPT_HEADERFUNCTION, headerCb);
+            curl_easy_setopt(pCurl, CURLOPT_HEADERDATA, &etag);
+
+            CURLcode resResource = curl_easy_perform(pCurl);
+            long httpCode = 0;
+            curl_easy_getinfo(pCurl, CURLINFO_RESPONSE_CODE, &httpCode);
+            fclose(pFp);
+            curl_easy_cleanup(pCurl);
+
+            if (resResource != CURLE_OK || httpCode >= 400) {
+                failed = true;
+                errorMessage = "Part " + std::to_string(partNum) + " failed: " + curl_easy_strerror(resResource);
+                return;
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(etagMutex);
+                etags[partNum - 1] = {partNum, etag};
+            }
+
+            long long nowTotal = uploadedBytes.fetch_add(currentPartSize) + currentPartSize;
+            if (callback) callback((double)nowTotal / totalSize);
+        }
+    };
+
+    for (int i = 0; i < concurrency; ++i) workers.emplace_back(workerFunc);
+    for (auto& w : workers) w.join();
+
+    if (failed) return Status::Fail(ErrorCode::StorageError, errorMessage);
+
+    // 4. 完成合并
+    json completeJ;
+    completeJ["upload_id"] = uploadId;
+    completeJ["key"] = objectKey;
+    json partsJ = json::array();
+    for (const auto& tag : etags) {
+        partsJ.push_back({{"part_number", tag.part_number}, {"etag", tag.etag}});
+    }
+    completeJ["parts"] = partsJ;
+
+    auto compRes = impl_->request("/api/v1/integration/upload/multipart/complete", "POST", completeJ.dump());
+    if (!compRes.ok()) return Status::Fail(compRes.code, compRes.message);
+
+    std::string ticketId;
+    try {
+        ticketId = json::parse(compRes.value).value("ticket_id", "");
+    } catch (...) {
+        return Status::Fail(ErrorCode::ServerError, "Failed to parse complete response");
+    }
+
+    // 5. 最终确认
+    json confJ;
+    confJ["ticket_id"] = ticketId;
+    confJ["name"] = name;
+    confJ["size"] = totalSize;
+    confJ["type_key"] = typeKey;
+
+    auto finalRes = impl_->request("/api/v1/integration/upload/confirm", "POST", confJ.dump());
+    return finalRes.ok() ? Status::Success(true) : Status::Fail(finalRes.code, finalRes.message);
 }
 
 // --- Discovery (Async) ---

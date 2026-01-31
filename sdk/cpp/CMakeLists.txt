@@ -56,6 +56,26 @@ if(SIMHUB_BUILD_EXAMPLES)
     # 04: Advanced Upload
     add_executable(example_04_upload examples/04_advanced_upload/main.cpp)
     target_link_libraries(example_04_upload PRIVATE SimHub::SDK)
+
+    # 05: Multipart Concurrent Upload
+    add_executable(example_05_multipart examples/05_multipart_upload/main.cpp)
+    target_link_libraries(example_05_multipart PRIVATE SimHub::SDK)
+endif()
+# --- Tests ---
+if(SIMHUB_BUILD_TESTS)
+    enable_testing()
+    find_package(GTest REQUIRED)
+    include(GoogleTest)
+
+    # Result/Types Test
+    add_executable(test_simhub_types tests/test_result.cpp)
+    target_link_libraries(test_simhub_types PRIVATE SimHub::SDK GTest::gtest_main)
+    gtest_discover_tests(test_simhub_types)
+
+    # Multipart Logic Test
+    add_executable(test_simhub_multipart tests/test_multipart_logic.cpp)
+    target_link_libraries(test_simhub_multipart PRIVATE SimHub::SDK GTest::gtest_main)
+    gtest_discover_tests(test_simhub_multipart)
 endif()
 
 # --- Installation ---
